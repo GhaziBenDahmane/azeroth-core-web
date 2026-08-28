@@ -45,6 +45,12 @@ type product struct {
 }
 
 type bundleItem struct {
-	ItemID   uint32 `json:"itemId"`
-	Quantity uint32 `json:"quantity"`
+	ItemID        uint32 `json:"itemId"`
+	Quantity      uint32 `json:"quantity"`
+	Name          string `json:"name,omitempty"`
+	Quality       uint8  `json:"quality,omitempty"`
+	ItemLevel     uint16 `json:"itemLevel,omitempty"`
+	RequiredLevel uint8  `json:"requiredLevel,omitempty"`
+	InventoryType uint8  `json:"inventoryType,omitempty"`
+	DisplayID     uint32 `json:"displayId,omitempty"`
 }

@@ -24,7 +24,7 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - Queued race-change and faction-change services using AzerothCore's supported character commands
 - 51 specialization-aware, full-slot WotLK S6, S7, and T8 loadouts resolved from the installed world database
 - Stripe Checkout credit packs with signed, replay-safe webhooks
-- Categorized shop with product editing/archival, scheduling, purchase limits, and limited-use coupons
+- Categorized shop with full product CRUD, WotLK item autocomplete, equipment/bag preview, scheduling, purchase limits, and limited-use coupons
 - Durable queued fulfillment through AzerothCore SOAP, with review/refund controls
 - Realm status, faction population, guild directory, and guild rosters
 - Database-backed news/announcement editor, live website configuration, scheduled maintenance, and a public status page
@@ -223,7 +223,7 @@ Purchases commit the debit and an immutable item snapshot before entering the de
 
 Operational probes are available at `/healthz`, `/readyz`, and `/metrics`.
 
-The public `/status` page reports portal, database, realm, and shop-delivery state. GMs can edit branding and links, disable feature modules, schedule maintenance, publish announcements, manage products, and create coupons from the account dashboard. Environment feature flags remain hard security gates; saved settings in `portal_settings` take effect immediately and can be reset by deleting the `site_config` row.
+The public `/status` page reports portal, database, realm, and shop-delivery state. GMs can edit branding and links, disable feature modules, schedule maintenance, publish announcements, manage products, and create coupons from the account dashboard. The catalog editor searches the installed WotLK `item_template`, displays equipment in a slot preview, and supports arbitrary item and bag quantities alongside gold, services, schedules, limits, and credit pricing. Environment feature flags remain hard security gates; saved settings in `portal_settings` take effect immediately and can be reset by deleting the `site_config` row.
 
 Character services verify account ownership and offline state before issuing a fixed, allow-listed AzerothCore command. The browser never supplies a raw command. Every attempted real service is recorded in `portal_character_services`.
 

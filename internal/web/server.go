@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -96,6 +97,8 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /api/admin/orders", s.feature(s.c.EnableAdminPanel, "Administration", s.adminOrders))
 	m.HandleFunc("GET /api/admin/ledger", s.feature(s.c.EnableAdminPanel, "Administration", s.adminLedger))
 	m.HandleFunc("GET /api/admin/products", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProducts))
+	m.HandleFunc("GET /api/admin/products/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProductDetail))
+	m.HandleFunc("GET /api/admin/items", s.feature(s.c.EnableAdminPanel, "Administration", s.adminItemSearch))
 	m.HandleFunc("PUT /api/admin/products/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProductUpdate))
 	m.HandleFunc("DELETE /api/admin/products/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProductDelete))
 	m.HandleFunc("GET /api/admin/coupons", s.feature(s.c.EnableAdminPanel, "Administration", s.adminCoupons))
@@ -720,8 +723,11 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 	provided := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	tokenOK := s.c.AdminToken != "" && len(provided) == len(s.c.AdminToken) && subtle.ConstantTimeCompare([]byte(provided), []byte(s.c.AdminToken)) == 1
 	gmOK := false
+	var actorID uint32
 	if !tokenOK {
-		_, gmOK = s.requireGM(r)
+		actor, ok := s.requireGM(r)
+		gmOK = ok
+		actorID = actor.ID
 	}
 	if !tokenOK && !gmOK {
 		problem(w, 401, "GM session or admin token required")
@@ -750,6 +756,10 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 		problem(w, 422, "A package supports at most 48 distinct items")
 		return
 	}
+	if e := s.validateProductItems(r.Context(), p); e != nil {
+		problem(w, 422, e.Error())
+		return
+	}
 	tx, e := s.s.Auth.BeginTx(r.Context(), nil)
 	if e != nil {
 		problem(w, 503, "Database unavailable")
@@ -775,6 +785,10 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 			problem(w, 500, "Could not create product bundle")
 			return
 		}
+	}
+	if _, e = tx.ExecContext(r.Context(), "INSERT INTO portal_admin_audit(actor_account_id,action,target,details) VALUES(?,'product.create',?,?)", actorID, strconv.FormatInt(id, 10), p.Name); e != nil {
+		problem(w, 500, "Could not audit product creation")
+		return
 	}
 	if e = tx.Commit(); e != nil {
 		problem(w, 500, "Could not create product")

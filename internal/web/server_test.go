@@ -112,6 +112,28 @@ func TestMockPortalManagementAndSelfService(t *testing.T) {
 			t.Fatalf("%s returned %d: %s", path, w.Code, w.Body.String())
 		}
 	}
+	if w := do(http.MethodGet, "/api/admin/items?q=bag", ""); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Frostweave Bag") {
+		t.Fatalf("item autocomplete returned %d: %s", w.Code, w.Body.String())
+	}
+	createdProduct := do(http.MethodPost, "/api/admin/products", `{"name":"Raid preparation","description":"Bags and supplies","price":25,"category":"Utility","gold":5000,"items":[{"itemId":41599,"quantity":4}]}`)
+	if createdProduct.Code != http.StatusCreated {
+		t.Fatalf("product create returned %d: %s", createdProduct.Code, createdProduct.Body.String())
+	}
+	var created map[string]any
+	if json.NewDecoder(createdProduct.Body).Decode(&created) != nil {
+		t.Fatal("invalid product response")
+	}
+	productID := uint32(created["id"].(float64))
+	if w := do(http.MethodGet, fmt.Sprintf("/api/admin/products/%d", productID), ""); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Frostweave Bag") {
+		t.Fatalf("product detail returned %d: %s", w.Code, w.Body.String())
+	}
+	updateBody := `{"name":"Raid preparation plus","description":"Bags, weapon and gold","price":30,"category":"Utility","gold":6000,"active":true,"items":[{"itemId":51809,"quantity":2},{"itemId":49623,"quantity":1}]}`
+	if w := do(http.MethodPut, fmt.Sprintf("/api/admin/products/%d", productID), updateBody); w.Code != http.StatusOK {
+		t.Fatalf("product update returned %d: %s", w.Code, w.Body.String())
+	}
+	if w := do(http.MethodDelete, fmt.Sprintf("/api/admin/products/%d", productID), ""); w.Code != http.StatusOK {
+		t.Fatalf("product archive returned %d: %s", w.Code, w.Body.String())
+	}
 	if w := do(http.MethodPost, "/api/characters/1/service", `{"action":"unstuck"}`); w.Code != http.StatusOK {
 		t.Fatalf("unstuck returned %d: %s", w.Code, w.Body.String())
 	}

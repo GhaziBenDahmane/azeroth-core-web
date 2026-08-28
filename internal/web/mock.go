@@ -168,6 +168,8 @@ func (s *Server) mockHandler() http.Handler {
 	m.HandleFunc("GET /api/admin/products", s.feature(s.c.EnableAdminPanel, "Administration", func(w http.ResponseWriter, _ *http.Request) {
 		jsonOut(w, 200, map[string]any{"products": mockProducts})
 	}))
+	m.HandleFunc("GET /api/admin/products/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProductDetail))
+	m.HandleFunc("GET /api/admin/items", s.feature(s.c.EnableAdminPanel, "Administration", s.adminItemSearch))
 	m.HandleFunc("GET /api/admin/accounts", s.feature(s.c.EnableAdminPanel, "Administration", s.mockAdminAccounts))
 	m.HandleFunc("POST /api/admin/moderation", s.feature(s.c.EnableAdminPanel, "Administration", s.rate(30, time.Minute, s.mockAdminModeration)))
 	m.HandleFunc("GET /api/admin/moderation", s.feature(s.c.EnableAdminPanel, "Administration", s.mockAdminModerationLog))
