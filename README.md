@@ -201,7 +201,7 @@ Operational probes are available at `/healthz`, `/readyz`, and `/metrics`.
 
 ## Local development
 
-Requirements: Go 1.24+, Node 22+, and access to an AzerothCore database.
+Requirements: Go 1.26+, Node 24+, and access to an AzerothCore database.
 
 ```bash
 npm install
