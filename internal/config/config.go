@@ -17,6 +17,12 @@ type Config struct {
 	ClientBuild, ExperienceRate            string
 	UptimeLabel, FooterText                string
 	DownloadURL, CommunityURL              string
+	LogoURL, HeroImageURL, FaviconURL      string
+	ThemePrimary, ThemeSecondary           string
+	ThemeAccent, ThemeBackground           string
+	Locale, TermsURL, PrivacyURL           string
+	UIText                                 map[string]string
+	News                                   []NewsItem
 	SOAPURL, SOAPUser, SOAPPassword        string
 	CookieSecure                           bool
 	Expansion                              int
@@ -34,6 +40,17 @@ type Config struct {
 	SMTPAddr, SMTPUser, SMTPPassword       string
 	SMTPFrom                               string
 	RealmStartWebhook, RealmControlToken   string
+	EnableRegistration, EnableArmory       bool
+	EnableRankings, EnableGuilds           bool
+	EnableRealmStatus, EnableShop          bool
+	EnableSupport, EnableAdminPanel        bool
+}
+
+type NewsItem struct {
+	Title   string `json:"title"`
+	Summary string `json:"summary"`
+	Date    string `json:"date"`
+	URL     string `json:"url"`
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
@@ -50,6 +67,9 @@ func Load() (Config, error) {
 		ExperienceRate: env("EXPERIENCE_RATE", "2×"), UptimeLabel: env("UPTIME_LABEL", "24/7"),
 		FooterText:  env("FOOTER_TEXT", "Independent community realm portal. Not affiliated with Blizzard Entertainment."),
 		DownloadURL: strings.TrimSpace(os.Getenv("DOWNLOAD_URL")), CommunityURL: strings.TrimSpace(os.Getenv("COMMUNITY_URL")),
+		LogoURL: strings.TrimSpace(os.Getenv("LOGO_URL")), HeroImageURL: strings.TrimSpace(os.Getenv("HERO_IMAGE_URL")), FaviconURL: strings.TrimSpace(os.Getenv("FAVICON_URL")),
+		ThemePrimary: env("THEME_PRIMARY", "#d3ae68"), ThemeSecondary: env("THEME_SECONDARY", "#f3d89c"), ThemeAccent: env("THEME_ACCENT", "#3fd0be"), ThemeBackground: env("THEME_BACKGROUND", "#07110f"),
+		Locale: env("PORTAL_LOCALE", "en"), TermsURL: strings.TrimSpace(os.Getenv("TERMS_URL")), PrivacyURL: strings.TrimSpace(os.Getenv("PRIVACY_URL")),
 		SOAPURL: os.Getenv("SOAP_URL"), SOAPUser: os.Getenv("SOAP_USER"), SOAPPassword: os.Getenv("SOAP_PASSWORD"),
 		CookieSecure: envBool("COOKIE_SECURE", false), Expansion: envInt("ACCOUNT_EXPANSION", 2),
 		StartingCredits: envInt("STARTING_CREDITS", 0), AdminToken: os.Getenv("ADMIN_TOKEN"),
@@ -60,6 +80,10 @@ func Load() (Config, error) {
 		TurnstileSiteKey: os.Getenv("TURNSTILE_SITE_KEY"), TurnstileSecret: os.Getenv("TURNSTILE_SECRET"),
 		SMTPAddr: os.Getenv("SMTP_ADDR"), SMTPUser: os.Getenv("SMTP_USER"), SMTPPassword: os.Getenv("SMTP_PASSWORD"), SMTPFrom: os.Getenv("SMTP_FROM"),
 		RealmStartWebhook: os.Getenv("REALM_START_WEBHOOK"), RealmControlToken: os.Getenv("REALM_CONTROL_TOKEN"),
+		EnableRegistration: envBool("ENABLE_REGISTRATION", true), EnableArmory: envBool("ENABLE_ARMORY", true),
+		EnableRankings: envBool("ENABLE_RANKINGS", true), EnableGuilds: envBool("ENABLE_GUILDS", true),
+		EnableRealmStatus: envBool("ENABLE_REALM_STATUS", true), EnableShop: envBool("ENABLE_SHOP", true),
+		EnableSupport: envBool("ENABLE_SUPPORT", true), EnableAdminPanel: envBool("ENABLE_ADMIN_PANEL", true),
 	}
 	if c.AuthDSN == "" && !c.MockMode {
 		return c, fmt.Errorf("AUTH_DSN is required")
@@ -74,6 +98,9 @@ func Load() (Config, error) {
 		if !identifier.MatchString(name) {
 			return c, fmt.Errorf("invalid database name %q", name)
 		}
+	}
+	if err := loadCustomization(&c); err != nil {
+		return c, err
 	}
 	return c, nil
 }

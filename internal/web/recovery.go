@@ -26,6 +26,17 @@ func (s *Server) publicConfig(w http.ResponseWriter, _ *http.Request) {
 		"experienceRate": s.c.ExperienceRate, "uptimeLabel": s.c.UptimeLabel,
 		"footerText": s.c.FooterText, "realmAddress": s.c.RealmAddress,
 		"downloadUrl": s.c.DownloadURL, "communityUrl": s.c.CommunityURL,
+		"logoUrl": s.c.LogoURL, "heroImageUrl": s.c.HeroImageURL, "faviconUrl": s.c.FaviconURL,
+		"themePrimary": s.c.ThemePrimary, "themeSecondary": s.c.ThemeSecondary,
+		"themeAccent": s.c.ThemeAccent, "themeBackground": s.c.ThemeBackground,
+		"locale": s.c.Locale, "translations": s.c.UIText, "news": s.c.News,
+		"termsUrl": s.c.TermsURL, "privacyUrl": s.c.PrivacyURL,
+		"features": map[string]bool{
+			"registration": s.c.EnableRegistration, "armory": s.c.EnableArmory,
+			"rankings": s.c.EnableRankings, "guilds": s.c.EnableGuilds,
+			"realm": s.c.EnableRealmStatus, "shop": s.c.EnableShop,
+			"support": s.c.EnableSupport, "admin": s.c.EnableAdminPanel,
+		},
 		"turnstileSiteKey":     s.c.TurnstileSiteKey,
 		"passwordResetEnabled": s.c.MockMode || (s.c.SMTPAddr != "" && s.c.SMTPFrom != ""),
 	})

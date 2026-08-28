@@ -178,6 +178,14 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `EXPANSION_NAME`, `CLIENT_VERSION`, `CLIENT_BUILD` | Client information shown in connection instructions | WotLK, `3.3.5a`, `12340` |
 | `EXPERIENCE_RATE`, `UPTIME_LABEL` | Home-page realm facts | `2×`, `24/7` |
 | `DOWNLOAD_URL`, `COMMUNITY_URL` | Optional HTTP(S) client-download and Discord/community links | unset/hidden |
+| `LOGO_URL`, `HERO_IMAGE_URL`, `FAVICON_URL` | Optional root-relative or HTTPS brand assets | unset |
+| `THEME_PRIMARY`, `THEME_SECONDARY`, `THEME_ACCENT`, `THEME_BACKGROUND` | Six-digit hex colors used by the runtime theme | built-in green/gold theme |
+| `PORTAL_LOCALE` | Document language tag used by browsers and formatters | `en` |
+| `UI_TEXT_JSON` | JSON object overriding marked interface labels, such as `{"nav.home":"Accueil"}` | `{}` |
+| `NEWS_JSON` | JSON array of up to 12 `{title,summary,date,url}` home-page news cards | `[]` |
+| `TERMS_URL`, `PRIVACY_URL` | Optional HTTP(S) legal links shown in the footer | unset/hidden |
+| `ENABLE_REGISTRATION`, `ENABLE_ARMORY`, `ENABLE_RANKINGS`, `ENABLE_GUILDS` | Enable or disable public modules and their API endpoints | `true` |
+| `ENABLE_REALM_STATUS`, `ENABLE_SHOP`, `ENABLE_SUPPORT`, `ENABLE_ADMIN_PANEL` | Enable or disable operational modules and their API endpoints | `true` |
 | `ACCOUNT_EXPANSION` | New account expansion field | `2` |
 | `REALM_ID` | Realm used when resolving GM access | `1` |
 | `GM_LEVEL` | Minimum AzerothCore GM level allowed to grant credits | `3` |
@@ -191,6 +199,8 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `SMTP_ADDR`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional password-recovery email transport | unset/disabled |
 
 Set `PUBLIC_URL=https://your-domain`, `COOKIE_SECURE=true`, terminate TLS at your proxy, and keep the portal and SOAP ports behind a firewall in production.
+
+`UI_TEXT_JSON` currently supports the shared keys `nav.home`, `nav.armory`, `nav.rankings`, `nav.guilds`, `nav.realm`, `nav.shop`, `action.signIn`, `action.register`, `action.account`, `footer.community`, `footer.terms`, `footer.privacy`, `home.heroLine1`, `home.heroLine2`, `home.createAccount`, `home.howToConnect`, `news.eyebrow`, `news.title`, and `news.readMore`. Values are inserted as text, never HTML.
 
 ## Verification
 

@@ -76,7 +76,7 @@ func TestTOTPWindow(t *testing.T) {
 }
 
 func TestMockCommunityAndOperations(t *testing.T) {
-	s := &Server{c: config.Config{MockMode: true}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	s := &Server{c: config.Config{MockMode: true, EnableRealmStatus: true, EnableGuilds: true}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
 	h := s.Handler()
 	for _, path := range []string{"/api/realm", "/api/guilds", "/api/guilds/1", "/healthz", "/readyz", "/metrics"} {
 		r := httptest.NewRequest("GET", path, nil)
@@ -103,6 +103,16 @@ func TestPublicBrandingConfig(t *testing.T) {
 	}
 	if _, exposed := body["realmControlToken"]; exposed {
 		t.Fatal("private realm control token was exposed")
+	}
+}
+
+func TestDisabledFeatureReturnsNotFound(t *testing.T) {
+	s := &Server{c: config.Config{MockMode: true, EnableArmory: false}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	r := httptest.NewRequest("GET", "/api/armory", nil)
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("disabled armory returned %d, want 404", w.Code)
 	}
 }
 

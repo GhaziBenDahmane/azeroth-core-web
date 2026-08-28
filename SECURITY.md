@@ -24,6 +24,8 @@ All request-derived values are passed as MySQL parameters. The only values inter
 - JSON bodies are limited to 1 MiB and unknown fields are rejected.
 - Responses set CSP, clickjacking, MIME-sniffing, referrer, and browser-permissions protections.
 - Dynamic UI values are escaped or assigned through `textContent`.
+- Runtime theme colors are restricted to six-digit hex values; brand assets require HTTPS or same-origin paths, and configurable links reject non-HTTP(S) schemes.
+- Disabled portal modules are rejected by their API endpoints as well as hidden in navigation; feature switches are not treated as client-side authorization.
 - Product image URLs are limited to absolute HTTP(S) URLs.
 - The admin bearer token is compared in constant time.
 - GM credit grants require a live authenticated session and the configured `account_access` level. Every grant is recorded in the append-only `portal_credit_ledger` table.
