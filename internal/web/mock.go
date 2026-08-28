@@ -20,20 +20,45 @@ func newMockState() *mockState {
 
 var mockCharacters = []character{
 	{GUID: 1, Name: "Arthoria", Race: 1, Class: 2, Gender: 1, Level: 80, Zone: 1519, Online: false, TotalTime: 4827600, Guild: "Keepers of Dawn"},
-	{GUID: 2, Name: "Thornhoof", Race: 6, Class: 11, Level: 80, Zone: 1637, Online: true, TotalTime: 3196800, Guild: "Keepers of Dawn"},
+	{GUID: 2, Name: "Thornhoof", Race: 6, Class: 11, Level: 80, Zone: 1637, Online: false, TotalTime: 3196800, Guild: "Keepers of Dawn"},
 	{GUID: 3, Name: "Velistra", Race: 10, Class: 8, Gender: 1, Level: 76, Zone: 4395, Online: false, TotalTime: 1912200, Guild: "Silver Covenant"},
 	{GUID: 4, Name: "Grimward", Race: 5, Class: 6, Level: 80, Zone: 210, Online: false, TotalTime: 5882400, Guild: "Ashen Vanguard"},
-	{GUID: 5, Name: "Quickarrow", Race: 4, Class: 3, Gender: 1, Level: 71, Zone: 65, Online: true, TotalTime: 1105200},
+	{GUID: 5, Name: "Quickarrow", Race: 4, Class: 3, Gender: 1, Level: 71, Zone: 65, Online: false, TotalTime: 1105200},
 	{GUID: 6, Name: "Emberhex", Race: 2, Class: 9, Level: 63, Zone: 3483, Online: false, TotalTime: 748800, Guild: "Ashen Vanguard"},
+	{GUID: 7, Name: "Ironward", Race: 3, Class: 1, Level: 80, Zone: 1519, Online: false, TotalTime: 2750400, Guild: "Keepers of Dawn"},
+	{GUID: 8, Name: "Nightshiv", Race: 5, Class: 4, Level: 78, Zone: 4395, Online: false, TotalTime: 1641600, Guild: "Ashen Vanguard"},
+	{GUID: 9, Name: "Dawnprayer", Race: 11, Class: 5, Gender: 1, Level: 74, Zone: 65, Online: false, TotalTime: 1296000, Guild: "Silver Covenant"},
+	{GUID: 10, Name: "Stormcaller", Race: 8, Class: 7, Level: 69, Zone: 3483, Online: false, TotalTime: 907200, Guild: ""},
 }
 
-var mockProducts = []product{
-	{ID: 1, ItemID: 49284, Quantity: 1, Price: 120, Name: "Swift Spectral Tiger", Description: "A rare spectral mount delivered directly through in-game mail.", Category: "Mounts"},
-	{ID: 2, ItemID: 49623, Quantity: 1, Price: 85, Name: "Shadowmourne", Description: "A legendary two-handed axe for the realm's mightiest champions.", Category: "Weapons"},
-	{ID: 3, ItemID: 51809, Quantity: 1, Price: 45, Name: "Portable Hole", Description: "A spacious 24-slot bag for long expeditions across Northrend.", Category: "Utility"},
-	{ID: 4, ItemID: 23713, Quantity: 1, Price: 60, Name: "Hippogryph Hatchling", Description: "A loyal companion from the forests of Feralas.", Category: "Companions"},
-	{ID: 5, ItemID: 37719, Quantity: 5, Price: 15, Name: "Adventurer Supply Bundle", Description: "Useful supplies for your next adventure.", Category: "Utility"},
-	{ID: 6, ItemID: 50818, Quantity: 1, Price: 75, Name: "Invincible's Reins", Description: "The famed steed of the fallen prince awaits a new rider.", Category: "Mounts"},
+var mockProducts = buildMockProducts()
+
+func buildMockProducts() []product {
+	products := []product{
+		{ID: 1, ItemID: 49284, Quantity: 1, Price: 120, Name: "Swift Spectral Tiger", Description: "A rare spectral mount delivered directly through in-game mail.", Category: "Mounts"},
+		{ID: 2, ItemID: 49623, Quantity: 1, Price: 85, Name: "Shadowmourne", Description: "A legendary two-handed axe for the realm's mightiest champions.", Category: "Weapons"},
+		{ID: 3, ItemID: 51809, Quantity: 1, Price: 45, Name: "Portable Hole", Description: "A spacious 24-slot bag for long expeditions across Northrend.", Category: "Utility"},
+		{ID: 4, ItemID: 23713, Quantity: 1, Price: 60, Name: "Hippogryph Hatchling", Description: "A loyal companion from the forests of Feralas.", Category: "Companions"},
+		{ID: 5, ItemID: 37719, Quantity: 5, Price: 15, Name: "Adventurer Supply Bundle", Description: "Useful supplies for your next adventure.", Category: "Utility"},
+		{ID: 6, ItemID: 50818, Quantity: 1, Price: 75, Name: "Invincible's Reins", Description: "The famed steed of the fallen prince awaits a new rider.", Category: "Mounts"},
+		{ID: 7, Price: 40, Name: "Instant Level 80", Description: "Raise one existing character to level 80 and receive a starter travel kit.", Category: "Services", Tier: "Level 80", ServiceLevel: 80, Includes: []string{"Level 80 boost", "Four 20-slot bags", "Cold Weather Flying starter gold"}},
+	}
+	classes := []struct {
+		ID   uint8
+		Name string
+	}{{1, "Warrior"}, {2, "Paladin"}, {3, "Hunter"}, {4, "Rogue"}, {5, "Priest"}, {6, "Death Knight"}, {7, "Shaman"}, {8, "Mage"}, {9, "Warlock"}, {11, "Druid"}}
+	tiers := []struct {
+		Name, Category, Description string
+		Price                       uint32
+	}{{"S6", "PvP", "Furious Gladiator loadout", 110}, {"S7", "PvP", "Relentless Gladiator loadout", 155}, {"T8", "PvE", "Ulduar raid-ready tier loadout", 135}}
+	id := uint32(8)
+	for _, class := range classes {
+		for _, tier := range tiers {
+			products = append(products, product{ID: id, Price: tier.Price, Name: class.Name + " " + tier.Name + " Package", Description: tier.Description + " selected for your class, with matching accessories and upgrades.", Category: tier.Category, ClassID: class.ID, ClassName: class.Name, Tier: tier.Name, ServiceLevel: 80, Includes: []string{"5-piece class armor set", "Class-appropriate weapon set", "Matching off-pieces and accessories", "Cut epic gem package", "Complete enchant scroll kit"}})
+			id++
+		}
+	}
+	return products
 }
 
 func (s *Server) mockHandler() http.Handler {
@@ -116,7 +141,7 @@ func (s *Server) mockOwnCharacters(w http.ResponseWriter, r *http.Request) {
 		problem(w, 401, "Sign in required")
 		return
 	}
-	jsonOut(w, 200, map[string]any{"characters": mockCharacters[:3]})
+	jsonOut(w, 200, map[string]any{"characters": mockCharacters})
 }
 func (s *Server) mockArmory(w http.ResponseWriter, r *http.Request) {
 	q := strings.ToLower(r.URL.Query().Get("q"))
@@ -213,6 +238,26 @@ func (s *Server) mockPurchase(w http.ResponseWriter, r *http.Request) {
 	}
 	if p == nil {
 		problem(w, 404, "Product not found")
+		return
+	}
+	characterClass := uint8(0)
+	characterOnline := false
+	for _, c := range mockCharacters {
+		if c.GUID == in.CharacterGUID {
+			characterClass = c.Class
+			characterOnline = c.Online
+		}
+	}
+	if characterClass == 0 {
+		problem(w, 422, "Choose one of your characters")
+		return
+	}
+	if characterOnline {
+		problem(w, 409, "Character must be offline for delivery")
+		return
+	}
+	if p.ClassID != 0 && p.ClassID != characterClass {
+		problem(w, 422, "This package does not match the selected character's class")
 		return
 	}
 	s.mock.mu.Lock()

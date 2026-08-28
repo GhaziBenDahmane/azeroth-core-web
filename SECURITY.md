@@ -36,7 +36,7 @@ All request-derived values are passed as MySQL parameters. The only values inter
 ## Residual risks and deployment requirements
 
 1. Wowhead's JavaScript and asset CDN is a third-party runtime dependency. A compromise or incompatible API change affects the armory model viewer. CSP restricts it to Wowhead's asset host, but self-hosted reviewed assets are safer.
-2. SOAP delivery and the SQL transaction cannot be atomic. A process failure after worldserver delivery but before the order commit can require manual reconciliation. Add an idempotent fulfillment worker before processing high-value real-money orders.
+2. SOAP delivery and the SQL transaction cannot be atomic. A process failure after worldserver delivery or one step of a bundle/level service but before the order commit can require manual reconciliation. Add an idempotent fulfillment worker before processing high-value real-money orders.
 3. Credits are not a payment system. A payment integration must credit wallets only from authenticated, replay-protected provider webhooks.
 4. Terminate TLS at a trusted proxy, enable secure cookies, firewall SOAP/MySQL, rotate the admin token, and use the least-privilege grants documented in the README.
 5. The in-memory demo mode must never be enabled on the public production deployment.

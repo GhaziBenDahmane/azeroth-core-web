@@ -90,6 +90,32 @@ curl -X POST http://localhost:8080/api/admin/products \
   }'
 ```
 
+Class-restricted gear packages accept up to twelve distinct mail attachments and can also apply a level service. For example:
+
+```bash
+curl -X POST http://localhost:8080/api/admin/products \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"Paladin T8 Package",
+    "description":"Realm-approved PvE set, gems and enchants.",
+    "price":135,
+    "category":"PvE",
+    "classId":2,
+    "tier":"T8",
+    "serviceLevel":80,
+    "items":[
+      {"itemId":45638,"quantity":1},
+      {"itemId":45632,"quantity":1},
+      {"itemId":45644,"quantity":1},
+      {"itemId":45650,"quantity":1},
+      {"itemId":45656,"quantity":1}
+    ]
+  }'
+```
+
+Use item IDs approved for your exact AzerothCore world database. Gems and enchant scrolls are ordinary bundle items and arrive in the same mail; the portal deliberately does not write enchantment data directly into character inventory tables.
+
 Credits are deliberately not tied to a payment provider. Grant credits through an audited staff tool or SQL until you integrate your payment processor:
 
 ```sql

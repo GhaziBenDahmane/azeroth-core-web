@@ -311,7 +311,7 @@ func (s *Server) armoryCharacter(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
-	rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url FROM portal_products WHERE active=1 ORDER BY category,price,name")
+	rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level FROM portal_products WHERE active=1 ORDER BY category,class_id,price,name")
 	if e != nil {
 		problem(w, 500, "Could not load shop")
 		return
@@ -320,7 +320,7 @@ func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
 	out := []product{}
 	for rows.Next() {
 		var p product
-		if rows.Scan(&p.ID, &p.Name, &p.Description, &p.ItemID, &p.Quantity, &p.Price, &p.Category, &p.ImageURL) == nil {
+		if rows.Scan(&p.ID, &p.Name, &p.Description, &p.ItemID, &p.Quantity, &p.Price, &p.Category, &p.ImageURL, &p.ClassID, &p.Tier, &p.ServiceLevel) == nil {
 			out = append(out, p)
 		}
 	}
@@ -344,7 +344,7 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	var p product
-	if e = tx.QueryRowContext(r.Context(), "SELECT id,name,item_id,quantity,price FROM portal_products WHERE id=? AND active=1 FOR UPDATE", in.ProductID).Scan(&p.ID, &p.Name, &p.ItemID, &p.Quantity, &p.Price); e != nil {
+	if e = tx.QueryRowContext(r.Context(), "SELECT id,name,item_id,quantity,price,class_id,tier_label,service_level FROM portal_products WHERE id=? AND active=1 FOR UPDATE", in.ProductID).Scan(&p.ID, &p.Name, &p.ItemID, &p.Quantity, &p.Price, &p.ClassID, &p.Tier, &p.ServiceLevel); e != nil {
 		problem(w, 404, "Product not found")
 		return
 	}
@@ -355,13 +355,18 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	}
 	var characterName string
 	var online bool
-	cq := fmt.Sprintf("SELECT name,online FROM %s.characters WHERE guid=? AND account=? AND deleteDate IS NULL", s.c.CharactersDB)
-	if e = s.s.Characters.QueryRowContext(r.Context(), cq, in.CharacterGUID, a.ID).Scan(&characterName, &online); e != nil {
+	var characterClass uint8
+	cq := fmt.Sprintf("SELECT name,online,class FROM %s.characters WHERE guid=? AND account=? AND deleteDate IS NULL", s.c.CharactersDB)
+	if e = s.s.Characters.QueryRowContext(r.Context(), cq, in.CharacterGUID, a.ID).Scan(&characterName, &online, &characterClass); e != nil {
 		problem(w, 422, "Choose one of your characters")
 		return
 	}
 	if online {
 		problem(w, 409, "Character must be offline for delivery")
+		return
+	}
+	if p.ClassID != 0 && characterClass != p.ClassID {
+		problem(w, 422, "This package does not match the selected character's class")
 		return
 	}
 	if !s.soap.Enabled() {
@@ -386,8 +391,31 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	if len(realmLabel) > 80 {
 		realmLabel = realmLabel[:80]
 	}
-	cmd := fmt.Sprintf(`send items %s "Portal order %d" "Thank you for supporting %s." %d:%d`, characterName, orderID, realmLabel, p.ItemID, p.Quantity)
-	_, e = s.soap.Command(r.Context(), cmd)
+	items := []bundleItem{}
+	itemRows, itemErr := tx.QueryContext(r.Context(), "SELECT item_id,quantity FROM portal_product_items WHERE product_id=? ORDER BY item_id", p.ID)
+	if itemErr == nil {
+		for itemRows.Next() {
+			var item bundleItem
+			if itemRows.Scan(&item.ItemID, &item.Quantity) == nil {
+				items = append(items, item)
+			}
+		}
+		itemRows.Close()
+	}
+	if len(items) == 0 && p.ItemID != 0 {
+		items = append(items, bundleItem{ItemID: p.ItemID, Quantity: p.Quantity})
+	}
+	if len(items) > 0 {
+		args := make([]string, 0, len(items))
+		for _, item := range items {
+			args = append(args, fmt.Sprintf("%d:%d", item.ItemID, item.Quantity))
+		}
+		cmd := fmt.Sprintf(`send items %s "Portal order %d" "Thank you for supporting %s." %s`, characterName, orderID, realmLabel, strings.Join(args, " "))
+		_, e = s.soap.Command(r.Context(), cmd)
+	}
+	if e == nil && p.ServiceLevel > 0 {
+		_, e = s.soap.Command(r.Context(), fmt.Sprintf("character level %s %d", characterName, p.ServiceLevel))
+	}
 	if e != nil {
 		_, _ = tx.ExecContext(r.Context(), "UPDATE portal_orders SET status='failed',error_message=? WHERE id=?", e.Error(), orderID)
 		problem(w, 502, "Delivery failed; your balance was not charged")
@@ -442,8 +470,8 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &p) {
 		return
 	}
-	if p.Name == "" || p.ItemID == 0 || p.Quantity == 0 || p.Price == 0 {
-		problem(w, 422, "name, itemId, quantity and price are required")
+	if p.Name == "" || p.Price == 0 || (p.ItemID == 0 && len(p.Items) == 0 && p.ServiceLevel == 0) {
+		problem(w, 422, "name, price, and an item bundle or service level are required")
 		return
 	}
 	if p.ImageURL != "" {
@@ -453,12 +481,36 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	res, e := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_products(name,description,item_id,quantity,price,category,image_url) VALUES(?,?,?,?,?,?,?)", p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL)
+	if len(p.Items) > 12 {
+		problem(w, 422, "A mail bundle supports at most 12 distinct items")
+		return
+	}
+	tx, e := s.s.Auth.BeginTx(r.Context(), nil)
+	if e != nil {
+		problem(w, 503, "Database unavailable")
+		return
+	}
+	defer tx.Rollback()
+	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_products(name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level) VALUES(?,?,?,?,?,?,?,?,?,?)", p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL, p.ClassID, p.Tier, p.ServiceLevel)
 	if e != nil {
 		problem(w, 500, "Could not create product")
 		return
 	}
 	id, _ := res.LastInsertId()
+	for _, item := range p.Items {
+		if item.ItemID == 0 || item.Quantity == 0 {
+			problem(w, 422, "Bundle item IDs and quantities must be positive")
+			return
+		}
+		if _, e = tx.ExecContext(r.Context(), "INSERT INTO portal_product_items(product_id,item_id,quantity) VALUES(?,?,?)", id, item.ItemID, item.Quantity); e != nil {
+			problem(w, 500, "Could not create product bundle")
+			return
+		}
+	}
+	if e = tx.Commit(); e != nil {
+		problem(w, 500, "Could not create product")
+		return
+	}
 	jsonOut(w, 201, map[string]any{"id": id})
 }
 
