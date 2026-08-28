@@ -1,6 +1,9 @@
 ---
+import { Button } from 'webcoreui/astro';
+import '../styles/webcore.scss';
 import '../styles/global.css';
 import '../styles/enhancements.css';
+import '../styles/modern.css';
 const { title = 'Azeroth Portal', page = 'home' } = Astro.props;
 ---
 <!doctype html>
@@ -10,19 +13,39 @@ const { title = 'Azeroth Portal', page = 'home' } = Astro.props;
   <meta name="viewport" content="width=device-width" />
   <meta name="description" content="Your gateway to the realm: account registration, armory and shop." />
   <title>{title}</title>
+  <script is:inline>
+    (() => {
+      const saved = localStorage.getItem('portal-theme');
+      document.documentElement.dataset.theme = saved || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    })();
+  </script>
 </head>
 <body data-page={page}>
 	<div id="maintenance-banner" class="maintenance-banner hidden"></div>
-  <div class="sky" aria-hidden="true"><i></i><i></i><i></i></div>
-  <header class="nav wrap">
-    <a class="brand" href="/"><img class="brand-logo hidden" data-brand-logo alt=""/><span class="brand-mark" data-brand-mark>A</span><span data-brand-name>AZEROTH<small>REALM PORTAL</small></span></a>
-    <nav aria-label="Primary navigation">
-      <a href="/" data-i18n="nav.home">Home</a><a href="/armory" data-i18n="nav.armory">Armory</a><a href="/rankings" data-i18n="nav.rankings">Rankings</a><a href="/guilds" data-i18n="nav.guilds">Guilds</a><a href="/realm" data-i18n="nav.realm">Realm</a><a href="/shop" data-i18n="nav.shop">Shop</a>
-    </nav>
-    <div class="nav-actions"><label class="realm-switcher hidden" title="Switch realm"><span>Realm</span><select id="realm-switcher" aria-label="Select realm"></select></label><a class="text-link admin-link hidden" href="/admin">Admin</a><a class="text-link signed-out" href="/login" data-i18n="action.signIn">Sign in</a><a class="button small signed-out" href="/register" data-i18n="action.register">Join realm</a><a class="button small signed-in hidden" href="/account" data-i18n="action.account">My account</a></div>
+  <header class="app-header">
+    <div class="nav wrap">
+      <a class="brand" href="/"><img class="brand-logo hidden" data-brand-logo alt=""/><span class="brand-mark" data-brand-mark>A</span><span><strong data-brand-name>AZEROTH</strong><small>Realm portal</small></span></a>
+      <nav aria-label="Primary navigation">
+        <a href="/" data-i18n="nav.home">Home</a><a href="/armory" data-i18n="nav.armory">Armory</a><a href="/rankings" data-i18n="nav.rankings">Rankings</a><a href="/guilds" data-i18n="nav.guilds">Guilds</a><a href="/realm" data-i18n="nav.realm">Realm</a><a href="/shop" data-i18n="nav.shop">Shop</a>
+      </nav>
+      <div class="nav-actions">
+        <label class="realm-switcher hidden" title="Switch realm"><span>Realm</span><select id="realm-switcher" aria-label="Select realm"></select></label>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Use light mode" title="Use light mode"><span class="theme-sun" aria-hidden="true">☀</span><span class="theme-moon" aria-hidden="true">☾</span></button>
+        <Button theme="flat" className="header-signin signed-out" href="/login" data-i18n="action.signIn">Sign in</Button>
+        <Button className="header-action signed-out" href="/register" data-i18n="action.register">Create account</Button>
+        <div class="account-menu signed-in hidden">
+          <button class="account-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false"><span data-i18n="action.account">My account</span><span class="account-chevron" aria-hidden="true">⌄</span></button>
+          <div class="account-dropdown" role="menu">
+            <a href="/account" role="menuitem">Account overview</a>
+            <a class="admin-link hidden" href="/admin" role="menuitem">Admin panel</a>
+            <button class="account-signout" type="button" role="menuitem">Sign out</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </header>
   <main><slot /></main>
-  <footer class="wrap"><div class="brand muted"><img class="brand-logo small hidden" data-brand-logo alt=""/><span class="brand-mark small" data-brand-mark>A</span><span data-brand-name>AZEROTH</span></div><p data-footer-text>Independent community realm portal. Not affiliated with Blizzard Entertainment.</p><div><a href="/armory" data-i18n="nav.armory">Armory</a><a href="/rankings" data-i18n="nav.rankings">Rankings</a><a href="/guilds" data-i18n="nav.guilds">Guilds</a><a href="/realm" data-i18n="nav.realm">Realm</a><a href="/shop" data-i18n="nav.shop">Shop</a><a class="config-community hidden" rel="noreferrer" data-i18n="footer.community">Community</a><a class="config-terms hidden" rel="noreferrer" data-i18n="footer.terms">Terms</a><a class="config-privacy hidden" rel="noreferrer" data-i18n="footer.privacy">Privacy</a></div></footer>
+  <footer class="site-footer"><div class="wrap footer-inner"><div><div class="brand muted"><img class="brand-logo small hidden" data-brand-logo alt=""/><span class="brand-mark small" data-brand-mark>A</span><span data-brand-name>AZEROTH</span></div><p data-footer-text>Independent community realm portal. Not affiliated with Blizzard Entertainment.</p><a id="default-hero-credit" class="photo-credit" href="https://commons.wikimedia.org/wiki/File:Steinfjord_Senja_Norway_(137838339).jpeg" target="_blank" rel="noreferrer">Aurora photo: Francesco Russo · CC BY 3.0 · Character artwork © Blizzard Entertainment</a></div><div class="footer-links"><a href="/armory" data-i18n="nav.armory">Armory</a><a href="/rankings" data-i18n="nav.rankings">Rankings</a><a href="/guilds" data-i18n="nav.guilds">Guilds</a><a href="/realm" data-i18n="nav.realm">Realm</a><a href="/shop" data-i18n="nav.shop">Shop</a><a class="config-community hidden" rel="noreferrer" data-i18n="footer.community">Community</a><a class="config-terms hidden" rel="noreferrer" data-i18n="footer.terms">Terms</a><a class="config-privacy hidden" rel="noreferrer" data-i18n="footer.privacy">Privacy</a></div></div></footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script is:inline src="/app.js"></script>
 </body>

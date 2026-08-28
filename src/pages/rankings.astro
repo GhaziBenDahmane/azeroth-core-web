@@ -2,7 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 ---
 <Layout title="Rankings — Azeroth" page="rankings">
-  <section class="page-hero wrap"><p class="eyebrow">SEASON LADDER</p><h1>Arena <em>rankings</em></h1><p>The realm's leading teams, ratings, records, and members.</p></section>
+  <section class="page-hero wrap"><p class="eyebrow">Competitive</p><h1>Arena rankings</h1><p>The realm's leading teams, ratings, records, and members.</p></section>
   <section class="wrap content-section"><div class="view-heading"><div><p class="eyebrow">TOP TEAMS</p><h2>Current arena season</h2></div><div class="bracket-picker"><button class="active" data-bracket="2">2v2</button><button data-bracket="3">3v3</button><button data-bracket="5">5v5</button></div></div><div id="arena-ranking" class="ranking-table"><div class="skeleton"></div></div></section>
   <section class="wrap content-section"><div class="view-heading"><div><p class="eyebrow">REALM LEADERS</p><h2>Character and guild rankings</h2></div><div class="bracket-picker" id="ranking-metrics"><button class="active" data-metric="honorable-kills">Honorable kills</button><button data-metric="achievements">Achievements</button><button data-metric="played-time">Played time</button><button data-metric="level">Level</button><button data-metric="guild-members">Guild size</button></div></div><div id="character-ranking" class="ranking-table"><div class="skeleton"></div></div><p class="muted">Rankings use data recorded by AzerothCore. Raid kill speed is not shown because the stock core records completion dates, not encounter duration.</p></section>
 </Layout>

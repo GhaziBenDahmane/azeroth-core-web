@@ -1,2 +1,8 @@
 import { defineConfig } from 'astro/config';
-export default defineConfig({ output: 'static', build: { assets: 'assets' } });
+import { webcore } from 'webcoreui/integration';
+
+export default defineConfig({
+  output: 'static',
+  integrations: [webcore()],
+  build: { assets: 'assets' },
+});

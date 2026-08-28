@@ -3,13 +3,13 @@ import Layout from '../layouts/Layout.astro';
 ---
 <Layout title="Sign in — Azeroth" page="login">
   <section class="auth-shell wrap compact">
-    <div class="auth-aside"><p class="eyebrow">WELCOME BACK</p><h1>RETURN TO<br/><em data-realm-name>AZEROTH.</em></h1><p>Manage your characters, credits and orders.</p></div>
+    <div class="auth-aside"><p class="eyebrow">Account portal</p><h1>Welcome back</h1><p>Manage your characters, credits, orders, and account security.</p></div>
     <form id="login-form" class="form-card">
-      <p class="eyebrow">ACCOUNT ACCESS</p><h2>Sign in</h2><p class="muted">New to the realm? <a href="/register">Create an account</a></p>
+      <p class="eyebrow">Account access</p><h2>Sign in</h2><p class="muted">New to the realm? <a href="/register">Create an account</a></p>
       <label>Username<input name="username" maxlength="32" autocomplete="username" required/></label>
       <label>Password<input name="password" type="password" maxlength="32" autocomplete="current-password" required/></label>
       <label>Authenticator code <small>Only required when two-factor authentication is enabled.</small><input name="OTP" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code"/></label>
-      <button class="button full" type="submit">Enter portal →</button><p class="muted"><a href="/forgot-password">Forgot password?</a></p><p class="form-message" aria-live="polite"></p>
+      <button class="button full" type="submit">Sign in</button><p class="muted"><a href="/forgot-password">Forgot password?</a></p><p class="form-message" aria-live="polite"></p>
     </form>
   </section>
 </Layout>

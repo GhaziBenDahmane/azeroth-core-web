@@ -260,7 +260,7 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `EXPANSION_NAME`, `CLIENT_VERSION`, `CLIENT_BUILD` | Client information shown in connection instructions | WotLK, `3.3.5a`, `12340` |
 | `EXPERIENCE_RATE`, `UPTIME_LABEL` | Home-page realm facts | `2×`, `24/7` |
 | `DOWNLOAD_URL`, `COMMUNITY_URL` | Optional HTTP(S) client-download and Discord/community links | unset/hidden |
-| `LOGO_URL`, `HERO_IMAGE_URL`, `FAVICON_URL` | Optional root-relative or HTTPS brand assets | unset |
+| `LOGO_URL`, `HERO_IMAGE_URL`, `FAVICON_URL` | Optional root-relative or HTTPS brand assets; the hero image identifies the server on the home page | bundled Northrend image for the hero, others unset |
 | `THEME_PRIMARY`, `THEME_SECONDARY`, `THEME_ACCENT`, `THEME_BACKGROUND` | Six-digit hex colors used by the runtime theme | built-in green/gold theme |
 | `PORTAL_LOCALE` | Document language tag used by browsers and formatters | `en` |
 | `UI_TEXT_JSON` | JSON object overriding marked interface labels, such as `{"nav.home":"Accueil"}` | `{}` |

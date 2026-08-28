@@ -1,0 +1,657 @@
+/* Modern application skin. Legacy selectors stay intact because app.js renders into them. */
+:root {
+  --ink: #e8eef7;
+  --muted: #94a3b8;
+  --gold: #60a5fa;
+  --gold2: #bfdbfe;
+  --teal: #38bdf8;
+  --bg: #070b14;
+  --panel: #101725;
+  --line: #263247;
+  --danger: #fb7185;
+  --class: #76b5ff;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: radial-gradient(circle at 50% -20%, rgba(59,130,246,.12), transparent 34rem), #070b14;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.55;
+}
+body::before, .sky { display: none; }
+main { min-height: calc(100vh - 148px); }
+.wrap { width: min(1180px, calc(100% - 48px)); margin-inline: auto; }
+.muted { color: var(--muted); }
+
+/* Never let user-, realm-, or item-supplied text enlarge its container. */
+:where(main, footer) :where(article, section, div, span, a, p, h1, h2, h3, h4, strong, small, label) {
+  min-width: 0;
+}
+:where(.account-panel, .character-card, .product-card, .news-card, .status-card,
+  .guild-card, .guild-profile, .realm-overview, .raid-card, .progress-summary,
+  .profile-stat, .personal-team, .form-card, .gm-panel, .catalog-slot,
+  .catalog-bundle-row, .admin-row, .ticket-row, .session-row) {
+  overflow-wrap: anywhere;
+}
+code, pre, .realm-title code, .code-copy code, .totp-box code {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+img { max-width: 100%; }
+
+/* App shell */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid rgba(148,163,184,.16);
+  background: rgba(7,11,20,.88);
+  box-shadow: 0 8px 30px rgba(0,0,0,.14);
+  backdrop-filter: blur(18px);
+}
+.nav { height: 68px; border: 0; }
+.brand { gap: 11px; font: inherit; letter-spacing: 0; }
+.brand > span:last-child { display: grid; line-height: 1.15; }
+.brand strong { font-size: 14px; letter-spacing: .02em; }
+.brand small { color: var(--muted); font: 500 11px/1.4 inherit; letter-spacing: 0; text-transform: none; }
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  transform: none;
+  background: linear-gradient(145deg, #3b82f6, #2563eb);
+  box-shadow: 0 8px 20px rgba(37,99,235,.25);
+  color: white;
+  font-size: 17px;
+  text-shadow: none;
+}
+.brand-mark.small { width: 28px; height: 28px; border-radius: 8px; font-size: 12px; }
+.brand-logo { height: 38px; max-width: 160px; }
+.nav nav { height: 100%; align-items: stretch; gap: 5px; color: var(--muted); font-size: 13px; }
+.nav nav a { display: grid; place-items: center; padding: 0 12px; border-bottom: 2px solid transparent; transition: .15s ease; }
+.nav nav a:hover { color: white; background: rgba(148,163,184,.06); }
+body[data-page="home"] .nav nav a[href="/"],
+body[data-page="armory"] .nav nav a[href="/armory"],
+body[data-page="rankings"] .nav nav a[href="/rankings"],
+body[data-page="guilds"] .nav nav a[href="/guilds"],
+body[data-page="realm"] .nav nav a[href="/realm"],
+body[data-page="shop"] .nav nav a[href="/shop"] { color: #fff; border-bottom-color: #3b82f6; }
+.nav-actions { gap: 9px; }
+.nav-actions .header-signin, .nav-actions .header-action { min-height: 36px; padding: 0 14px; border-radius: 8px; font-size: 12px; white-space: nowrap; }
+.text-link { color: var(--muted); font-size: 12px; padding: 8px; }
+.realm-switcher { color: var(--muted); font-size: 11px; letter-spacing: 0; text-transform: none; }
+.realm-switcher select { min-width: 112px; height: 36px; border-radius: 8px; }
+.theme-toggle, .account-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #101827;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+.theme-toggle { width: 36px; padding: 0; font-size: 17px; }
+.theme-toggle:hover, .account-menu-trigger:hover { border-color: #475569; background: #182234; color: #fff; }
+.theme-moon { display: none; }
+.account-menu { position: relative; }
+.account-menu-trigger { gap: 8px; padding: 0 13px; font: 600 12px/1 inherit; white-space: nowrap; }
+.account-chevron { font-size: 15px; transition: transform .15s ease; }
+.account-menu.open .account-chevron { transform: rotate(180deg); }
+.account-dropdown {
+  position: absolute;
+  z-index: 120;
+  top: calc(100% + 9px);
+  right: 0;
+  display: none;
+  width: 184px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #111827;
+  box-shadow: 0 18px 45px rgba(0,0,0,.3);
+}
+.account-menu.open .account-dropdown { display: grid; }
+.account-dropdown a, .account-dropdown button {
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #cbd5e1;
+  font: 500 12px/1 inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.account-dropdown a:hover, .account-dropdown button:hover { background: #1e293b; color: #fff; }
+.account-dropdown .account-signout { border-top: 1px solid var(--line); border-radius: 0 0 7px 7px; color: #fda4af; }
+
+/* Type and conventional page headers */
+.eyebrow {
+  margin: 0 0 8px;
+  color: #60a5fa;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .02em;
+  text-transform: none;
+}
+.page-hero { padding: 58px 0 34px; border-bottom: 0; }
+.page-hero h1, .hero h1, .auth-aside h1, .section-head h2, .cta h2,
+.view-heading h2, .admin-view-head h2, .form-card h2, dialog h2 {
+  color: #f8fafc;
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: -.035em;
+  line-height: 1.1;
+}
+.page-hero h1 { margin: 6px 0 12px; font-size: clamp(34px, 5vw, 50px); }
+.page-hero h1 em, .hero h1 em, .auth-aside h1 em { color: inherit; font-style: normal; -webkit-text-stroke: 0; text-shadow: none; }
+.page-hero > p:not(.eyebrow) { max-width: 680px; margin: 0; color: var(--muted); font-size: 15px; }
+.content-section { padding: 30px 0 80px; }
+.section-head, .view-heading { align-items: center; margin-bottom: 24px; }
+.section-head h2, .view-heading h2 { margin: 4px 0; font-size: 28px; }
+
+/* Controls */
+.button, .ghost-button, .filter, .bracket-picker button, .armory-tabs button,
+.profile-tabs button, .credit-packages button, .code-copy, button {
+  border-radius: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.button {
+  min-height: 42px;
+  padding: 0 18px;
+  gap: 8px;
+  border: 1px solid #3b82f6;
+  background: #3b82f6;
+  box-shadow: 0 6px 18px rgba(37,99,235,.18);
+  color: white;
+  font-size: 13px;
+  font-weight: 650;
+}
+.button:hover { filter: brightness(1.08); transform: none; }
+.button.small { min-height: 36px; padding: 0 13px; font-size: 12px; }
+.ghost-button { padding: 9px 14px; border: 1px solid var(--line); border-radius: 8px; background: #111827; color: #cbd5e1; font-size: 13px; }
+.ghost-button:hover { border-color: #475569; background: #182234; color: white; }
+input, select, textarea, .gm-panel select, .gm-panel textarea {
+  width: 100%;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0b1220;
+  color: #f8fafc;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+input, select { height: 42px; padding: 0 12px; }
+textarea, .gm-panel textarea { padding: 11px 12px; }
+input:focus, select:focus, textarea:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(59,130,246,.14); }
+label { color: #cbd5e1; }
+
+/* Keep the entire application on one typography system. */
+header :where(h1,h2,h3,h4,h5,h6,strong,b,button,input,select),
+main :where(h1,h2,h3,h4,h5,h6,strong,b,button,input,select,textarea),
+footer :where(h1,h2,h3,h4,h5,h6,strong,b,button,input,select) {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+/* Landing */
+.home-hero {
+  --hero-image: url('/images/northrend-hero.jpg');
+  position: relative;
+  background-image: linear-gradient(180deg, rgba(4,9,18,.48), rgba(4,9,18,.84)), var(--hero-image);
+  background-position: center;
+  background-size: cover;
+  border-bottom: 1px solid rgba(147,197,253,.16);
+}
+.home-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 15%, rgba(4,9,18,.3) 100%);
+  pointer-events: none;
+}
+.home-hero:not(.custom-hero)::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  right: max(1%, calc((100vw - 1360px) / 2));
+  bottom: 0;
+  width: min(25vw, 340px);
+  height: 84%;
+  background: url('/images/arthas-menethil.png') no-repeat center bottom / contain;
+  opacity: .68;
+  filter: drop-shadow(0 18px 38px rgba(0,0,0,.55));
+  -webkit-mask-image: radial-gradient(ellipse 68% 62% at 58% 52%, #000 38%, rgba(0,0,0,.78) 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 68% 62% at 58% 52%, #000 38%, rgba(0,0,0,.78) 62%, transparent 100%);
+  pointer-events: none;
+}
+.hero { position: relative; z-index: 1; min-height: 690px; padding: 76px 0; display: flex; align-items: center; justify-content: center; }
+.hero-copy { width: min(820px, 100%); padding: 0; text-align: center; }
+.hero h1 { margin: 16px 0 20px; font-size: clamp(48px, 7vw, 76px); }
+.lede { max-width: 650px; margin-inline: auto; color: #d3dcea; font-size: 17px; line-height: 1.7; }
+.expansion-pill { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin: 4px auto 0; padding: 7px 11px; border: 1px solid rgba(191,219,254,.3); border-radius: 999px; background: rgba(7,15,28,.55); color: #bfdbfe; font-size: 11px; backdrop-filter: blur(10px); }
+.expansion-pill strong { color: white; }
+.hero-actions { justify-content: center; gap: 14px; margin: 30px 0 42px; }
+.play { gap: 8px; color: #cbd5e1; font-size: 13px; }
+.play b { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 9px; color: #93c5fd; }
+.stats { justify-content: center; gap: 10px; }
+.stats div { min-width: 160px; padding: 16px 18px; border: 1px solid rgba(191,219,254,.22) !important; border-radius: 10px; background: rgba(7,15,28,.68); text-align: center; backdrop-filter: blur(10px); }
+.stats dt { color: #f8fafc; font: 700 20px/1.2 inherit; }
+.stats dd { margin: 5px 0 0; color: var(--muted); font-size: 11px; letter-spacing: 0; text-transform: none; }
+.sigil { display: none; }
+.panel-section { padding: 70px 0; border-block: 1px solid rgba(148,163,184,.12); background: rgba(15,23,42,.42); }
+.steps { gap: 16px; }
+.steps article, .news-card {
+  min-height: 230px;
+  padding: 26px;
+  border: 1px solid var(--line) !important;
+  border-radius: 12px;
+  background: #0f1726;
+}
+.steps article { overflow: hidden; }
+.steps article > b { top: 20px; color: #475569; font: 650 13px/1 inherit; }
+.step-icon { width: 42px; height: 42px; margin-bottom: 24px; border: 0; border-radius: 10px; background: rgba(59,130,246,.12); color: #60a5fa; }
+.steps h3, .news-card h3 { margin: 0 0 8px; font: 650 17px/1.3 inherit; }
+.steps p, .news-card p { color: var(--muted); font-size: 13px; line-height: 1.65; }
+.steps a, .steps article > span:last-child, .news-card a { color: #60a5fa; font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.code-copy { padding: 11px; border: 1px solid var(--line); background: #080e19; }
+.code-copy { gap: 12px; overflow: hidden; }
+.code-copy code { display: block; flex: 1 1 auto; }
+.code-copy > span { flex: 0 0 auto; }
+.cta { padding: 80px 0; }
+.cta h2 { font-size: 38px; }
+.realm-live-section { padding-block: 54px; }
+.realm-live-section .section-head > p { max-width: 440px; margin: 0; color: var(--muted); font-size: 13px; text-align: right; }
+.home-realm-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,340px),1fr)); gap: 16px; }
+.home-realm-card { padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: #0f1726; box-shadow: 0 8px 30px rgba(0,0,0,.10); }
+.home-realm-card.skeleton { min-height: 230px; }
+.home-realm-card header { display: flex; align-items: center; justify-content: space-between; min-height: 24px; }
+.home-realm-card header > div { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; font-weight: 650; text-transform: uppercase; }
+.realm-live-dot { width: 8px; height: 8px; border-radius: 50%; background: #64748b; box-shadow: 0 0 0 4px rgba(100,116,139,.12); }
+.home-realm-card.is-online .realm-live-dot { background: #34d399; box-shadow: 0 0 0 4px rgba(52,211,153,.12); }
+.home-realm-card.is-offline .realm-live-dot { background: #fb7185; box-shadow: 0 0 0 4px rgba(251,113,133,.12); }
+.realm-maintenance { padding: 4px 8px; border-radius: 999px; background: rgba(245,158,11,.12); color: #fbbf24; font-size: 10px; }
+.home-realm-card h3 { margin: 18px 0 3px; color: #f8fafc; font: 700 24px/1.2 inherit; }
+.home-realm-card > p { margin: 0; color: var(--muted); font-size: 12px; }
+.home-realm-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 22px 0 14px; }
+.home-realm-card dl div { padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: #0b1320; }
+.home-realm-card dt { color: #dbeafe; font-size: 20px; font-weight: 700; }
+.home-realm-card dd { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
+.realm-factions { display: flex; justify-content: space-between; padding: 10px 2px 18px; color: var(--muted); font-size: 11px; }
+.home-realm-card > a { display: flex; align-items: center; justify-content: space-between; padding-top: 15px; border-top: 1px solid var(--line); color: #60a5fa; font-size: 12px; font-weight: 600; }
+
+/* Shared cards and tables */
+.character-card, .product-card, .account-panel, .realm-overview, .guild-profile,
+.profile-stat, .profile-overview section, .personal-team, .raid-card, .progress-summary,
+.status-card, .gm-panel, dialog {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #0f1726;
+  box-shadow: 0 8px 30px rgba(0,0,0,.10);
+}
+.character-card, .product-card { transition: border-color .15s, box-shadow .15s; }
+.character-card > *, .product-body, .product-foot, .account-panel > *,
+.guild-card > *, .realm-title > *, .profile-head > *, .rank-row > *,
+.raid-card header > *, .admin-row > *, .ticket-row > *, .session-row > * { min-width: 0; }
+.character-card:hover, .product-card:hover { border-color: #475569; box-shadow: 0 12px 34px rgba(0,0,0,.18); transform: none; }
+.avatar { border: 0; border-radius: 10px; background: #1e293b; color: #bfdbfe; font: 700 18px/1 inherit; }
+.character-card h3, .profile-head h2, .guild-card b, .roster-row b,
+.realm-title h2, .guild-profile h2, .raid-card h3, .product-body h3 {
+  font-family: inherit;
+  font-weight: 650;
+}
+.skeleton { border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(100deg,#0f1726 20%,#1e293b 45%,#0f1726 70%); background-size: 200% 100%; }
+.empty { border: 1px dashed #334155; border-radius: 12px; }
+.ranking-table, .data-table-wrap { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #0f1726; }
+.rank-row { min-height: 78px; border-color: var(--line); background: transparent; }
+.rank-row:hover:not(.rank-head) { background: rgba(51,65,85,.22); }
+.rank-head { min-height: 44px; background: #111b2b; color: var(--muted); font-size: 11px; letter-spacing: 0; text-transform: none; }
+.rank-number, .team-rating { color: #bfdbfe; font-family: inherit; font-weight: 700; }
+.rank-row h3 { font: 650 15px/1.3 inherit; }
+.data-table th { padding: 13px 14px; border-color: var(--line); background: #111b2b; color: #94a3b8; font-size: 11px; letter-spacing: 0; text-transform: none; }
+.data-table td { padding: 14px; border-color: var(--line); color: #cbd5e1; font-size: 12px; }
+.data-table td b { color: #f8fafc; font: 600 12px/1.4 inherit; }
+.table-status { border-radius: 999px; font-size: 10px; letter-spacing: 0; text-transform: none; }
+
+/* Shop */
+.credit-store { margin-top: 20px; padding: 26px; border: 1px solid var(--line); border-radius: 12px; background: #10192a; }
+.credit-store h2 { margin: 4px 0; font: 700 24px/1.2 inherit; }
+.credit-store p { color: var(--muted); font-size: 13px; }
+.credit-packages button { min-width: 112px; padding: 14px; border: 1px solid #334155; background: #0b1220; color: #dbeafe; }
+.credit-packages { flex-wrap: wrap; justify-content: flex-end; }
+.credit-packages button:hover { border-color: #60a5fa; transform: none; }
+.credit-packages b { font: 700 19px/1.2 inherit; }
+.credit-packages span { font-size: 11px; letter-spacing: 0; text-transform: none; }
+.filter { padding: 8px 13px; border: 1px solid var(--line); background: #101827; color: #aebbd0; font-size: 12px; }
+.filter.active, .bracket-picker button.active { border-color: #3b82f6; background: #2563eb; color: white; }
+.product-art { height: 150px; border-color: var(--line); background: #111d30 !important; color: #bfdbfe; font: 700 42px/1 inherit; }
+.product-art img.product-icon { width: 84px; height: 84px; border: 1px solid #64748b; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,.3); }
+.product-art-label, .product-body .tier { border-radius: 6px; background: rgba(7,11,20,.88); color: #cbd5e1; font: 600 10px/1 inherit; letter-spacing: 0; text-transform: none; }
+.product-body .category { color: #7dd3fc; font-size: 11px; letter-spacing: 0; text-transform: none; }
+.product-body h3 { font-size: 17px; }
+.product-body > p { font-size: 12px; }
+.product-body h3, .product-body p, .package-includes li { overflow-wrap: anywhere; }
+
+/* Dense, consistent rhythm for public application pages. */
+body:not([data-page="home"]) .page-hero { padding: 44px 0 20px; }
+main > .content-section { padding: 18px 0 56px; }
+main > .content-section + .content-section { padding-top: 0; }
+.armory-shell { padding: 0 0 56px; }
+.armory-shell .search { max-width: 650px; margin: 18px 0 22px; gap: 8px; }
+.armory-shell .search input { border-right: 1px solid #334155; }
+.armory-shell .search .button { flex: 0 0 auto; }
+.character-grid, .product-grid { gap: 12px 16px; }
+.character-card { min-height: 102px; padding: 20px 22px; }
+.character-card h3 { margin-bottom: 4px; }
+.character-card p + p { margin-top: 3px; }
+.view-heading { margin: 0 0 18px; }
+.content-section + .content-section .view-heading { padding-top: 36px; border-top: 1px solid rgba(148,163,184,.12); }
+.bracket-picker { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.bracket-picker button { min-height: 40px; border: 1px solid var(--line) !important; padding: 8px 14px; }
+.rank-row { min-height: 72px; padding: 14px 24px; }
+.rank-row h3 { margin-bottom: 6px; }
+.team-members { gap: 20px; }
+.team-members a { gap: 2px; }
+.guild-grid { gap: 12px; }
+.guild-card { min-height: 92px; padding: 18px 20px; }
+.guild-card b { font-size: 14px; }
+.realm-overview { padding: 28px 30px; }
+.realm-stats { margin-top: 26px; }
+.realm-stats article { padding: 20px; }
+.faction-balance { margin-top: 24px; }
+.credit-store { margin-top: 0; }
+body[data-page="shop"] main > .content-section { padding-top: 24px; }
+.filters { align-items: flex-start; margin-bottom: 20px; }
+.filter-buttons { gap: 6px; }
+.product-art { height: 132px; }
+.product-art { font-family: Inter, ui-sans-serif, system-ui, sans-serif !important; }
+.product-art.service-art { font-size: 15px; font-weight: 650; letter-spacing: .02em; }
+.package-card .product-art { height: 118px; }
+.product-art img.product-icon { width: 72px; height: 72px; }
+.product-body { display: flex; flex-direction: column; min-height: 210px; padding: 20px; }
+.product-body h3 { margin: 10px 0 8px; }
+.product-body > p { min-height: 0; margin: 8px 0; line-height: 1.6; }
+.package-includes { margin-top: 10px; }
+.product-foot { margin-top: auto; padding-top: 16px; }
+.product-foot .price { color: #dbeafe; font-size: 14px; }
+.product-foot .buy {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #3b82f6;
+  border-radius: 7px;
+  background: #2563eb;
+  color: white;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.product-foot .buy:hover { background: #3b82f6; }
+.account-grid { padding-top: 6px; }
+.account-tools { padding-bottom: 56px; }
+.admin-shell { padding-bottom: 64px; }
+
+/* Forms and account */
+.auth-shell { min-height: calc(100vh - 68px); grid-template-columns: .9fr minmax(400px,.72fr); gap: 80px; padding-block: 70px; }
+.auth-shell.compact { min-height: 670px; }
+.auth-aside h1 { margin: 12px 0 18px; font-size: clamp(42px,5vw,62px); }
+.auth-aside > p:last-of-type { color: var(--muted); font-size: 15px; line-height: 1.7; }
+.auth-aside ul { color: #aebbd0; font-size: 13px; line-height: 2.1; }
+.auth-aside li::before { content: "✓"; color: #60a5fa; }
+.form-card { padding: 34px; border: 1px solid var(--line); border-radius: 14px; background: #0f1726; box-shadow: 0 24px 60px rgba(0,0,0,.22); }
+.form-card h2, dialog h2 { margin: 5px 0; font-size: 27px; }
+.form-card label, dialog label { margin: 20px 0; color: #cbd5e1; font-size: 12px; font-weight: 550; letter-spacing: 0; text-transform: none; }
+.form-card label small { color: #718096; font-size: 11px; }
+.form-card a { color: #60a5fa; }
+.form-message { color: var(--danger); font-size: 12px; }
+.balance-card { border: 1px solid #2f4c76; border-radius: 12px; background: linear-gradient(145deg,#17243a,#101827); }
+
+/* Armory and realm */
+.armory-tabs, .profile-tabs { gap: 4px; border-color: var(--line); }
+.armory-tabs button, .profile-tabs button { padding: 14px 16px; color: var(--muted); font-size: 12px; letter-spacing: 0; text-transform: none; }
+.armory-tabs button.active, .profile-tabs button.active { color: #fff; border-bottom-color: #60a5fa; }
+.profile-head { border-color: var(--line); }
+.profile-head h2 { font-size: 28px; }
+.guild-name { color: #60a5fa; font: 600 12px/1 inherit; }
+.paperdoll { border: 1px solid var(--line); border-radius: 14px; background: radial-gradient(circle at center,rgba(59,130,246,.1),transparent 48%),#0d1523; }
+.character-model { border-color: var(--line); }
+.character-model::before { border-color: rgba(96,165,250,.16); background: rgba(30,41,59,.28); }
+.model-rune { color: rgba(96,165,250,.22); font-family: inherit; }
+.gear-slot { border-color: var(--line); border-radius: 8px; background: #0a111d; }
+.gear-slot:hover { border-color: #475569; background: #121d2e; transform: none; }
+.gear-icon { border-radius: 6px; background: #070b14; }
+.gear-label strong { font: 600 11px/1.3 inherit; }
+.item-tooltip { border-color: #475569; border-radius: 10px; background: rgba(7,11,20,.98); box-shadow: 0 18px 50px rgba(0,0,0,.55); }
+.item-tooltip { width: min(285px, calc(100vw - 24px)); overflow-wrap: anywhere; }
+.realm-overview, .guild-profile { padding: 30px; }
+.realm-title h2, .guild-profile h2 { font-size: 27px; }
+.realm-title > strong { color: #dbeafe; font: 700 34px/1 inherit; }
+.realm-stats { gap: 12px; background: transparent; }
+.realm-stats article { border: 1px solid var(--line); border-radius: 10px; background: #0b1320; }
+.realm-stats span { font-size: 11px; letter-spacing: 0; text-transform: none; }
+.realm-stats b { font: 700 22px/1.2 inherit; }
+.guild-card { border: 1px solid var(--line); border-radius: 10px; background: #0f1726; }
+.guild-card:hover { border-color: #475569; }
+.guild-crest { border-radius: 10px; clip-path: none; background: #1e293b; color: #93c5fd; font: 700 18px/1 inherit; }
+
+/* Admin */
+.admin-shell { grid-template-columns: 230px minmax(0,1fr); gap: 28px; padding-top: 20px; }
+.admin-sidebar { top: 88px; gap: 3px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: #0f1726; }
+.admin-sidebar .eyebrow { padding: 8px 10px 12px; color: #64748b; }
+.admin-sidebar > a { padding: 10px 11px; border: 0; border-radius: 7px; color: #aebbd0; font-size: 12px; letter-spacing: 0; text-transform: none; }
+.admin-sidebar > a:hover { background: #172235; color: #fff; }
+.admin-sidebar > a.active { border: 0; background: #1d4ed8; color: white; }
+.admin-view-head { align-items: center; }
+.admin-view-head h2 { margin: 3px 0; font-size: 27px; }
+.admin-view-head p:not(.eyebrow) { font-size: 13px; }
+.admin-subnav { gap: 4px; border-color: var(--line); }
+.admin-subnav a { padding: 9px 13px; border-radius: 7px; color: var(--muted); font-size: 12px; letter-spacing: 0; text-transform: none; }
+.admin-subnav a.active { border-color: #334155; background: #1e293b; color: #fff; }
+.gm-panel { padding: 24px; }
+.row-actions { min-width: 0; flex-wrap: wrap; }
+.gm-panel h3, .account-panel h3, .admin-section-title { font-family: inherit !important; font-weight: 650 !important; }
+.status-card { padding: 20px; }
+.status-card span { font-size: 11px; letter-spacing: 0; text-transform: none; }
+.status-card strong { font: 650 15px/1.3 inherit; }
+.item-search-results { border-color: #475569; border-radius: 8px; background: #0b1220; box-shadow: 0 18px 45px rgba(0,0,0,.4); }
+.catalog-slot, .catalog-bundle-row { border-color: var(--line); border-radius: 8px; background: #0b1220; }
+.catalog-product-kind { border-radius: 999px; color: #7dd3fc; font-size: 11px; letter-spacing: 0; text-transform: none; }
+.gm-command-console pre { border-radius: 8px; border-color: var(--line); background: #050914; color: #a7f3d0; }
+
+/* Footer */
+.site-footer { border-top: 1px solid rgba(148,163,184,.14); background: #080d17; }
+.footer-inner { min-height: 120px; display: flex; align-items: center; justify-content: space-between; gap: 30px; }
+.footer-inner > div:first-child > p { margin: 9px 0 0; color: #64748b; font-size: 11px; }
+.photo-credit { display: inline-block; margin-top: 4px; color: #526176; font-size: 9px; }
+.photo-credit:hover { color: #94a3b8; }
+.footer-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 20px; color: #94a3b8; font-size: 12px; }
+.footer-links a:hover { color: white; }
+.toast { border: 1px solid #334155; border-radius: 10px; background: #111827; box-shadow: 0 18px 45px rgba(0,0,0,.3); }
+
+@media (max-width: 1050px) {
+  .nav nav { gap: 0; }
+  .nav nav a { padding-inline: 8px; }
+  .nav-actions .header-signin { display: none; }
+  .credit-store { align-items: flex-start; flex-direction: column; }
+  .credit-packages { width: 100%; justify-content: flex-start; }
+}
+@media (max-width: 850px) {
+  .wrap { width: min(100% - 32px, 1180px); }
+  .nav { height: auto; min-height: 64px; flex-wrap: wrap; padding-block: 10px; }
+  .nav nav { order: 3; display: flex; width: 100%; height: 42px; overflow-x: auto; }
+  .nav nav a { flex: 1 0 auto; padding-inline: 14px; }
+  .hero { padding-top: 60px; }
+  .hero-copy { width: 100%; }
+  .home-hero:not(.custom-hero)::before { right: -10%; width: 48vw; opacity: .24; }
+  .steps, .news-grid { grid-template-columns: 1fr; }
+  .auth-shell { grid-template-columns: 1fr; gap: 24px; }
+  .auth-aside { display: block; }
+  .auth-aside h1 { font-size: 40px; }
+  .admin-shell { grid-template-columns: 1fr; }
+  .admin-sidebar { position: static; display: flex; border-radius: 10px; }
+  .admin-sidebar > a { white-space: nowrap; }
+}
+@media (max-width: 560px) {
+  .wrap { width: min(100% - 24px, 1180px); }
+  .brand small { display: none; }
+  .realm-switcher span { display: none; }
+  .nav-actions .header-action { padding-inline: 10px; }
+  .realm-switcher select { min-width: 92px; }
+  .hero { min-height: 650px; padding: 48px 0; }
+  .hero h1 { font-size: 43px; }
+  .hero-actions { align-items: stretch; }
+  .hero-actions .button { width: 100%; }
+  body:not([data-page="home"]) .page-hero { padding: 32px 0 14px; }
+  main > .content-section { padding: 14px 0 40px; }
+  .armory-shell .search { margin-top: 14px; }
+  .filters { gap: 10px; }
+  .class-filter { flex: 1 1 140px; }
+  .stats { display: grid; grid-template-columns: 1fr; }
+  .stats div { min-width: 0; }
+  .page-hero { padding-top: 40px; }
+  .form-card { padding: 24px; }
+  .auth-aside { display: none; }
+  .credit-packages { grid-template-columns: 1fr; }
+  .credit-packages button { min-width: 0; width: 100%; }
+  .section-head, .view-heading, .admin-view-head, .admin-hero,
+  .profile-head, .realm-title { align-items: flex-start; flex-direction: column; }
+  .profile-vitals, .realm-title > strong { margin-left: 0; text-align: left; }
+  .rank-row { grid-template-columns: 32px minmax(0, 1fr) 58px; }
+  .footer-inner { align-items: flex-start; flex-direction: column; padding-block: 30px; }
+  .footer-links { justify-content: flex-start; gap: 14px; }
+}
+
+/* Light appearance. Kept as an explicit theme so a realm's choice persists
+   independently of browser or operating-system changes. */
+html[data-theme="light"] {
+  --ink: #172033;
+  --muted: #64748b;
+  --gold: #2563eb !important;
+  --gold2: #1d4ed8 !important;
+  --teal: #0284c7 !important;
+  --bg: #f5f7fb !important;
+  --panel: #ffffff;
+  --line: #d9e1ec;
+  --danger: #be123c;
+  --class: #2563eb;
+  color-scheme: light;
+}
+html[data-theme="light"] .theme-sun { display: none; }
+html[data-theme="light"] .theme-moon { display: inline; }
+html[data-theme="light"] body {
+  background: radial-gradient(circle at 50% -20%, rgba(59,130,246,.10), transparent 34rem), #f5f7fb;
+}
+html[data-theme="light"] .app-header {
+  border-bottom-color: rgba(100,116,139,.2);
+  background: rgba(255,255,255,.9);
+  box-shadow: 0 8px 30px rgba(15,23,42,.05);
+}
+html[data-theme="light"] .nav nav a:hover { color: #0f172a; background: #f1f5f9; }
+html[data-theme="light"] body[data-page="home"] .nav nav a[href="/"],
+html[data-theme="light"] body[data-page="armory"] .nav nav a[href="/armory"],
+html[data-theme="light"] body[data-page="rankings"] .nav nav a[href="/rankings"],
+html[data-theme="light"] body[data-page="guilds"] .nav nav a[href="/guilds"],
+html[data-theme="light"] body[data-page="realm"] .nav nav a[href="/realm"],
+html[data-theme="light"] body[data-page="shop"] .nav nav a[href="/shop"] { color: #0f172a; }
+html[data-theme="light"] .theme-toggle,
+html[data-theme="light"] .account-menu-trigger,
+html[data-theme="light"] .ghost-button { border-color: #d5deea; background: #fff; color: #334155; }
+html[data-theme="light"] .theme-toggle:hover,
+html[data-theme="light"] .account-menu-trigger:hover,
+html[data-theme="light"] .ghost-button:hover { border-color: #94a3b8; background: #f8fafc; color: #0f172a; }
+html[data-theme="light"] .account-dropdown { border-color: #d9e1ec; background: #fff; box-shadow: 0 18px 45px rgba(15,23,42,.14); }
+html[data-theme="light"] .account-dropdown a,
+html[data-theme="light"] .account-dropdown button { color: #334155; }
+html[data-theme="light"] .account-dropdown a:hover,
+html[data-theme="light"] .account-dropdown button:hover { background: #f1f5f9; color: #0f172a; }
+html[data-theme="light"] .account-dropdown .account-signout { color: #be123c; }
+html[data-theme="light"] .header-signin { color: #334155 !important; }
+html[data-theme="light"] .page-hero h1,
+html[data-theme="light"] .section-head h2,
+html[data-theme="light"] .view-heading h2,
+html[data-theme="light"] .admin-view-head h2,
+html[data-theme="light"] .form-card h2,
+html[data-theme="light"] dialog h2 { color: #0f172a; }
+html[data-theme="light"] input,
+html[data-theme="light"] select,
+html[data-theme="light"] textarea,
+html[data-theme="light"] .gm-panel select,
+html[data-theme="light"] .gm-panel textarea { border-color: #cbd5e1; background: #fff; color: #0f172a; }
+html[data-theme="light"] label { color: #334155; }
+html[data-theme="light"] :where(.character-card, .product-card, .account-panel, .realm-overview, .guild-profile,
+  .profile-stat, .profile-overview section, .personal-team, .raid-card, .progress-summary,
+  .status-card, .gm-panel, .form-card, dialog, .guild-card, .steps article, .news-card) {
+  border-color: #d9e1ec;
+  background: #fff;
+  box-shadow: 0 8px 26px rgba(15,23,42,.055);
+}
+html[data-theme="light"] .character-card:hover,
+html[data-theme="light"] .product-card:hover,
+html[data-theme="light"] .guild-card:hover { border-color: #aebcd0; box-shadow: 0 12px 32px rgba(15,23,42,.09); }
+html[data-theme="light"] .avatar,
+html[data-theme="light"] .guild-crest { background: #e8f0fc; color: #1d4ed8; }
+html[data-theme="light"] .ranking-table,
+html[data-theme="light"] .data-table-wrap { border-color: #d9e1ec; background: #fff; }
+html[data-theme="light"] .rank-head,
+html[data-theme="light"] .data-table th { background: #f1f5f9; color: #64748b; }
+html[data-theme="light"] .rank-row:hover:not(.rank-head) { background: #f8fafc; }
+html[data-theme="light"] .data-table td { color: #475569; }
+html[data-theme="light"] .data-table td b { color: #0f172a; }
+html[data-theme="light"] .credit-store { border-color: #d9e1ec; background: #fff; }
+html[data-theme="light"] .home-realm-card { border-color: #d9e1ec; background: #fff; box-shadow: 0 8px 26px rgba(15,23,42,.055); }
+html[data-theme="light"] .home-realm-card h3 { color: #0f172a; }
+html[data-theme="light"] .home-realm-card dl div { border-color: #d9e1ec; background: #f8fafc; }
+html[data-theme="light"] .home-realm-card dt { color: #1d4ed8; }
+html[data-theme="light"] .credit-packages button,
+html[data-theme="light"] .filter { border-color: #d5deea; background: #fff; color: #475569; }
+html[data-theme="light"] .credit-packages button:hover { border-color: #60a5fa; }
+html[data-theme="light"] .armory-tabs button.active,
+html[data-theme="light"] .profile-tabs button.active { color: #0f172a; }
+html[data-theme="light"] .profile-stat strong,
+html[data-theme="light"] .profile-vitals strong,
+html[data-theme="light"] .rank-number,
+html[data-theme="light"] .team-rating { color: #1d4ed8; }
+html[data-theme="light"] .product-art { border-color: #d9e1ec; background: #edf3fb !important; color: #1d4ed8; }
+html[data-theme="light"] .product-art-label,
+html[data-theme="light"] .product-body .tier { background: rgba(255,255,255,.92); color: #475569; }
+html[data-theme="light"] .balance-card { border-color: #bfdbfe; background: linear-gradient(145deg,#eff6ff,#fff); }
+html[data-theme="light"] .paperdoll { border-color: #d9e1ec; background: radial-gradient(circle at center,rgba(59,130,246,.10),transparent 48%),#fff; }
+html[data-theme="light"] .gear-slot { border-color: #d9e1ec; background: #f8fafc; }
+html[data-theme="light"] .gear-slot:hover { border-color: #aebcd0; background: #f1f5f9; }
+html[data-theme="light"] .gear-icon { background: #e8eef7; }
+html[data-theme="light"] .item-tooltip { border-color: #94a3b8; background: rgba(255,255,255,.98); box-shadow: 0 18px 50px rgba(15,23,42,.18); }
+html[data-theme="light"] .realm-stats article { border-color: #d9e1ec; background: #f8fafc; }
+html[data-theme="light"] .admin-sidebar { border-color: #d9e1ec; background: #fff; }
+html[data-theme="light"] .admin-sidebar > a:hover { background: #f1f5f9; color: #0f172a; }
+html[data-theme="light"] .admin-sidebar > a.active { background: #2563eb; color: #fff; }
+html[data-theme="light"] .admin-subnav a.active { border-color: #cbd5e1; background: #e8eef7; color: #0f172a; }
+html[data-theme="light"] .catalog-slot,
+html[data-theme="light"] .catalog-bundle-row,
+html[data-theme="light"] .item-search-results { border-color: #d9e1ec; background: #fff; }
+html[data-theme="light"] .gm-command-console pre { border-color: #cbd5e1; background: #0f172a; }
+html[data-theme="light"] .site-footer { border-top-color: #d9e1ec; background: #fff; }
+html[data-theme="light"] .footer-links a:hover { color: #0f172a; }
+html[data-theme="light"] .toast { border-color: #d9e1ec; background: #fff; box-shadow: 0 18px 45px rgba(15,23,42,.14); }
+html[data-theme="light"] .panel-section { border-color: #d9e1ec; background: #eef3f9; }
+/* The photographic home hero intentionally remains dark for readable overlay text. */
+html[data-theme="light"] .home-hero :where(h1, .lede, .stats dt) { color: #f8fafc; }
+
+@media (max-width: 560px) {
+  .theme-toggle { flex: 0 0 36px; }
+  .account-menu-trigger { padding-inline: 10px; }
+  .account-menu-trigger > span:first-child { max-width: 72px; overflow: hidden; text-overflow: ellipsis; }
+  .realm-live-section .section-head > p { text-align: left; }
+}
