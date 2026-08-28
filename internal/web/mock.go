@@ -70,7 +70,7 @@ func buildMockProducts() []product {
 				continue
 			}
 			gladiator := map[string]string{"S6": "Furious", "S7": "Relentless"}[season.Name] + " Gladiator's " + set.PvPArmor
-			includes := []string{"Complete 5-piece " + gladiator + " set", "Matching neck, cloak, wrists, belt & boots", "2 rings and 2 PvP trinkets", "Spec weapon set + ranged weapon or relic"}
+			includes := []string{"Complete 5-piece " + gladiator + " set", "Matching neck, cloak, wrists, belt & boots", "2 rings and 2 PvP trinkets", "Alliance/Horde Medallion selected at checkout", "Spec weapon set + ranged weapon or relic"}
 			includes = append(includes, kits[set.Role]...)
 			includes = append(includes, "Level 80 service")
 			products = append(products, product{ID: id, Price: season.Price, Name: set.Class + " " + set.Spec + " " + season.Name + " Package", Description: "WotLK " + gladiator + " starter loadout for " + set.Spec + ".", Category: "PvP", ClassID: set.ID, ClassName: set.Class, Tier: season.Name, ServiceLevel: 80, Includes: includes})

@@ -19,7 +19,7 @@ Each resolved package is now a complete specialization loadout containing:
 - A complete enchant kit covering head, shoulders, legs, chest, gloves, weapon, cloak, wrists, and boots.
 - A level-80 service.
 
-S6 and S7 use their matching Gladiator off-pieces, jewelry, and weapons. T8 uses curated Ulduar items at item level 219–239, with armor type, role, dual-wield rules, shields, and relics selected per specialization. Death knight tanks correctly receive a two-handed weapon rather than a shield.
+S6 and S7 use their matching Gladiator off-pieces, jewelry, and weapons. Every PvP package includes a crowd-control-removing Medallion; the order snapshot selects `Medallion of the Alliance` or `Medallion of the Horde` from the chosen character's race. The remaining S6/S7 gear is faction-neutral. T8 uses curated Ulduar items at item level 219–239, with armor type, role, dual-wield rules, shields, and relics selected per specialization. Death knight tanks correctly receive a two-handed weapon rather than a shield.
 
 ## Delivery behavior
 

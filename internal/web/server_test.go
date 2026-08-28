@@ -86,3 +86,19 @@ func TestMockCommunityAndOperations(t *testing.T) {
 		}
 	}
 }
+
+func TestWotLKRaceFactions(t *testing.T) {
+	for _, race := range []uint8{1, 3, 4, 7, 11} {
+		if !isAllianceRace(race) || isHordeRace(race) {
+			t.Errorf("race %d should be Alliance only", race)
+		}
+	}
+	for _, race := range []uint8{2, 5, 6, 8, 10} {
+		if !isHordeRace(race) || isAllianceRace(race) {
+			t.Errorf("race %d should be Horde only", race)
+		}
+	}
+	if isAllianceRace(0) || isHordeRace(0) {
+		t.Fatal("unknown race must not be assigned a faction")
+	}
+}

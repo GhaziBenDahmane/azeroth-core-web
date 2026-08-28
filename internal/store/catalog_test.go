@@ -59,5 +59,8 @@ func TestEveryPackageHasCompleteUniqueEquipmentLoadout(t *testing.T) {
 		if !slots["two hand"] && !slots["main hand"] {
 			t.Errorf("%s has no weapon", d.key)
 		}
+		if (d.tier == "S6" || d.tier == "S7") && !names["Medallion of the Alliance"] {
+			t.Errorf("%s has no faction PvP medallion placeholder", d.key)
+		}
 	}
 }

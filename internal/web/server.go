@@ -437,6 +437,9 @@ func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
 		if name == "" {
 			name = fmt.Sprintf("item %d", ref.item.ItemID)
 		}
+		if (byID[ref.productID].Tier == "S6" || byID[ref.productID].Tier == "S7") && name == "Medallion of the Alliance" {
+			name = "Medallion of the Alliance/Horde (selected for character)"
+		}
 		byID[ref.productID].Includes = append(byID[ref.productID].Includes, fmt.Sprintf("%d × %s", ref.item.Quantity, name))
 	}
 	jsonOut(w, 200, map[string]any{"products": out, "deliveryEnabled": s.soap.Enabled()})
@@ -470,9 +473,9 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	}
 	var characterName string
 	var online bool
-	var characterClass uint8
-	cq := fmt.Sprintf("SELECT name,online,class FROM %s.characters WHERE guid=? AND account=? AND deleteDate IS NULL", s.c.CharactersDB)
-	if e = s.s.Characters.QueryRowContext(r.Context(), cq, in.CharacterGUID, a.ID).Scan(&characterName, &online, &characterClass); e != nil {
+	var characterClass, characterRace uint8
+	cq := fmt.Sprintf("SELECT name,online,class,race FROM %s.characters WHERE guid=? AND account=? AND deleteDate IS NULL", s.c.CharactersDB)
+	if e = s.s.Characters.QueryRowContext(r.Context(), cq, in.CharacterGUID, a.ID).Scan(&characterName, &online, &characterClass, &characterRace); e != nil {
 		problem(w, 422, "Choose one of your characters")
 		return
 	}
@@ -516,6 +519,31 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	if len(items) == 0 && p.ItemID != 0 {
 		items = append(items, bundleItem{ItemID: p.ItemID, Quantity: p.Quantity})
 	}
+	if p.Tier == "S6" || p.Tier == "S7" {
+		allianceID, hordeID, medallionErr := s.pvpMedallionIDs(r.Context())
+		if medallionErr != nil {
+			problem(w, 500, "Could not resolve faction PvP trinket")
+			return
+		}
+		chosenID := hordeID
+		if isAllianceRace(characterRace) {
+			chosenID = allianceID
+		} else if !isHordeRace(characterRace) {
+			problem(w, 422, "Character race has no supported faction")
+			return
+		}
+		replaced := false
+		for i := range items {
+			if items[i].ItemID == allianceID {
+				items[i].ItemID = chosenID
+				replaced = true
+			}
+		}
+		if !replaced {
+			problem(w, 500, "PvP package is missing its faction trinket")
+			return
+		}
+	}
 	for _, item := range items {
 		if _, e = tx.ExecContext(r.Context(), "INSERT INTO portal_order_items(order_id,item_id,quantity) VALUES(?,?,?)", orderID, item.ItemID, item.Quantity); e != nil {
 			problem(w, 500, "Could not snapshot order items")
@@ -528,6 +556,25 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	}
 	s.metrics.orders.Add(1)
 	jsonOut(w, 202, map[string]any{"ok": true, "orderId": orderID, "message": "Order accepted and queued for in-game delivery."})
+}
+
+func (s *Server) pvpMedallionIDs(ctx context.Context) (alliance, horde uint32, err error) {
+	q := fmt.Sprintf("SELECT entry FROM `%s`.item_template WHERE name=? AND ItemLevel<=226 AND RequiredLevel<=80 AND VerifiedBuild>1 ORDER BY ItemLevel DESC,entry DESC LIMIT 1", s.c.WorldDB)
+	if err = s.s.World.QueryRowContext(ctx, q, "Medallion of the Alliance").Scan(&alliance); err != nil {
+		return 0, 0, err
+	}
+	if err = s.s.World.QueryRowContext(ctx, q, "Medallion of the Horde").Scan(&horde); err != nil {
+		return 0, 0, err
+	}
+	return alliance, horde, nil
+}
+
+func isAllianceRace(race uint8) bool {
+	return race == 1 || race == 3 || race == 4 || race == 7 || race == 11
+}
+
+func isHordeRace(race uint8) bool {
+	return race == 2 || race == 5 || race == 6 || race == 8 || race == 10
 }
 
 func (s *Server) orders(w http.ResponseWriter, r *http.Request) {

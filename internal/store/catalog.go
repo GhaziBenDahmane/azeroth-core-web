@@ -115,7 +115,13 @@ func (s *Store) resolveSet(ctx context.Context, d catalogSet) ([]catalogItem, er
 		return nil, err
 	}
 	for _, gear := range loadout {
-		q = fmt.Sprintf("SELECT entry FROM `%s`.item_template WHERE name=? AND RequiredLevel<=80 AND VerifiedBuild>1 ORDER BY ItemLevel DESC,entry DESC LIMIT 1", s.C.WorldDB)
+		q = fmt.Sprintf("SELECT entry FROM `%s`.item_template WHERE name=? AND RequiredLevel<=80 AND VerifiedBuild>1", s.C.WorldDB)
+		if gear.name == "Medallion of the Alliance" {
+			// The name is reused by Wrathful's ilvl 264 trinket. S6/S7 use the
+			// ilvl 226 version; its Horde counterpart is selected at checkout.
+			q += " AND ItemLevel<=226"
+		}
+		q += " ORDER BY ItemLevel DESC,entry DESC LIMIT 1"
 		var id uint32
 		if err := s.World.QueryRowContext(ctx, q, gear.name).Scan(&id); err == sql.ErrNoRows {
 			return nil, nil

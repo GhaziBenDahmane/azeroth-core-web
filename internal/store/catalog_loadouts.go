@@ -132,9 +132,9 @@ func equipmentLoadout(d catalogSet) ([]loadoutItem, error) {
 	wrist, waist, feet := pvpOffpieces(d)
 	physical := d.role == "strength" || d.role == "agility"
 	suffix, ring, secondRing := "Dominance", "Band of Dominance", "Titan-Forged Band of Ascendancy"
-	trinket1, trinket2 := "Titan-Forged Rune of Accuracy", "Platinum Disks of Sorcery"
+	trinket1, trinket2 := "Titan-Forged Rune of Accuracy", "Medallion of the Alliance"
 	if physical {
-		suffix, ring, secondRing, trinket1, trinket2 = "Triumph", "Band of Triumph", "Titan-Forged Band of Victory", "Titan-Forged Rune of Cruelty", "Platinum Disks of Battle"
+		suffix, ring, secondRing, trinket1 = "Triumph", "Band of Triumph", "Titan-Forged Band of Victory", "Titan-Forged Rune of Cruelty"
 	}
 	if d.role == "healer" {
 		suffix, trinket1 = "Salvation", "Titan-Forged Rune of Alacrity"
