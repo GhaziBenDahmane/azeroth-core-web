@@ -19,7 +19,16 @@ import (
 )
 
 func (s *Server) publicConfig(w http.ResponseWriter, _ *http.Request) {
-	jsonOut(w, 200, map[string]any{"turnstileSiteKey": s.c.TurnstileSiteKey, "passwordResetEnabled": s.c.SMTPAddr != "" && s.c.SMTPFrom != ""})
+	jsonOut(w, 200, map[string]any{
+		"portalName": s.c.PortalName, "realmName": s.c.RealmName, "brandMark": s.c.BrandMark,
+		"tagline": s.c.PortalTagline, "expansionName": s.c.ExpansionName,
+		"clientVersion": s.c.ClientVersion, "clientBuild": s.c.ClientBuild,
+		"experienceRate": s.c.ExperienceRate, "uptimeLabel": s.c.UptimeLabel,
+		"footerText": s.c.FooterText, "realmAddress": s.c.RealmAddress,
+		"downloadUrl": s.c.DownloadURL, "communityUrl": s.c.CommunityURL,
+		"turnstileSiteKey":     s.c.TurnstileSiteKey,
+		"passwordResetEnabled": s.c.MockMode || (s.c.SMTPAddr != "" && s.c.SMTPFrom != ""),
+	})
 }
 
 func (s *Server) verifyTurnstile(ctx context.Context, token, remoteAddr string) bool {
@@ -86,7 +95,7 @@ func (s *Server) passwordResetRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	link := s.c.PublicURL + "/reset-password?token=" + url.QueryEscape(token)
-	subject := "Azeroth portal password reset"
+	subject := strings.NewReplacer("\r", " ", "\n", " ").Replace(s.c.PortalName) + " portal password reset"
 	body := "A password reset was requested for " + username + ".\r\n\r\n" + link + "\r\n\r\nThis link expires in one hour. If you did not request this, ignore this email."
 	go func() {
 		if mailErr := s.sendMail(email, subject, body); mailErr != nil {

@@ -16,6 +16,28 @@ async function api(path, options = {}) {
   if (!response.ok) throw Object.assign(new Error(body.error || 'Something went wrong'), {status:response.status});
   return body;
 }
+function publicLink(value){try{const url=new URL(value,location.origin);return ['http:','https:'].includes(url.protocol)?url.href:''}catch{return ''}}
+function applyPublicConfig(c){
+  const name=c.portalName||c.realmName||'Azeroth',mark=(c.brandMark||name.slice(0,1)||'A').slice(0,3);
+  $$('[data-brand-name]').forEach(x=>{const small=$('small',x);if(small){x.firstChild.textContent=name.toUpperCase()}else{x.textContent=name.toUpperCase()}});
+  $$('[data-brand-mark]').forEach(x=>x.textContent=mark.toUpperCase());
+  $$('[data-realm-name]').forEach(x=>x.textContent=(c.realmName||name).toUpperCase()+'.');
+  if(document.title.includes('Azeroth'))document.title=document.title.replace('Azeroth',name);
+  const description=$('meta[name=description]');if(description&&c.tagline)description.content=c.tagline;
+  if($('#portal-tagline'))$('#portal-tagline').textContent=c.tagline;
+  if($('#client-version'))$('#client-version').textContent=c.clientVersion;
+  if($('#experience-rate'))$('#experience-rate').textContent=c.experienceRate;
+  if($('#uptime-label'))$('#uptime-label').textContent=c.uptimeLabel;
+  if($('#expansion-name'))$('#expansion-name').textContent=c.expansionName;
+  if($('#client-description'))$('#client-description').textContent=`${c.expansionName} ${c.clientVersion}`;
+  if($('#client-build'))$('#client-build').textContent=c.clientBuild;
+  if($('#realm-address'))$('#realm-address').textContent=c.realmAddress;
+  $$('[data-footer-text]').forEach(x=>x.textContent=c.footerText);
+  const download=publicLink(c.downloadUrl);if(download&&$('#download-link')){$('#download-link').href=download;$('#download-link').classList.remove('hidden')}
+  const community=publicLink(c.communityUrl);$$('.config-community').forEach(x=>{if(community){x.href=community;x.classList.remove('hidden')}});
+}
+const publicConfigPromise=api('/api/public-config');
+publicConfigPromise.then(applyPublicConfig).catch(()=>{});
 function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2600)}
 function setMessage(form,message,success=false){const el=$('.form-message',form);el.textContent=message;el.classList.toggle('success',success)}
 function submitJSON(form,path,onSuccess){form?.addEventListener('submit',async e=>{e.preventDefault();const button=$('button[type=submit]',form);button.disabled=true;setMessage(form,'');try{const data=Object.fromEntries(new FormData(form));const result=await api(path,{method:'POST',body:JSON.stringify(data)});await onSuccess(result)}catch(err){setMessage(form,err.message)}finally{button.disabled=false}})}
@@ -31,7 +53,7 @@ if(page==='home'){
 }
 if(page==='register'){
   submitJSON($('#register-form'),'/api/auth/register',()=>{setMessage($('#register-form'),'Account created. Taking you to sign in…',true);setTimeout(()=>location.href='/login',900)});
-  api('/api/public-config').then(c=>{if(!c.turnstileSiteKey)return;const script=document.createElement('script');script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';script.async=true;script.onload=()=>window.turnstile.render('#turnstile',{sitekey:c.turnstileSiteKey,callback:token=>$('[name=turnstileToken]').value=token});document.head.append(script)}).catch(()=>{});
+  publicConfigPromise.then(c=>{if(!c.turnstileSiteKey)return;const script=document.createElement('script');script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';script.async=true;script.onload=()=>window.turnstile.render('#turnstile',{sitekey:c.turnstileSiteKey,callback:token=>$('[name=turnstileToken]').value=token});document.head.append(script)}).catch(()=>{});
 }
 if(page==='login') submitJSON($('#login-form'),'/api/auth/login',()=>{location.href='/account'});
 if(page==='forgot-password') submitJSON($('#forgot-form'),'/api/auth/password/request',result=>setMessage($('#forgot-form'),result.message,true));

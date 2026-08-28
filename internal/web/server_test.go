@@ -7,6 +7,7 @@ import (
 	"encoding/base32"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -85,6 +86,23 @@ func TestMockCommunityAndOperations(t *testing.T) {
 		if w.Code != 200 {
 			t.Errorf("%s returned %d: %s", path, w.Code, w.Body.String())
 		}
+	}
+}
+
+func TestPublicBrandingConfig(t *testing.T) {
+	s := &Server{c: config.Config{MockMode: true, PortalName: "Frosthold", RealmName: "Frosthold One", RealmAddress: "logon.frosthold.test", BrandMark: "FH", ExpansionName: "Wrath", ClientVersion: "3.3.5a"}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	r := httptest.NewRequest("GET", "/api/public-config", nil)
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, r)
+	var body map[string]any
+	if w.Code != 200 || json.NewDecoder(w.Body).Decode(&body) != nil {
+		t.Fatalf("public config returned %d: %s", w.Code, w.Body.String())
+	}
+	if body["portalName"] != "Frosthold" || body["realmAddress"] != "logon.frosthold.test" || body["brandMark"] != "FH" {
+		t.Fatalf("unexpected public branding config: %#v", body)
+	}
+	if _, exposed := body["realmControlToken"]; exposed {
+		t.Fatal("private realm control token was exposed")
 	}
 }
 

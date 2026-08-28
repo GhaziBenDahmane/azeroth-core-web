@@ -12,6 +12,11 @@ type Config struct {
 	Addr, AuthDSN, CharactersDSN, WorldDSN string
 	AuthDB, CharactersDB, WorldDB          string
 	PublicURL, RealmName, RealmAddress     string
+	PortalName, BrandMark, PortalTagline   string
+	ExpansionName, ClientVersion           string
+	ClientBuild, ExperienceRate            string
+	UptimeLabel, FooterText                string
+	DownloadURL, CommunityURL              string
 	SOAPURL, SOAPUser, SOAPPassword        string
 	CookieSecure                           bool
 	Expansion                              int
@@ -39,6 +44,12 @@ func Load() (Config, error) {
 		AuthDSN: os.Getenv("AUTH_DSN"), CharactersDSN: os.Getenv("CHARACTERS_DSN"), WorldDSN: os.Getenv("WORLD_DSN"),
 		AuthDB: env("AUTH_DB", "acore_auth"), CharactersDB: env("CHARACTERS_DB", "acore_characters"), WorldDB: env("WORLD_DB", "acore_world"),
 		PublicURL: env("PUBLIC_URL", "http://localhost:8080"), RealmName: env("REALM_NAME", "Azeroth"), RealmAddress: env("REALM_ADDRESS", "logon.example.com"),
+		PortalName: env("PORTAL_NAME", env("REALM_NAME", "Azeroth")), BrandMark: env("BRAND_MARK", "A"),
+		PortalTagline: env("PORTAL_TAGLINE", "A timeless realm, shaped by its community. Forge alliances, conquer raids, and write your story."),
+		ExpansionName: env("EXPANSION_NAME", "Wrath of the Lich King"), ClientVersion: env("CLIENT_VERSION", "3.3.5a"), ClientBuild: env("CLIENT_BUILD", "12340"),
+		ExperienceRate: env("EXPERIENCE_RATE", "2×"), UptimeLabel: env("UPTIME_LABEL", "24/7"),
+		FooterText:  env("FOOTER_TEXT", "Independent community realm portal. Not affiliated with Blizzard Entertainment."),
+		DownloadURL: strings.TrimSpace(os.Getenv("DOWNLOAD_URL")), CommunityURL: strings.TrimSpace(os.Getenv("COMMUNITY_URL")),
 		SOAPURL: os.Getenv("SOAP_URL"), SOAPUser: os.Getenv("SOAP_USER"), SOAPPassword: os.Getenv("SOAP_PASSWORD"),
 		CookieSecure: envBool("COOKIE_SECURE", false), Expansion: envInt("ACCOUNT_EXPANSION", 2),
 		StartingCredits: envInt("STARTING_CREDITS", 0), AdminToken: os.Getenv("ADMIN_TOKEN"),

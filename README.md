@@ -173,6 +173,11 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `PUBLIC_URL` | Canonical origin used for CSRF checks | `http://localhost:8080` |
 | `COOKIE_SECURE` | Require HTTPS for session cookies | `false` |
 | `REALM_NAME`, `REALM_ADDRESS` | UI realm identity and realmlist address | `Azeroth`, example host |
+| `PORTAL_NAME`, `BRAND_MARK` | Site-wide display name and short sigil (up to 3 characters recommended) | realm name, `A` |
+| `PORTAL_TAGLINE`, `FOOTER_TEXT` | Home-page introduction and footer copy | community-oriented defaults |
+| `EXPANSION_NAME`, `CLIENT_VERSION`, `CLIENT_BUILD` | Client information shown in connection instructions | WotLK, `3.3.5a`, `12340` |
+| `EXPERIENCE_RATE`, `UPTIME_LABEL` | Home-page realm facts | `2×`, `24/7` |
+| `DOWNLOAD_URL`, `COMMUNITY_URL` | Optional HTTP(S) client-download and Discord/community links | unset/hidden |
 | `ACCOUNT_EXPANSION` | New account expansion field | `2` |
 | `REALM_ID` | Realm used when resolving GM access | `1` |
 | `GM_LEVEL` | Minimum AzerothCore GM level allowed to grant credits | `3` |

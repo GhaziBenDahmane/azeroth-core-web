@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -99,7 +100,7 @@ func buildMockProducts() []product {
 func (s *Server) mockHandler() http.Handler {
 	m := http.NewServeMux()
 	m.HandleFunc("GET /api/status", func(w http.ResponseWriter, _ *http.Request) {
-		jsonOut(w, 200, map[string]any{"online": true, "realm": "Azeroth Demo", "address": "logon.demo.local", "shopDelivery": true, "demo": true})
+		jsonOut(w, 200, map[string]any{"online": true, "realm": s.c.RealmName, "address": s.c.RealmAddress, "shopDelivery": true, "demo": true})
 	})
 	m.HandleFunc("POST /api/auth/register", s.mockRegister)
 	m.HandleFunc("POST /api/auth/login", s.mockLogin)
@@ -108,9 +109,7 @@ func (s *Server) mockHandler() http.Handler {
 		jsonOut(w, 200, map[string]string{"message": "Demo recovery request accepted. No email was sent."})
 	})
 	m.HandleFunc("POST /api/auth/password/reset", func(w http.ResponseWriter, r *http.Request) { jsonOut(w, 200, map[string]bool{"ok": true}) })
-	m.HandleFunc("GET /api/public-config", func(w http.ResponseWriter, _ *http.Request) {
-		jsonOut(w, 200, map[string]any{"turnstileSiteKey": "", "passwordResetEnabled": true})
-	})
+	m.HandleFunc("GET /api/public-config", s.publicConfig)
 	m.HandleFunc("GET /api/me", s.mockMe)
 	m.HandleFunc("GET /api/characters", s.mockOwnCharacters)
 	m.HandleFunc("GET /api/armory", s.mockArmory)
@@ -526,7 +525,7 @@ func (s *Server) mockAdminModerationLog(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) mockRealm(w http.ResponseWriter, _ *http.Request) {
-	jsonOut(w, 200, map[string]any{"name": "Azeroth Demo", "address": "logon.demo.local", "port": 8085, "population": 1.2, "characters": 18472, "online": 846, "allianceOnline": 431, "hordeOnline": 415, "uptime": 1209480, "recordOnline": 1732})
+	jsonOut(w, 200, map[string]any{"name": s.c.RealmName, "address": s.c.RealmAddress, "port": 8085, "population": 1.2, "characters": 18472, "online": 846, "allianceOnline": 431, "hordeOnline": 415, "uptime": 1209480, "recordOnline": 1732})
 }
 
 func mockGuildData() []map[string]any {
@@ -627,7 +626,8 @@ func (s *Server) mockTOTPSetup(w http.ResponseWriter, r *http.Request) {
 	s.mock.totpSecret = "JBSWY3DPEHPK3PXP"
 	s.mock.totpEnabled = false
 	s.mock.mu.Unlock()
-	jsonOut(w, 200, map[string]string{"secret": "JBSWY3DPEHPK3PXP", "uri": "otpauth://totp/Azeroth%20Demo:" + u + "?secret=JBSWY3DPEHPK3PXP&issuer=Azeroth%20Demo"})
+	issuer := s.c.PortalName
+	jsonOut(w, 200, map[string]string{"secret": "JBSWY3DPEHPK3PXP", "uri": "otpauth://totp/" + url.PathEscape(issuer+":"+u) + "?secret=JBSWY3DPEHPK3PXP&issuer=" + url.QueryEscape(issuer)})
 }
 func (s *Server) mockTOTPEnable(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.mockUser(r); !ok {

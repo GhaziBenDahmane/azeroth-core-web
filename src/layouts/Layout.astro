@@ -14,14 +14,14 @@ const { title = 'Azeroth Portal', page = 'home' } = Astro.props;
 <body data-page={page}>
   <div class="sky" aria-hidden="true"><i></i><i></i><i></i></div>
   <header class="nav wrap">
-    <a class="brand" href="/"><span class="brand-mark">A</span><span>AZEROTH<small>REALM PORTAL</small></span></a>
+    <a class="brand" href="/"><span class="brand-mark" data-brand-mark>A</span><span data-brand-name>AZEROTH<small>REALM PORTAL</small></span></a>
     <nav aria-label="Primary navigation">
       <a href="/">Home</a><a href="/armory">Armory</a><a href="/rankings">Rankings</a><a href="/guilds">Guilds</a><a href="/realm">Realm</a><a href="/shop">Shop</a>
     </nav>
     <div class="nav-actions"><a class="text-link signed-out" href="/login">Sign in</a><a class="button small signed-out" href="/register">Join realm</a><a class="button small signed-in hidden" href="/account">My account</a></div>
   </header>
   <main><slot /></main>
-  <footer class="wrap"><div class="brand muted"><span class="brand-mark small">A</span><span>AZEROTH</span></div><p>Independent community realm portal. Not affiliated with Blizzard Entertainment.</p><div><a href="/armory">Armory</a><a href="/rankings">Rankings</a><a href="/guilds">Guilds</a><a href="/realm">Realm</a><a href="/shop">Shop</a></div></footer>
+  <footer class="wrap"><div class="brand muted"><span class="brand-mark small" data-brand-mark>A</span><span data-brand-name>AZEROTH</span></div><p data-footer-text>Independent community realm portal. Not affiliated with Blizzard Entertainment.</p><div><a href="/armory">Armory</a><a href="/rankings">Rankings</a><a href="/guilds">Guilds</a><a href="/realm">Realm</a><a href="/shop">Shop</a><a class="config-community hidden" rel="noreferrer">Community</a></div></footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script is:inline src="/app.js"></script>
 </body>
