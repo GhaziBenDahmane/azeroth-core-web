@@ -364,7 +364,7 @@ func (s *Server) armoryCharacter(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	jsonOut(w, 200, map[string]any{"character": c, "equipment": items, "profile": s.loadCharacterProfile(r.Context(), c.GUID)})
+	jsonOut(w, 200, map[string]any{"character": c, "equipment": items, "profile": s.loadCharacterProfile(r.Context(), c.GUID), "arenaTeams": s.characterArenaTeams(r, c.GUID)})
 }
 
 func (s *Server) shop(w http.ResponseWriter, r *http.Request) {

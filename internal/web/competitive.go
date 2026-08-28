@@ -24,6 +24,36 @@ type arenaTeam struct {
 	Members     []arenaMember `json:"members"`
 }
 
+type characterArenaTeam struct {
+	ID             uint32 `json:"id"`
+	Rank           uint32 `json:"rank"`
+	Name           string `json:"name"`
+	Bracket        uint8  `json:"bracket"`
+	Rating         uint16 `json:"rating"`
+	SeasonGames    uint16 `json:"seasonGames"`
+	SeasonWins     uint16 `json:"seasonWins"`
+	PersonalRating uint16 `json:"personalRating"`
+	PersonalGames  uint16 `json:"personalGames"`
+	PersonalWins   uint16 `json:"personalWins"`
+}
+
+func (s *Server) characterArenaTeams(r *http.Request, guid uint32) []characterArenaTeam {
+	q := fmt.Sprintf(`SELECT t.arenaTeamId,t.name,t.type,t.rating,t.seasonGames,t.seasonWins,m.personalRating,m.seasonGames,m.seasonWins,(SELECT COUNT(*)+1 FROM %s.arena_team ranked WHERE ranked.type=t.type AND (ranked.rating>t.rating OR (ranked.rating=t.rating AND ranked.arenaTeamId<t.arenaTeamId))) FROM %s.arena_team_member m JOIN %s.arena_team t ON t.arenaTeamId=m.arenaTeamId WHERE m.guid=? ORDER BY t.type`, s.c.CharactersDB, s.c.CharactersDB, s.c.CharactersDB)
+	rows, err := s.s.Characters.QueryContext(r.Context(), q, guid)
+	if err != nil {
+		return []characterArenaTeam{}
+	}
+	defer rows.Close()
+	out := []characterArenaTeam{}
+	for rows.Next() {
+		var x characterArenaTeam
+		if rows.Scan(&x.ID, &x.Name, &x.Bracket, &x.Rating, &x.SeasonGames, &x.SeasonWins, &x.PersonalRating, &x.PersonalGames, &x.PersonalWins, &x.Rank) == nil {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
 func (s *Server) arenaRankings(w http.ResponseWriter, r *http.Request) {
 	bracket, _ := strconv.Atoi(r.URL.Query().Get("bracket"))
 	if bracket != 2 && bracket != 3 && bracket != 5 {

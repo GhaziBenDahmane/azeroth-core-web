@@ -214,7 +214,11 @@ func (s *Server) mockCharacter(w http.ResponseWriter, r *http.Request) {
 				{"slot": 15, "entry": 50730, "name": "Glorenzelg, High-Blade of the Silver Hand", "quality": 4, "itemLevel": 271, "requiredLevel": 80, "armor": 0, "icon": "inv_sword_140", "stats": []string{"Two-Hand Sword", "954–1,432 Damage · Speed 3.60", "+164 Strength · +183 Stamina"}},
 				{"slot": 18, "entry": 50455, "name": "Warsong Gulch Mark of Honor", "quality": 3, "itemLevel": 80, "requiredLevel": 80, "armor": 0, "icon": "inv_bannerpvp_02", "stats": []string{"Relic"}},
 			}
-			jsonOut(w, 200, map[string]any{"character": c, "equipment": items, "profile": characterProfile{Achievements: 164, Exalted: 12, TalentSpecs: 2, TalentSpells: 44, Glyphs: 6, Professions: []profession{{ID: 164, Name: "Blacksmithing", Value: 450, Maximum: 450}, {ID: 186, Name: "Mining", Value: 450, Maximum: 450}}}})
+			personalArena := []characterArenaTeam{}
+			if c.Name == "Arthoria" {
+				personalArena = []characterArenaTeam{{ID: 1, Rank: 1, Name: "Relentless", Bracket: 2, Rating: 2478, SeasonGames: 184, SeasonWins: 137, PersonalRating: 2491, PersonalGames: 172, PersonalWins: 129}, {ID: 4, Rank: 4, Name: "Ice Block Heroes", Bracket: 3, Rating: 2155, SeasonGames: 128, SeasonWins: 82, PersonalRating: 2142, PersonalGames: 119, PersonalWins: 75}}
+			}
+			jsonOut(w, 200, map[string]any{"character": c, "equipment": items, "profile": characterProfile{Achievements: 164, Exalted: 12, TalentSpecs: 2, TalentSpells: 44, Glyphs: 6, Professions: []profession{{ID: 164, Name: "Blacksmithing", Value: 450, Maximum: 450}, {ID: 186, Name: "Mining", Value: 450, Maximum: 450}}}, "arenaTeams": personalArena})
 			return
 		}
 	}
