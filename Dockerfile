@@ -1,4 +1,4 @@
-FROM node:24-alpine AS ui
+FROM --platform=$BUILDPLATFORM node:24-alpine AS ui
 WORKDIR /src
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
 ARG NPM_CONFIG_REPLACE_REGISTRY_HOST=never
@@ -10,13 +10,15 @@ COPY src ./src
 COPY public ./public
 RUN npm run build
 
-FROM golang:1.26-alpine AS api
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS api
 WORKDIR /src
+ARG TARGETOS
+ARG TARGETARCH
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=ui /src/dist ./dist
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /portal .
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /portal .
 
 FROM alpine:3.22
 COPY --from=api /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
