@@ -27,6 +27,7 @@ All request-derived values are passed as MySQL parameters. The only values inter
 - Product image URLs are limited to absolute HTTP(S) URLs.
 - The admin bearer token is compared in constant time.
 - GM credit grants require a live authenticated session and the configured `account_access` level. Every grant is recorded in the append-only `portal_credit_ledger` table.
+- Moderation endpoints require the configured AzerothCore GM level. Only the fixed `ban account`, `unban account`, and `kick` commands can be issued; targets and durations are allow-listed, self-bans are rejected, and every attempt is recorded in `portal_moderation_log`.
 - Stripe credits are applied only after HMAC verification with a five-minute timestamp tolerance. Event and checkout IDs enforce replay safety.
 - Registration can require server-verified Cloudflare Turnstile tokens; it is disabled unless configured.
 

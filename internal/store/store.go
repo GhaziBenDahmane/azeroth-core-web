@@ -126,6 +126,11 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 event_id VARCHAR(255) PRIMARY KEY, checkout_id VARCHAR(255) NOT NULL, account_id INT UNSIGNED NOT NULL,
 		 credits INT UNSIGNED NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		 UNIQUE KEY idx_portal_checkout (checkout_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS portal_moderation_log (
+		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, actor_account_id INT UNSIGNED NOT NULL, target_account_id INT UNSIGNED NOT NULL DEFAULT 0,
+		 target VARCHAR(64) NOT NULL, action VARCHAR(30) NOT NULL, duration VARCHAR(30) NOT NULL DEFAULT '', reason VARCHAR(255) NOT NULL DEFAULT '',
+		 status ENUM('executed','review') NOT NULL, error_message VARCHAR(500) NOT NULL DEFAULT '', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		 INDEX idx_portal_moderation_target (target_account_id,created_at), INDEX idx_portal_moderation_actor (actor_account_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_password_resets (
 		 token_hash BINARY(32) PRIMARY KEY, account_id INT UNSIGNED NOT NULL, expires_at TIMESTAMP NOT NULL,
 		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_portal_reset_account (account_id)) ENGINE=InnoDB`,

@@ -15,10 +15,12 @@ type mockState struct {
 	users       map[string]string
 	totpSecret  string
 	totpEnabled bool
+	bans        map[string]string
+	moderation  []map[string]any
 }
 
 func newMockState() *mockState {
-	return &mockState{balance: 500, users: map[string]string{"DEMO": "demo1234"}, orders: []map[string]any{{"id": 1042, "itemId": 49623, "quantity": 1, "total": 85, "status": "delivered", "created": time.Now().Add(-24 * time.Hour)}}}
+	return &mockState{balance: 500, users: map[string]string{"DEMO": "demo1234"}, bans: map[string]string{}, orders: []map[string]any{{"id": 1042, "itemId": 49623, "quantity": 1, "total": 85, "status": "delivered", "created": time.Now().Add(-24 * time.Hour)}}}
 }
 
 var mockCharacters = []character{
@@ -129,6 +131,9 @@ func (s *Server) mockHandler() http.Handler {
 	m.HandleFunc("GET /api/admin/products", func(w http.ResponseWriter, _ *http.Request) {
 		jsonOut(w, 200, map[string]any{"products": mockProducts})
 	})
+	m.HandleFunc("GET /api/admin/accounts", s.mockAdminAccounts)
+	m.HandleFunc("POST /api/admin/moderation", s.rate(30, time.Minute, s.mockAdminModeration))
+	m.HandleFunc("GET /api/admin/moderation", s.mockAdminModerationLog)
 	m.HandleFunc("POST /api/admin/products", s.mockAdminProduct)
 	m.HandleFunc("POST /api/admin/orders/{id}/retry", s.mockAdminOrderAction)
 	m.HandleFunc("POST /api/admin/orders/{id}/refund", s.mockAdminOrderAction)
@@ -370,6 +375,78 @@ func (s *Server) mockCredits(w http.ResponseWriter, r *http.Request) {
 	balance := s.mock.balance
 	s.mock.mu.Unlock()
 	jsonOut(w, 200, map[string]any{"ok": true, "username": strings.ToUpper(in.Username), "amount": in.Amount, "balance": balance})
+}
+
+func (s *Server) mockAdminAccounts(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 403, "GM access required")
+		return
+	}
+	q := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("q")))
+	type mockAccount struct {
+		ID         uint32      `json:"id"`
+		Username   string      `json:"username"`
+		Email      string      `json:"email"`
+		Locked     bool        `json:"locked"`
+		Banned     bool        `json:"banned"`
+		BanUntil   uint64      `json:"banUntil"`
+		BanReason  string      `json:"banReason"`
+		Characters []character `json:"characters"`
+	}
+	s.mock.mu.Lock()
+	defer s.mock.mu.Unlock()
+	accounts := []mockAccount{}
+	for _, a := range []mockAccount{{1, "DEMO", "demo@example.com", false, false, 0, "", mockCharacters[:3]}, {2, "FROSTBYTE", "frost@example.com", false, false, 0, "", mockCharacters[3:6]}} {
+		if q != "" && !strings.Contains(a.Username, q) && !strings.Contains(strings.ToUpper(a.Email), q) {
+			continue
+		}
+		if reason, banned := s.mock.bans[a.Username]; banned {
+			a.Banned, a.BanReason, a.BanUntil = true, reason, uint64(time.Now().Add(7*24*time.Hour).Unix())
+		}
+		accounts = append(accounts, a)
+	}
+	jsonOut(w, 200, map[string]any{"accounts": accounts})
+}
+
+func (s *Server) mockAdminModeration(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 403, "GM access required")
+		return
+	}
+	var in struct{ Action, Target, Duration, Reason string }
+	if !decode(w, r, &in) {
+		return
+	}
+	in.Action, in.Target, in.Reason = strings.ToLower(strings.TrimSpace(in.Action)), strings.ToUpper(strings.TrimSpace(in.Target)), strings.TrimSpace(in.Reason)
+	if in.Action != "ban" && in.Action != "unban" && in.Action != "kick" {
+		problem(w, 422, "Action must be ban, unban, or kick")
+		return
+	}
+	if len(in.Reason) < 3 {
+		problem(w, 422, "Reason is required")
+		return
+	}
+	s.mock.mu.Lock()
+	if in.Action == "ban" {
+		s.mock.bans[in.Target] = in.Reason
+	}
+	if in.Action == "unban" {
+		delete(s.mock.bans, in.Target)
+	}
+	s.mock.moderation = append([]map[string]any{{"id": len(s.mock.moderation) + 1, "Actor": "DEMO", "Target": in.Target, "Action": in.Action, "Duration": in.Duration, "Reason": in.Reason, "Status": "executed", "Created": time.Now()}}, s.mock.moderation...)
+	s.mock.mu.Unlock()
+	jsonOut(w, 200, map[string]any{"ok": true, "action": in.Action, "target": in.Target})
+}
+
+func (s *Server) mockAdminModerationLog(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 403, "GM access required")
+		return
+	}
+	s.mock.mu.Lock()
+	entries := append([]map[string]any(nil), s.mock.moderation...)
+	s.mock.mu.Unlock()
+	jsonOut(w, 200, map[string]any{"entries": entries})
 }
 
 func (s *Server) mockRealm(w http.ResponseWriter, _ *http.Request) {

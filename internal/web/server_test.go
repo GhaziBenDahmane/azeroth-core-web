@@ -118,3 +118,25 @@ func TestServiceCommandsAreAllowListed(t *testing.T) {
 		t.Fatal("arbitrary service command was accepted")
 	}
 }
+
+func TestModerationInputAllowLists(t *testing.T) {
+	for _, duration := range []string{"30m", "7d", "1w", "1d12h", "-1"} {
+		if !banDurationPattern.MatchString(duration) {
+			t.Errorf("valid duration %q rejected", duration)
+		}
+	}
+	for _, duration := range []string{"", "forever", "-2", "7 days", "7d\nserver shutdown"} {
+		if banDurationPattern.MatchString(duration) {
+			t.Errorf("unsafe duration %q accepted", duration)
+		}
+	}
+	if !validAccountName("PLAYER123") || validAccountName("PLAYER;BAN") {
+		t.Fatal("account name allow-list is incorrect")
+	}
+	if !validCharacterName("Arthoria") || validCharacterName("Arthoria kick") {
+		t.Fatal("character name allow-list is incorrect")
+	}
+	if !validModerationReason("Repeated harassment") || validModerationReason("reason\nserver shutdown") || validModerationReason(`bad "quote"`) {
+		t.Fatal("moderation reason allow-list is incorrect")
+	}
+}

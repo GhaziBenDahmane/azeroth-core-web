@@ -13,6 +13,7 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - Password changes, TOTP two-factor authentication, and session revocation
 - Single-use email password recovery and optional Cloudflare Turnstile registration protection
 - Audited GM credit grants authorized from AzerothCore `account_access`
+- GM player lookup with active-ban status, audited account bans/unbans, and character kicks
 - GM delivery queue/reconciliation view and credit ledger
 - Gold bundles, level services, and class-restricted multi-item gear packages
 - Queued race-change and faction-change services using AzerothCore's supported character commands
@@ -70,6 +71,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_products TO 'portal'@'
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_product_items TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_orders TO 'portal'@'%';
 GRANT SELECT, INSERT ON acore_auth.portal_credit_ledger TO 'portal'@'%';
+GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_moderation_log TO 'portal'@'%';
 GRANT SELECT ON acore_auth.account_access TO 'portal'@'%';
 ```
 
