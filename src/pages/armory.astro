@@ -1,0 +1,33 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Armory — Azeroth" page="armory">
+  <section class="page-hero armory-hero wrap">
+    <p class="eyebrow">HALL OF HEROES</p>
+    <h1>Realm <em>armory</em></h1>
+    <p>Inspect equipment, guild progression, and the realm's top arena teams.</p>
+  </section>
+  <section class="wrap armory-shell">
+    <nav class="armory-tabs" aria-label="Armory sections">
+      <button class="active" data-armory-tab="characters">Characters</button>
+      <button data-armory-tab="arena">Arena rankings</button>
+      <button data-armory-tab="progression">Raid progression</button>
+    </nav>
+    <div id="characters-view" class="armory-view">
+      <form id="armory-search" class="search"><input name="q" maxlength="12" placeholder="Search character name…" aria-label="Character name"/><button class="button" type="submit">Search</button></form>
+      <div id="armory-results" class="character-grid loading-grid"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+      <div id="character-detail"></div>
+    </div>
+    <div id="arena-view" class="armory-view hidden">
+      <div class="view-heading"><div><p class="eyebrow">SEASON LADDER</p><h2>Top arena teams</h2></div><div class="bracket-picker"><button class="active" data-bracket="2">2v2</button><button data-bracket="3">3v3</button><button data-bracket="5">5v5</button></div></div>
+      <div id="arena-ranking" class="ranking-table"><div class="skeleton"></div></div>
+    </div>
+    <div id="progression-view" class="armory-view hidden">
+      <div class="view-heading"><div><p class="eyebrow">PVE ARCHIVES</p><h2>Raid progression</h2><p>Choose a hero to see their recorded achievements and guild-first dates.</p></div></div>
+      <form id="progression-search" class="search"><input name="q" maxlength="12" placeholder="Search character name…"/><button class="button" type="submit">Find hero</button></form>
+      <div id="progression-characters" class="character-grid"></div>
+      <div id="progression-detail"></div>
+    </div>
+  </section>
+  <div id="item-tooltip" class="item-tooltip" role="tooltip"></div>
+</Layout>

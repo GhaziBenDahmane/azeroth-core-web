@@ -1,0 +1,4 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="My account — Azeroth" page="account"><section class="page-hero wrap account-head"><div><p class="eyebrow">COMMAND CENTER</p><h1>Welcome, <em id="account-name">hero</em></h1><p>Characters, balance and recent deliveries.</p></div><button id="logout" class="ghost-button">Sign out</button></section><section class="wrap account-grid"><article class="account-panel"><div class="panel-title"><h2>Your characters</h2><span id="character-count"></span></div><div id="account-characters" class="account-characters"><div class="skeleton"></div></div></article><aside><article class="balance-card"><p>Portal balance</p><strong><span id="account-balance">—</span> <small>credits</small></strong><a href="/shop">Visit shop →</a></article><article class="account-panel"><h2>Recent orders</h2><div id="orders" class="orders"><p class="muted">Loading…</p></div></article></aside></section></Layout>

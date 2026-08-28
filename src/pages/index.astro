@@ -1,0 +1,20 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Azeroth — Begin your legend" page="home">
+  <section class="hero wrap">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="status-dot"></span><span id="realm-status">Realm status loading</span></p>
+      <h1>YOUR LEGEND<br/><em>AWAITS.</em></h1>
+      <p class="lede">A timeless Wrath of the Lich King realm, shaped by its community. Forge alliances, conquer raids, and write your story.</p>
+      <div class="hero-actions"><a class="button" href="/register">Create account <span>→</span></a><a class="play" href="#start"><b>↓</b> How to connect</a></div>
+      <dl class="stats"><div><dt>3.3.5a</dt><dd>Client version</dd></div><div><dt>2×</dt><dd>Experience rate</dd></div><div><dt>24/7</dt><dd>Realm uptime</dd></div></dl>
+    </div>
+    <div class="sigil" aria-hidden="true"><div class="orbit one"></div><div class="orbit two"></div><div class="rune">A</div><span>WRATH OF THE LICH KING</span></div>
+  </section>
+  <section class="panel-section" id="start"><div class="wrap">
+    <div class="section-head"><div><p class="eyebrow">ENTER THE REALM</p><h2>Three steps to adventure</h2></div><p>Everything you need to begin your journey.</p></div>
+    <div class="steps"><article><b>01</b><span class="step-icon">✦</span><h3>Create your account</h3><p>Register a free game account in moments.</p><a href="/register">Register now →</a></article><article><b>02</b><span class="step-icon">⬇</span><h3>Prepare the client</h3><p>Use a clean Wrath of the Lich King 3.3.5a client.</p><span>Version 12340</span></article><article><b>03</b><span class="step-icon">⌁</span><h3>Set your realmlist</h3><p>Open realmlist.wtf and replace its contents with:</p><button class="code-copy" data-copy=""><code>set realmlist <i id="realm-address">logon.example.com</i></code><span>Copy</span></button></article></div>
+  </div></section>
+  <section class="cta wrap"><p class="eyebrow">THE WAR HORN SOUNDS</p><h2>Will you answer?</h2><p>Heroes are remembered. Legends never die.</p><a class="button" href="/register">Begin your journey →</a></section>
+</Layout>
