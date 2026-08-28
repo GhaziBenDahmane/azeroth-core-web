@@ -2,10 +2,12 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/example/azeroth-portal/internal/config"
@@ -21,6 +23,28 @@ func main() {
 	if e != nil {
 		slog.Error("configuration", "error", e)
 		os.Exit(1)
+	}
+	if len(os.Args) > 1 {
+		if os.Args[1] != "bootstrap-account" {
+			slog.Error("command", "error", "unknown command")
+			os.Exit(2)
+		}
+		gmLevel, realmID := 3, -1
+		if _, e = fmt.Sscan(os.Getenv("BOOTSTRAP_GM_LEVEL"), &gmLevel); e != nil && os.Getenv("BOOTSTRAP_GM_LEVEL") != "" {
+			slog.Error("bootstrap account", "error", "invalid BOOTSTRAP_GM_LEVEL")
+			os.Exit(1)
+		}
+		if _, e = fmt.Sscan(os.Getenv("BOOTSTRAP_REALM_ID"), &realmID); e != nil && os.Getenv("BOOTSTRAP_REALM_ID") != "" {
+			slog.Error("bootstrap account", "error", "invalid BOOTSTRAP_REALM_ID")
+			os.Exit(1)
+		}
+		e = store.BootstrapAccount(c, os.Getenv("BOOTSTRAP_USERNAME"), os.Getenv("BOOTSTRAP_PASSWORD"), os.Getenv("BOOTSTRAP_EMAIL"), gmLevel, realmID)
+		if e != nil {
+			slog.Error("bootstrap account", "error", e)
+			os.Exit(1)
+		}
+		slog.Info("bootstrap account ready", "username", strings.ToUpper(strings.TrimSpace(os.Getenv("BOOTSTRAP_USERNAME"))), "gmLevel", gmLevel, "realmID", realmID)
+		return
 	}
 	var s *store.Store
 	if !c.MockMode {

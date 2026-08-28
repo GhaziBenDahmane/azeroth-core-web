@@ -30,6 +30,19 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 
 The portal creates its own `portal_*` tables in `acore_auth`. It never modifies AzerothCore's inventory tables. Shop items are sent by the worldserver itself via in-game mail.
 
+Deployment automation can idempotently create a dedicated AzerothCore account with valid SRP6 credentials before the server starts. Existing credentials are never overwritten:
+
+```bash
+BOOTSTRAP_USERNAME=PORTALSOAP \
+BOOTSTRAP_PASSWORD='generated-secret' \
+BOOTSTRAP_EMAIL=portal-soap@localhost.invalid \
+BOOTSTRAP_GM_LEVEL=3 \
+BOOTSTRAP_REALM_ID=-1 \
+portal bootstrap-account
+```
+
+AzerothCore requires administrator security level for every SOAP account. Keep that account machine-only, keep SOAP on the private container network, and do not publish port `7878`.
+
 ## Quick start
 
 ```bash
