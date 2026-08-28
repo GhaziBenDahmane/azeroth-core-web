@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/example/azeroth-portal/internal/config"
@@ -31,6 +32,12 @@ type Server struct {
 	static  fs.FS
 	limiter *limiter
 	mock    *mockState
+	metrics portalMetrics
+}
+type portalMetrics struct {
+	requests atomic.Uint64
+	errors   atomic.Uint64
+	orders   atomic.Uint64
 }
 type limiter struct {
 	mu   sync.Mutex
@@ -38,7 +45,11 @@ type limiter struct {
 }
 
 func New(s *store.Store, c config.Config, static fs.FS) *Server {
-	return &Server{s: s, c: c, soap: soap.New(c.SOAPURL, c.SOAPUser, c.SOAPPassword), static: static, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	server := &Server{s: s, c: c, soap: soap.New(c.SOAPURL, c.SOAPUser, c.SOAPPassword), static: static, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	if !c.MockMode && server.soap.Enabled() {
+		go server.deliveryLoop()
+	}
+	return server
 }
 
 func (s *Server) Handler() http.Handler {
@@ -50,17 +61,39 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("POST /api/auth/register", s.rate(5, time.Hour, s.register))
 	m.HandleFunc("POST /api/auth/login", s.rate(10, 10*time.Minute, s.login))
 	m.HandleFunc("POST /api/auth/logout", s.logout)
+	m.HandleFunc("POST /api/auth/password/request", s.rate(5, time.Hour, s.passwordResetRequest))
+	m.HandleFunc("POST /api/auth/password/reset", s.rate(10, time.Hour, s.passwordResetConfirm))
+	m.HandleFunc("GET /api/public-config", s.publicConfig)
 	m.HandleFunc("GET /api/me", s.me)
 	m.HandleFunc("GET /api/characters", s.characters)
 	m.HandleFunc("GET /api/armory", s.armorySearch)
 	m.HandleFunc("GET /api/armory/{name}", s.armoryCharacter)
 	m.HandleFunc("GET /api/arena", s.arenaRankings)
 	m.HandleFunc("GET /api/progression/{name}", s.raidProgression)
+	m.HandleFunc("GET /api/realm", s.realmOverview)
+	m.HandleFunc("GET /api/guilds", s.guildList)
+	m.HandleFunc("GET /api/guilds/{id}", s.guildDetail)
+	m.HandleFunc("GET /healthz", s.health)
+	m.HandleFunc("GET /readyz", s.ready)
+	m.HandleFunc("GET /metrics", s.prometheusMetrics)
 	m.HandleFunc("GET /api/shop", s.shop)
 	m.HandleFunc("POST /api/shop/purchase", s.rate(10, time.Minute, s.purchase))
 	m.HandleFunc("GET /api/orders", s.orders)
 	m.HandleFunc("POST /api/admin/products", s.adminProduct)
 	m.HandleFunc("POST /api/admin/credits", s.rate(30, time.Minute, s.adminCredits))
+	m.HandleFunc("POST /api/admin/orders/{id}/retry", s.adminRetryOrder)
+	m.HandleFunc("POST /api/admin/orders/{id}/refund", s.adminRefundOrder)
+	m.HandleFunc("GET /api/admin/orders", s.adminOrders)
+	m.HandleFunc("GET /api/admin/ledger", s.adminLedger)
+	m.HandleFunc("GET /api/admin/products", s.adminProducts)
+	m.HandleFunc("POST /api/billing/checkout", s.billingCheckout)
+	m.HandleFunc("POST /api/billing/webhook", s.billingWebhook)
+	m.HandleFunc("GET /api/security/sessions", s.securitySessions)
+	m.HandleFunc("DELETE /api/security/sessions/{id}", s.securityRevokeSession)
+	m.HandleFunc("POST /api/security/password", s.securityPassword)
+	m.HandleFunc("POST /api/security/totp/setup", s.securityTOTPSetup)
+	m.HandleFunc("POST /api/security/totp/enable", s.securityTOTPEnable)
+	m.HandleFunc("POST /api/security/totp/disable", s.securityTOTPDisable)
 	m.Handle("/", spaHandler(s.static))
 	return s.middleware(m)
 }
@@ -70,14 +103,19 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
-		w.Header().Set("Content-Security-Policy", "default-src 'self' blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://wow.zamimg.com; script-src 'self' https://wow.zamimg.com; connect-src 'self' https://nether.wowhead.com https://wow.zamimg.com; worker-src 'self' blob:")
+		w.Header().Set("Content-Security-Policy", "default-src 'self' blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://wow.zamimg.com; script-src 'self' https://wow.zamimg.com https://challenges.cloudflare.com; connect-src 'self' https://nether.wowhead.com https://wow.zamimg.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; worker-src 'self' blob:")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
 		if r.Method != http.MethodGet && r.Method != http.MethodHead && !s.sameOrigin(r) {
 			problem(w, http.StatusForbidden, "Invalid request origin")
 			return
 		}
 		start := time.Now()
-		next.ServeHTTP(w, r)
+		rw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rw, r)
+		s.metrics.requests.Add(1)
+		if rw.status >= 500 {
+			s.metrics.errors.Add(1)
+		}
 		slog.Info("request", "method", r.Method, "path", r.URL.Path, "duration", time.Since(start))
 	})
 }
@@ -96,8 +134,12 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
-	var in struct{ Username, Password, Email string }
+	var in struct{ Username, Password, Email, TurnstileToken string }
 	if !decode(w, r, &in) {
+		return
+	}
+	if !s.verifyTurnstile(r.Context(), in.TurnstileToken, r.RemoteAddr) {
+		problem(w, 422, "Human verification failed")
 		return
 	}
 	in.Username = strings.ToUpper(strings.TrimSpace(in.Username))
@@ -150,16 +192,21 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
-	var in struct{ Username, Password string }
+	var in struct{ Username, Password, OTP string }
 	if !decode(w, r, &in) {
 		return
 	}
 	in.Username = strings.ToUpper(strings.TrimSpace(in.Username))
 	var a account
-	var salt, verifier []byte
-	q := fmt.Sprintf("SELECT id,username,email,salt,verifier FROM `%s`.account a WHERE username=? AND locked=0 AND NOT EXISTS (SELECT 1 FROM `%s`.account_banned b WHERE b.id=a.id AND b.active=1)", s.c.AuthDB, s.c.AuthDB)
-	if err := s.s.Auth.QueryRowContext(r.Context(), q, in.Username).Scan(&a.ID, &a.Username, &a.Email, &salt, &verifier); err != nil || !srp.Verify(a.Username, in.Password, salt, verifier) {
+	var salt, verifier, totpSecret []byte
+	var totpEnabled bool
+	q := fmt.Sprintf("SELECT a.id,a.username,a.email,a.salt,a.verifier,COALESCE(ps.totp_secret,''),COALESCE(ps.totp_enabled,0) FROM `%s`.account a LEFT JOIN portal_account_security ps ON ps.account_id=a.id WHERE username=? AND locked=0 AND NOT EXISTS (SELECT 1 FROM `%s`.account_banned b WHERE b.id=a.id AND b.active=1)", s.c.AuthDB, s.c.AuthDB)
+	if err := s.s.Auth.QueryRowContext(r.Context(), q, in.Username).Scan(&a.ID, &a.Username, &a.Email, &salt, &verifier, &totpSecret, &totpEnabled); err != nil || !srp.Verify(a.Username, in.Password, salt, verifier) {
 		problem(w, 401, "Invalid username or password")
+		return
+	}
+	if totpEnabled && !validTOTP(string(totpSecret), in.OTP, time.Now()) {
+		problem(w, 401, "A valid authenticator code is required")
 		return
 	}
 	raw := make([]byte, 32)
@@ -170,7 +217,12 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	token := hex.EncodeToString(raw)
 	hash := sha256.Sum256([]byte(token))
 	expires := time.Now().Add(7 * 24 * time.Hour)
-	if _, err := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_sessions (token_hash,account_id,expires_at) VALUES (?,?,?)", hash[:], a.ID, expires); err != nil {
+	ua := r.UserAgent()
+	if len(ua) > 255 {
+		ua = ua[:255]
+	}
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if _, err := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_sessions (token_hash,account_id,expires_at,ip_address,user_agent) VALUES (?,?,?,?,?)", hash[:], a.ID, expires, ip, ua); err != nil {
 		problem(w, 500, "Could not create session")
 		return
 	}
@@ -195,6 +247,9 @@ func (s *Server) auth(r *http.Request) (account, error) {
 	h := sha256.Sum256([]byte(c.Value))
 	q := fmt.Sprintf("SELECT a.id,a.username,a.email FROM portal_sessions s JOIN `%s`.account a ON a.id=s.account_id WHERE s.token_hash=? AND s.expires_at>NOW() AND a.locked=0 AND NOT EXISTS (SELECT 1 FROM `%s`.account_banned b WHERE b.id=a.id AND b.active=1)", s.c.AuthDB, s.c.AuthDB)
 	err = s.s.Auth.QueryRowContext(r.Context(), q, h[:]).Scan(&a.ID, &a.Username, &a.Email)
+	if err == nil {
+		_, _ = s.s.Auth.ExecContext(r.Context(), "UPDATE portal_sessions SET last_seen_at=NOW() WHERE token_hash=? AND last_seen_at < NOW()-INTERVAL 5 MINUTE", h[:])
+	}
 	return a, err
 }
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
@@ -309,7 +364,7 @@ func (s *Server) armoryCharacter(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	jsonOut(w, 200, map[string]any{"character": c, "equipment": items})
+	jsonOut(w, 200, map[string]any{"character": c, "equipment": items, "profile": s.loadCharacterProfile(r.Context(), c.GUID)})
 }
 
 func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
@@ -379,7 +434,7 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "Could not debit wallet")
 		return
 	}
-	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_orders(account_id,character_guid,product_id,item_id,quantity,total) VALUES(?,?,?,?,?,?)", a.ID, in.CharacterGUID, p.ID, p.ItemID, p.Quantity, p.Price)
+	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_orders(account_id,character_guid,product_id,item_id,quantity,total,status,service_level,gold_amount) VALUES(?,?,?,?,?,?,'pending',?,?)", a.ID, in.CharacterGUID, p.ID, p.ItemID, p.Quantity, p.Price, p.ServiceLevel, p.Gold)
 	if e != nil {
 		problem(w, 500, "Could not create order")
 		return
@@ -388,10 +443,6 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	if strings.ContainsAny(characterName, " \t\r\n\"\\") {
 		problem(w, 422, "Character name cannot be used for delivery")
 		return
-	}
-	realmLabel := strings.NewReplacer("\"", "", "\\", "", "\r", " ", "\n", " ").Replace(s.c.RealmName)
-	if len(realmLabel) > 80 {
-		realmLabel = realmLabel[:80]
 	}
 	items := []bundleItem{}
 	itemRows, itemErr := tx.QueryContext(r.Context(), "SELECT item_id,quantity FROM portal_product_items WHERE product_id=? ORDER BY item_id", p.ID)
@@ -407,34 +458,18 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	if len(items) == 0 && p.ItemID != 0 {
 		items = append(items, bundleItem{ItemID: p.ItemID, Quantity: p.Quantity})
 	}
-	if len(items) > 0 {
-		args := make([]string, 0, len(items))
-		for _, item := range items {
-			args = append(args, fmt.Sprintf("%d:%d", item.ItemID, item.Quantity))
+	for _, item := range items {
+		if _, e = tx.ExecContext(r.Context(), "INSERT INTO portal_order_items(order_id,item_id,quantity) VALUES(?,?,?)", orderID, item.ItemID, item.Quantity); e != nil {
+			problem(w, 500, "Could not snapshot order items")
+			return
 		}
-		cmd := fmt.Sprintf(`send items %s "Portal order %d" "Thank you for supporting %s." %s`, characterName, orderID, realmLabel, strings.Join(args, " "))
-		_, e = s.soap.Command(r.Context(), cmd)
 	}
-	if e == nil && p.ServiceLevel > 0 {
-		_, e = s.soap.Command(r.Context(), fmt.Sprintf("character level %s %d", characterName, p.ServiceLevel))
-	}
-	if e == nil && p.Gold > 0 {
-		_, e = s.soap.Command(r.Context(), fmt.Sprintf(`send money %s "Portal order %d" "Thank you for supporting %s." %d`, characterName, orderID, realmLabel, uint64(p.Gold)*10000))
-	}
-	if e != nil {
-		_, _ = tx.ExecContext(r.Context(), "UPDATE portal_orders SET status='failed',error_message=? WHERE id=?", e.Error(), orderID)
-		problem(w, 502, "Delivery failed; your balance was not charged")
+	if e = tx.Commit(); e != nil {
+		problem(w, 500, "Could not queue order")
 		return
 	}
-	_, e = tx.ExecContext(r.Context(), "UPDATE portal_orders SET status='delivered',delivered_at=NOW() WHERE id=?", orderID)
-	if e == nil {
-		e = tx.Commit()
-	}
-	if e != nil {
-		problem(w, 500, "Delivery completed but order recording failed; contact staff with the current time")
-		return
-	}
-	jsonOut(w, 201, map[string]any{"ok": true, "orderId": orderID, "message": "Item sent to the character's in-game mailbox."})
+	s.metrics.orders.Add(1)
+	jsonOut(w, 202, map[string]any{"ok": true, "orderId": orderID, "message": "Order accepted and queued for in-game delivery."})
 }
 
 func (s *Server) orders(w http.ResponseWriter, r *http.Request) {
@@ -467,8 +502,13 @@ func (s *Server) orders(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 	provided := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	if s.c.AdminToken == "" || len(provided) != len(s.c.AdminToken) || subtle.ConstantTimeCompare([]byte(provided), []byte(s.c.AdminToken)) != 1 {
-		problem(w, 401, "Admin token required")
+	tokenOK := s.c.AdminToken != "" && len(provided) == len(s.c.AdminToken) && subtle.ConstantTimeCompare([]byte(provided), []byte(s.c.AdminToken)) == 1
+	gmOK := false
+	if !tokenOK {
+		_, gmOK = s.requireGM(r)
+	}
+	if !tokenOK && !gmOK {
+		problem(w, 401, "GM session or admin token required")
 		return
 	}
 	var p product

@@ -20,6 +20,14 @@ type Config struct {
 	MockMode                               bool
 	RealmID                                int
 	GMLevel                                int
+	StripeSecret                           string
+	StripeWebhookSecret                    string
+	StripePriceSmall                       string
+	StripePriceMedium                      string
+	StripePriceLarge                       string
+	TurnstileSiteKey, TurnstileSecret      string
+	SMTPAddr, SMTPUser, SMTPPassword       string
+	SMTPFrom                               string
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
@@ -35,6 +43,10 @@ func Load() (Config, error) {
 		StartingCredits: envInt("STARTING_CREDITS", 0), AdminToken: os.Getenv("ADMIN_TOKEN"),
 		MockMode: envBool("MOCK_MODE", false),
 		RealmID:  envInt("REALM_ID", 1), GMLevel: envInt("GM_LEVEL", 3),
+		StripeSecret: os.Getenv("STRIPE_SECRET_KEY"), StripeWebhookSecret: os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		StripePriceSmall: os.Getenv("STRIPE_PRICE_SMALL"), StripePriceMedium: os.Getenv("STRIPE_PRICE_MEDIUM"), StripePriceLarge: os.Getenv("STRIPE_PRICE_LARGE"),
+		TurnstileSiteKey: os.Getenv("TURNSTILE_SITE_KEY"), TurnstileSecret: os.Getenv("TURNSTILE_SECRET"),
+		SMTPAddr: os.Getenv("SMTP_ADDR"), SMTPUser: os.Getenv("SMTP_USER"), SMTPPassword: os.Getenv("SMTP_PASSWORD"), SMTPFrom: os.Getenv("SMTP_FROM"),
 	}
 	if c.AuthDSN == "" && !c.MockMode {
 		return c, fmt.Errorf("AUTH_DSN is required")

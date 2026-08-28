@@ -1,11 +1,21 @@
 package web
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
+	"crypto/sha256"
+	"encoding/base32"
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 	"io/fs"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
+
+	"github.com/example/azeroth-portal/internal/config"
 )
 
 func TestSPAHandlerServesRouteIndexes(t *testing.T) {
@@ -21,6 +31,58 @@ func TestSPAHandlerServesRouteIndexes(t *testing.T) {
 		h.ServeHTTP(w, r)
 		if w.Code != 200 || strings.TrimSpace(w.Body.String()) != want {
 			t.Errorf("%s: got %d %q, want 200 %q", route, w.Code, w.Body.String(), want)
+		}
+	}
+}
+
+func TestStripeSignature(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	payload := []byte(`{"id":"evt_test"}`)
+	mac := hmac.New(sha256.New, []byte("whsec_test"))
+	_, _ = fmt.Fprintf(mac, "%d.", now.Unix())
+	_, _ = mac.Write(payload)
+	header := fmt.Sprintf("t=%d,v1=%s", now.Unix(), hex.EncodeToString(mac.Sum(nil)))
+	if !verifyStripeSignature(payload, header, "whsec_test", now) {
+		t.Fatal("valid signature rejected")
+	}
+	if verifyStripeSignature([]byte("changed"), header, "whsec_test", now) {
+		t.Fatal("tampered payload accepted")
+	}
+	if verifyStripeSignature(payload, header, "whsec_test", now.Add(6*time.Minute)) {
+		t.Fatal("stale signature accepted")
+	}
+}
+
+func TestTOTPWindow(t *testing.T) {
+	secret := "JBSWY3DPEHPK3PXP"
+	now := time.Unix(1_700_000_000, 0)
+	raw, _ := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, uint64(now.Unix()/30))
+	mac := hmac.New(sha1.New, raw)
+	_, _ = mac.Write(buf)
+	sum := mac.Sum(nil)
+	i := sum[len(sum)-1] & 15
+	value := (uint32(sum[i])&127)<<24 | uint32(sum[i+1])<<16 | uint32(sum[i+2])<<8 | uint32(sum[i+3])
+	code := fmt.Sprintf("%06d", value%1_000_000)
+	if !validTOTP(secret, code, now) {
+		t.Fatal("valid TOTP rejected")
+	}
+	if validTOTP(secret, "000000", now) && code != "000000" {
+		t.Fatal("invalid TOTP accepted")
+	}
+}
+
+func TestMockCommunityAndOperations(t *testing.T) {
+	s := &Server{c: config.Config{MockMode: true}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	h := s.Handler()
+	for _, path := range []string{"/api/realm", "/api/guilds", "/api/guilds/1", "/healthz", "/readyz", "/metrics"} {
+		r := httptest.NewRequest("GET", path, nil)
+		r.Header.Set("Origin", "")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != 200 {
+			t.Errorf("%s returned %d: %s", path, w.Code, w.Body.String())
 		}
 	}
 }

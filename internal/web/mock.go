@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -8,10 +9,12 @@ import (
 )
 
 type mockState struct {
-	mu      sync.Mutex
-	balance uint32
-	orders  []map[string]any
-	users   map[string]string
+	mu          sync.Mutex
+	balance     uint32
+	orders      []map[string]any
+	users       map[string]string
+	totpSecret  string
+	totpEnabled bool
 }
 
 func newMockState() *mockState {
@@ -74,24 +77,54 @@ func (s *Server) mockHandler() http.Handler {
 	m.HandleFunc("POST /api/auth/register", s.mockRegister)
 	m.HandleFunc("POST /api/auth/login", s.mockLogin)
 	m.HandleFunc("POST /api/auth/logout", s.mockLogout)
+	m.HandleFunc("POST /api/auth/password/request", func(w http.ResponseWriter, r *http.Request) {
+		jsonOut(w, 200, map[string]string{"message": "Demo recovery request accepted. No email was sent."})
+	})
+	m.HandleFunc("POST /api/auth/password/reset", func(w http.ResponseWriter, r *http.Request) { jsonOut(w, 200, map[string]bool{"ok": true}) })
+	m.HandleFunc("GET /api/public-config", func(w http.ResponseWriter, _ *http.Request) {
+		jsonOut(w, 200, map[string]any{"turnstileSiteKey": "", "passwordResetEnabled": true})
+	})
 	m.HandleFunc("GET /api/me", s.mockMe)
 	m.HandleFunc("GET /api/characters", s.mockOwnCharacters)
 	m.HandleFunc("GET /api/armory", s.mockArmory)
 	m.HandleFunc("GET /api/armory/{name}", s.mockCharacter)
 	m.HandleFunc("GET /api/arena", s.mockArena)
 	m.HandleFunc("GET /api/progression/{name}", s.mockProgression)
+	m.HandleFunc("GET /api/realm", s.mockRealm)
+	m.HandleFunc("GET /api/guilds", s.mockGuilds)
+	m.HandleFunc("GET /api/guilds/{id}", s.mockGuild)
 	m.HandleFunc("GET /api/shop", func(w http.ResponseWriter, _ *http.Request) {
 		jsonOut(w, 200, map[string]any{"products": mockProducts, "deliveryEnabled": true})
 	})
 	m.HandleFunc("POST /api/shop/purchase", s.mockPurchase)
 	m.HandleFunc("GET /api/orders", s.mockOrders)
 	m.HandleFunc("POST /api/admin/credits", s.rate(30, time.Minute, s.mockCredits))
+	m.HandleFunc("GET /api/admin/orders", s.mockAdminOrders)
+	m.HandleFunc("GET /api/admin/ledger", func(w http.ResponseWriter, _ *http.Request) {
+		jsonOut(w, 200, map[string]any{"entries": []map[string]any{{"id": 1, "Actor": "DEMO", "Target": "DEMO", "Amount": 500, "Reason": "Demo starting balance", "Created": time.Now().Add(-48 * time.Hour)}}})
+	})
+	m.HandleFunc("GET /api/admin/products", func(w http.ResponseWriter, _ *http.Request) {
+		jsonOut(w, 200, map[string]any{"products": mockProducts})
+	})
+	m.HandleFunc("POST /api/admin/products", s.mockAdminProduct)
+	m.HandleFunc("POST /api/admin/orders/{id}/retry", s.mockAdminOrderAction)
+	m.HandleFunc("POST /api/admin/orders/{id}/refund", s.mockAdminOrderAction)
+	m.HandleFunc("POST /api/billing/checkout", s.mockBillingCheckout)
+	m.HandleFunc("GET /api/security/sessions", s.mockSecuritySessions)
+	m.HandleFunc("DELETE /api/security/sessions/{id}", s.mockSecurityRevoke)
+	m.HandleFunc("POST /api/security/password", s.mockSecurityPassword)
+	m.HandleFunc("POST /api/security/totp/setup", s.mockTOTPSetup)
+	m.HandleFunc("POST /api/security/totp/enable", s.mockTOTPEnable)
+	m.HandleFunc("POST /api/security/totp/disable", s.mockTOTPDisable)
+	m.HandleFunc("GET /healthz", s.health)
+	m.HandleFunc("GET /readyz", s.ready)
+	m.HandleFunc("GET /metrics", s.prometheusMetrics)
 	m.Handle("/", spaHandler(s.static))
 	return m
 }
 
 func (s *Server) mockRegister(w http.ResponseWriter, r *http.Request) {
-	var in struct{ Username, Password, Email string }
+	var in struct{ Username, Password, Email, TurnstileToken string }
 	if !decode(w, r, &in) {
 		return
 	}
@@ -105,7 +138,7 @@ func (s *Server) mockRegister(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, 201, map[string]any{"ok": true, "message": "Demo account created."})
 }
 func (s *Server) mockLogin(w http.ResponseWriter, r *http.Request) {
-	var in struct{ Username, Password string }
+	var in struct{ Username, Password, OTP string }
 	if !decode(w, r, &in) {
 		return
 	}
@@ -181,7 +214,7 @@ func (s *Server) mockCharacter(w http.ResponseWriter, r *http.Request) {
 				{"slot": 15, "entry": 50730, "name": "Glorenzelg, High-Blade of the Silver Hand", "quality": 4, "itemLevel": 271, "requiredLevel": 80, "armor": 0, "icon": "inv_sword_140", "stats": []string{"Two-Hand Sword", "954–1,432 Damage · Speed 3.60", "+164 Strength · +183 Stamina"}},
 				{"slot": 18, "entry": 50455, "name": "Warsong Gulch Mark of Honor", "quality": 3, "itemLevel": 80, "requiredLevel": 80, "armor": 0, "icon": "inv_bannerpvp_02", "stats": []string{"Relic"}},
 			}
-			jsonOut(w, 200, map[string]any{"character": c, "equipment": items})
+			jsonOut(w, 200, map[string]any{"character": c, "equipment": items, "profile": characterProfile{Achievements: 164, Exalted: 12, TalentSpecs: 2, TalentSpells: 44, Glyphs: 6, Professions: []profession{{ID: 164, Name: "Blacksmithing", Value: 450, Maximum: 450}, {ID: 186, Name: "Mining", Value: 450, Maximum: 450}}}})
 			return
 		}
 	}
@@ -310,4 +343,174 @@ func (s *Server) mockCredits(w http.ResponseWriter, r *http.Request) {
 	balance := s.mock.balance
 	s.mock.mu.Unlock()
 	jsonOut(w, 200, map[string]any{"ok": true, "username": strings.ToUpper(in.Username), "amount": in.Amount, "balance": balance})
+}
+
+func (s *Server) mockRealm(w http.ResponseWriter, _ *http.Request) {
+	jsonOut(w, 200, map[string]any{"name": "Azeroth Demo", "address": "logon.demo.local", "port": 8085, "population": 1.2, "characters": 18472, "online": 846, "allianceOnline": 431, "hordeOnline": 415, "uptime": 1209480, "recordOnline": 1732})
+}
+
+func mockGuildData() []map[string]any {
+	return []map[string]any{{"id": 1, "name": "Keepers of Dawn", "leader": "Arthoria", "members": 42, "averageLevel": 78.4, "online": 14}, {"id": 2, "name": "Ashen Vanguard", "leader": "Grimward", "members": 36, "averageLevel": 76.9, "online": 9}, {"id": 3, "name": "Silver Covenant", "leader": "Velistra", "members": 29, "averageLevel": 73.2, "online": 6}}
+}
+
+func (s *Server) mockGuilds(w http.ResponseWriter, _ *http.Request) {
+	jsonOut(w, 200, map[string]any{"guilds": mockGuildData()})
+}
+func (s *Server) mockGuild(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var guild map[string]any
+	for _, g := range mockGuildData() {
+		if id == fmt.Sprint(g["id"]) {
+			guild = g
+		}
+	}
+	if guild == nil {
+		problem(w, 404, "Guild not found")
+		return
+	}
+	members := []map[string]any{}
+	for _, c := range mockCharacters {
+		if c.Guild == guild["name"] {
+			members = append(members, map[string]any{"guid": c.GUID, "name": c.Name, "race": c.Race, "class": c.Class, "gender": c.Gender, "level": c.Level, "zone": c.Zone, "online": c.Online, "totalTime": c.TotalTime, "rank": map[bool]string{true: "Guild Master", false: "Raider"}[c.Name == guild["leader"]]})
+		}
+	}
+	guild["motd"] = "Strength through fellowship. Raid nights Thursday and Sunday."
+	guild["info"] = "A progression guild welcoming committed adventurers across Northrend."
+	jsonOut(w, 200, map[string]any{"guild": guild, "members": members})
+}
+
+func (s *Server) mockBillingCheckout(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	var in struct {
+		Package string `json:"package"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	credits := map[string]uint32{"small": 100, "medium": 550, "large": 1200}[in.Package]
+	if credits == 0 {
+		problem(w, 422, "Unknown credit package")
+		return
+	}
+	s.mock.mu.Lock()
+	s.mock.balance += credits
+	s.mock.mu.Unlock()
+	jsonOut(w, 200, map[string]string{"url": "/account?payment=success&demo=1"})
+}
+func (s *Server) mockSecuritySessions(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	now := time.Now()
+	jsonOut(w, 200, map[string]any{"sessions": []map[string]any{{"id": "demo-current", "Created": now.Add(-2 * time.Hour), "LastSeen": now, "Expires": now.Add(7 * 24 * time.Hour), "IP": "127.0.0.1", "UserAgent": "Demo browser", "Current": true}}})
+}
+func (s *Server) mockSecurityRevoke(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	jsonOut(w, 200, map[string]bool{"ok": true})
+}
+func (s *Server) mockSecurityPassword(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.mockUser(r)
+	if !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	var in struct {
+		CurrentPassword string `json:"currentPassword"`
+		NewPassword     string `json:"newPassword"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	s.mock.mu.Lock()
+	defer s.mock.mu.Unlock()
+	if s.mock.users[u] != in.CurrentPassword || len(in.NewPassword) < 8 {
+		problem(w, 422, "Check the current password and use at least 8 characters")
+		return
+	}
+	s.mock.users[u] = in.NewPassword
+	jsonOut(w, 200, map[string]bool{"ok": true})
+}
+func (s *Server) mockTOTPSetup(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.mockUser(r)
+	if !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	s.mock.mu.Lock()
+	s.mock.totpSecret = "JBSWY3DPEHPK3PXP"
+	s.mock.totpEnabled = false
+	s.mock.mu.Unlock()
+	jsonOut(w, 200, map[string]string{"secret": "JBSWY3DPEHPK3PXP", "uri": "otpauth://totp/Azeroth%20Demo:" + u + "?secret=JBSWY3DPEHPK3PXP&issuer=Azeroth%20Demo"})
+}
+func (s *Server) mockTOTPEnable(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	var in struct {
+		Code string `json:"code"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	s.mock.mu.Lock()
+	defer s.mock.mu.Unlock()
+	if !validTOTP(s.mock.totpSecret, in.Code, time.Now()) {
+		problem(w, 422, "Invalid authenticator code")
+		return
+	}
+	s.mock.totpEnabled = true
+	jsonOut(w, 200, map[string]bool{"ok": true})
+}
+func (s *Server) mockTOTPDisable(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	s.mock.mu.Lock()
+	s.mock.totpEnabled = false
+	s.mock.mu.Unlock()
+	jsonOut(w, 200, map[string]bool{"ok": true})
+}
+func (s *Server) mockAdminOrders(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	s.mock.mu.Lock()
+	defer s.mock.mu.Unlock()
+	jsonOut(w, 200, map[string]any{"orders": s.mock.orders})
+}
+func (s *Server) mockAdminOrderAction(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	jsonOut(w, 200, map[string]bool{"ok": true})
+}
+func (s *Server) mockAdminProduct(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	var p product
+	if !decode(w, r, &p) {
+		return
+	}
+	if p.Name == "" || p.Price == 0 || p.ItemID == 0 || p.Quantity == 0 {
+		problem(w, 422, "Name, price, item ID, and quantity are required")
+		return
+	}
+	s.mock.mu.Lock()
+	p.ID = uint32(len(mockProducts) + 1)
+	mockProducts = append(mockProducts, p)
+	s.mock.mu.Unlock()
+	jsonOut(w, 201, map[string]any{"id": p.ID})
 }

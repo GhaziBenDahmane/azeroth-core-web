@@ -10,14 +10,20 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - 2v2, 3v3, and 5v5 arena team ladders with ratings, records, and rosters
 - PvE raid progression from character achievement dates, including guild-first dates
 - Account dashboard with characters, credit balance, and order history
+- Password changes, TOTP two-factor authentication, and session revocation
+- Single-use email password recovery and optional Cloudflare Turnstile registration protection
 - Audited GM credit grants authorized from AzerothCore `account_access`
+- GM delivery queue/reconciliation view and credit ledger
 - Gold bundles, level services, and class-restricted multi-item gear packages
+- Stripe Checkout credit packs with signed, replay-safe webhooks
 - Categorized shop with an admin product API
-- Safe shop fulfillment through AzerothCore's `send items` SOAP command
+- Durable queued fulfillment through AzerothCore SOAP, with review/refund controls
+- Realm status, faction population, guild directory, and guild rosters
+- Health, readiness, and Prometheus metrics endpoints
 - Responsive, dependency-light Astro UI
 - One multi-stage Docker image; no Node runtime in production
 
-The portal creates four `portal_*` tables in `acore_auth`. It never modifies AzerothCore's inventory tables. Shop items are sent by the worldserver itself via in-game mail.
+The portal creates its own `portal_*` tables in `acore_auth`. It never modifies AzerothCore's inventory tables. Shop items are sent by the worldserver itself via in-game mail.
 
 ## Quick start
 
@@ -122,13 +128,15 @@ curl -X POST http://localhost:8080/api/admin/products \
 
 Use item IDs approved for your exact AzerothCore world database. Gems and enchant scrolls are ordinary bundle items and arrive in the same mail; the portal deliberately does not write enchantment data directly into character inventory tables.
 
-Credits are deliberately not tied to a payment provider. Grant credits through an audited staff tool or SQL until you integrate your payment processor:
+Credits can be granted through the audited GM console. To sell fixed credit packs, configure the five `STRIPE_*` variables and point a Stripe webhook at `/api/billing/webhook` for `checkout.session.completed` events.
 
 ```sql
 UPDATE acore_auth.portal_wallets SET balance = balance + 100 WHERE account_id = 1;
 ```
 
-For real-money sales, have the payment provider's signed webhook credit the wallet. Never trust a credit amount sent by the browser. The purchase endpoint locks both product and wallet rows and rolls back the debit when SOAP fails. As with any external delivery call, a process crash in the narrow interval after mail delivery and before the SQL commit needs staff reconciliation from worldserver and portal logs.
+Purchases commit the debit and an immutable item snapshot before entering the delivery queue. Ambiguous SOAP failures move to `review` instead of being retried automatically, preventing duplicate mail. A GM can inspect, retry, or refund them from the account console.
+
+Operational probes are available at `/healthz`, `/readyz`, and `/metrics`.
 
 ## Local development
 
@@ -160,6 +168,10 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `STARTING_CREDITS` | New wallet balance | `0` |
 | `SOAP_URL`, `SOAP_USER`, `SOAP_PASSWORD` | Worldserver delivery endpoint | unset |
 | `ADMIN_TOKEN` | Bearer token for product creation | unset/disabled |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe API and webhook signing secrets | unset/disabled |
+| `STRIPE_PRICE_SMALL`, `STRIPE_PRICE_MEDIUM`, `STRIPE_PRICE_LARGE` | Stripe Price IDs for 100/550/1,200 credits | unset |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Optional registration bot protection | unset/disabled |
+| `SMTP_ADDR`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional password-recovery email transport | unset/disabled |
 
 Set `PUBLIC_URL=https://your-domain`, `COOKIE_SECURE=true`, terminate TLS at your proxy, and keep the portal and SOAP ports behind a firewall in production.
 
