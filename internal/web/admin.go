@@ -2,8 +2,10 @@ package web
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -164,7 +166,10 @@ func (s *Server) adminModeration(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "GM access required")
 		return
 	}
-	var in struct{ Action, Target, Duration, Reason string }
+	var in struct {
+		Action, Target, Duration, Reason string
+		Level, RealmID                   int
+	}
 	if !decode(w, r, &in) {
 		return
 	}
@@ -206,7 +211,7 @@ func (s *Server) adminModeration(w http.ResponseWriter, r *http.Request) {
 			in.Duration = ""
 			command = "unban account " + in.Target
 		}
-	case "kick":
+	case "kick", "mute", "unmute":
 		if !validCharacterName(in.Target) {
 			problem(w, 422, "Enter a valid character name")
 			return
@@ -216,9 +221,68 @@ func (s *Server) adminModeration(w http.ResponseWriter, r *http.Request) {
 			problem(w, 404, "Character not found")
 			return
 		}
-		command = "kick " + in.Target
+		switch in.Action {
+		case "kick":
+			command = "kick " + in.Target
+		case "mute":
+			minutes, parseErr := strconv.Atoi(in.Duration)
+			if parseErr != nil || minutes < 1 || minutes > 525600 {
+				problem(w, 422, "Mute duration must be 1–525600 minutes")
+				return
+			}
+			command = fmt.Sprintf("mute %s %d %s", in.Target, minutes, in.Reason)
+		case "unmute":
+			in.Duration = ""
+			command = "unmute " + in.Target
+		}
+	case "ip_ban", "ip_unban":
+		if net.ParseIP(in.Target) == nil {
+			problem(w, 422, "Enter a valid IPv4 or IPv6 address")
+			return
+		}
+		if in.Action == "ip_ban" {
+			if !banDurationPattern.MatchString(in.Duration) {
+				problem(w, 422, "Duration must look like 30m, 7d, 1w, or -1 for permanent")
+				return
+			}
+			command = fmt.Sprintf("ban ip %s %s %s", in.Target, in.Duration, in.Reason)
+		} else {
+			in.Duration = ""
+			command = "unban ip " + in.Target
+		}
+	case "announce":
+		in.Target = "realm"
+		command = "announce " + in.Reason
+	case "motd":
+		in.Target = "realm"
+		command = "server set motd " + in.Reason
+	case "gm_level":
+		if !validAccountName(in.Target) || in.Level < 0 || in.Level > int(s.gmLevel(r.Context(), actor.ID)) || in.RealmID < -1 {
+			problem(w, 422, "Invalid account, GM level, or realm ID")
+			return
+		}
+		if err := s.s.Auth.QueryRowContext(r.Context(), fmt.Sprintf("SELECT id,username FROM %s.account WHERE username=?", s.c.AuthDB), strings.ToUpper(in.Target)).Scan(&targetAccountID, &in.Target); err != nil {
+			problem(w, 404, "Account not found")
+			return
+		}
+		if targetAccountID == actor.ID {
+			problem(w, 409, "You cannot change your own GM level")
+			return
+		}
+		command = fmt.Sprintf("account set gmlevel %s %d %d", in.Target, in.Level, in.RealmID)
+	case "restart", "shutdown":
+		delay, parseErr := strconv.Atoi(in.Duration)
+		if parseErr != nil || delay < 10 || delay > 3600 {
+			problem(w, 422, "Server delay must be 10–3600 seconds")
+			return
+		}
+		in.Target = "realm"
+		command = fmt.Sprintf("server %s %d", in.Action, delay)
+	case "cancel_shutdown":
+		in.Target, in.Duration = "realm", ""
+		command = "server shutdown cancel"
 	default:
-		problem(w, 422, "Action must be ban, unban, or kick")
+		problem(w, 422, "Unsupported moderation action")
 		return
 	}
 	logResult, err := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_moderation_log(actor_account_id,target_account_id,target,action,duration,reason,status) VALUES(?,?,?,?,?,?,'review')", actor.ID, targetAccountID, in.Target, in.Action, in.Duration, in.Reason)

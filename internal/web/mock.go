@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,10 +18,11 @@ type mockState struct {
 	totpEnabled bool
 	bans        map[string]string
 	moderation  []map[string]any
+	tickets     []supportTicket
 }
 
 func newMockState() *mockState {
-	return &mockState{balance: 500, users: map[string]string{"DEMO": "demo1234"}, bans: map[string]string{}, orders: []map[string]any{{"id": 1042, "itemId": 49623, "quantity": 1, "total": 85, "status": "delivered", "created": time.Now().Add(-24 * time.Hour)}}}
+	return &mockState{balance: 500, users: map[string]string{"DEMO": "demo1234"}, bans: map[string]string{}, tickets: []supportTicket{{ID: 1, AccountID: 1, Username: "DEMO", CharacterGUID: 1, Subject: "Missing quest item", Message: "The quest item did not drop after the boss encounter.", Status: "open", Created: time.Now().Add(-2 * time.Hour), Updated: time.Now().Add(-2 * time.Hour)}}, orders: []map[string]any{{"id": 1042, "itemId": 49623, "quantity": 1, "total": 85, "status": "delivered", "created": time.Now().Add(-24 * time.Hour)}}}
 }
 
 var mockCharacters = []character{
@@ -123,6 +125,8 @@ func (s *Server) mockHandler() http.Handler {
 	})
 	m.HandleFunc("POST /api/shop/purchase", s.mockPurchase)
 	m.HandleFunc("GET /api/orders", s.mockOrders)
+	m.HandleFunc("GET /api/tickets", s.mockTickets)
+	m.HandleFunc("POST /api/tickets", s.mockCreateTicket)
 	m.HandleFunc("POST /api/admin/credits", s.rate(30, time.Minute, s.mockCredits))
 	m.HandleFunc("GET /api/admin/orders", s.mockAdminOrders)
 	m.HandleFunc("GET /api/admin/ledger", func(w http.ResponseWriter, _ *http.Request) {
@@ -134,6 +138,8 @@ func (s *Server) mockHandler() http.Handler {
 	m.HandleFunc("GET /api/admin/accounts", s.mockAdminAccounts)
 	m.HandleFunc("POST /api/admin/moderation", s.rate(30, time.Minute, s.mockAdminModeration))
 	m.HandleFunc("GET /api/admin/moderation", s.mockAdminModerationLog)
+	m.HandleFunc("GET /api/admin/tickets", s.mockAdminTickets)
+	m.HandleFunc("POST /api/admin/tickets/{id}", s.mockAdminTicketUpdate)
 	m.HandleFunc("POST /api/admin/products", s.mockAdminProduct)
 	m.HandleFunc("POST /api/admin/orders/{id}/retry", s.mockAdminOrderAction)
 	m.HandleFunc("POST /api/admin/orders/{id}/refund", s.mockAdminOrderAction)
@@ -353,6 +359,69 @@ func (s *Server) mockOrders(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, 200, map[string]any{"orders": orders})
 }
 
+func (s *Server) mockTickets(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	s.mock.mu.Lock()
+	tickets := append([]supportTicket(nil), s.mock.tickets...)
+	s.mock.mu.Unlock()
+	jsonOut(w, 200, map[string]any{"tickets": tickets})
+}
+
+func (s *Server) mockCreateTicket(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	var in struct {
+		CharacterGUID    uint32
+		Subject, Message string
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	in.Subject, in.Message = strings.TrimSpace(in.Subject), strings.TrimSpace(in.Message)
+	if len(in.Subject) < 3 || len(in.Message) < 10 {
+		problem(w, 422, "Enter a subject and detailed message")
+		return
+	}
+	s.mock.mu.Lock()
+	id := uint64(len(s.mock.tickets) + 1)
+	now := time.Now()
+	s.mock.tickets = append([]supportTicket{{ID: id, AccountID: 1, Username: "DEMO", CharacterGUID: in.CharacterGUID, Subject: in.Subject, Message: in.Message, Status: "open", Created: now, Updated: now}}, s.mock.tickets...)
+	s.mock.mu.Unlock()
+	jsonOut(w, 201, map[string]any{"ok": true, "id": id})
+}
+
+func (s *Server) mockAdminTickets(w http.ResponseWriter, r *http.Request) { s.mockTickets(w, r) }
+
+func (s *Server) mockAdminTicketUpdate(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 403, "GM access required")
+		return
+	}
+	id, _ := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	var in struct{ Status, Response string }
+	if !decode(w, r, &in) {
+		return
+	}
+	s.mock.mu.Lock()
+	defer s.mock.mu.Unlock()
+	for i := range s.mock.tickets {
+		if s.mock.tickets[i].ID == id {
+			s.mock.tickets[i].Status = in.Status
+			s.mock.tickets[i].Response = in.Response
+			s.mock.tickets[i].GM = "DEMO"
+			s.mock.tickets[i].Updated = time.Now()
+			jsonOut(w, 200, map[string]any{"ok": true})
+			return
+		}
+	}
+	problem(w, 404, "Ticket not found")
+}
+
 func (s *Server) mockCredits(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.mockUser(r); !ok {
 		problem(w, 401, "Sign in required")
@@ -413,13 +482,17 @@ func (s *Server) mockAdminModeration(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "GM access required")
 		return
 	}
-	var in struct{ Action, Target, Duration, Reason string }
+	var in struct {
+		Action, Target, Duration, Reason string
+		Level, RealmID                   int
+	}
 	if !decode(w, r, &in) {
 		return
 	}
 	in.Action, in.Target, in.Reason = strings.ToLower(strings.TrimSpace(in.Action)), strings.ToUpper(strings.TrimSpace(in.Target)), strings.TrimSpace(in.Reason)
-	if in.Action != "ban" && in.Action != "unban" && in.Action != "kick" {
-		problem(w, 422, "Action must be ban, unban, or kick")
+	allowed := map[string]bool{"ban": true, "unban": true, "kick": true, "mute": true, "unmute": true, "ip_ban": true, "ip_unban": true, "gm_level": true, "announce": true, "motd": true, "restart": true, "shutdown": true, "cancel_shutdown": true}
+	if !allowed[in.Action] {
+		problem(w, 422, "Unsupported moderation action")
 		return
 	}
 	if len(in.Reason) < 3 {

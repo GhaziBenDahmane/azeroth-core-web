@@ -131,6 +131,12 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 target VARCHAR(64) NOT NULL, action VARCHAR(30) NOT NULL, duration VARCHAR(30) NOT NULL DEFAULT '', reason VARCHAR(255) NOT NULL DEFAULT '',
 		 status ENUM('executed','review') NOT NULL, error_message VARCHAR(500) NOT NULL DEFAULT '', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		 INDEX idx_portal_moderation_target (target_account_id,created_at), INDEX idx_portal_moderation_actor (actor_account_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS portal_support_tickets (
+		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, account_id INT UNSIGNED NOT NULL, character_guid INT UNSIGNED NOT NULL DEFAULT 0,
+		 subject VARCHAR(100) NOT NULL, message TEXT NOT NULL, status ENUM('open','answered','closed') NOT NULL DEFAULT 'open',
+		 gm_account_id INT UNSIGNED NOT NULL DEFAULT 0, response TEXT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		 INDEX idx_portal_ticket_account (account_id,created_at), INDEX idx_portal_ticket_status (status,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_password_resets (
 		 token_hash BINARY(32) PRIMARY KEY, account_id INT UNSIGNED NOT NULL, expires_at TIMESTAMP NOT NULL,
 		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_portal_reset_account (account_id)) ENGINE=InnoDB`,
