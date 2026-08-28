@@ -27,7 +27,8 @@ All request-derived values are passed as MySQL parameters. The only values inter
 - Product image URLs are limited to absolute HTTP(S) URLs.
 - The admin bearer token is compared in constant time.
 - GM credit grants require a live authenticated session and the configured `account_access` level. Every grant is recorded in the append-only `portal_credit_ledger` table.
-- Moderation and realm-operation endpoints require the configured AzerothCore GM level. Only fixed commands for bans, mutes, kicks, announcements, MOTD, GM levels, and guarded shutdown/restart scheduling can be issued; inputs are allow-listed, privilege escalation and self-role changes are rejected, and every attempt is recorded in `portal_moderation_log`.
+- Moderation and realm-operation endpoints require the configured AzerothCore GM level. Only fixed commands for bans, mutes, kicks, announcements, MOTD, GM levels, and guarded start/shutdown/restart operations can be issued; inputs are allow-listed, privilege escalation and self-role changes are rejected, and every attempt is recorded in `portal_moderation_log`.
+- Starting an offline realm uses only the operator-configured `REALM_START_WEBHOOK`; users cannot choose its URL. Use HTTPS and a narrowly scoped bearer token, restrict outbound network access, and make the receiver idempotent.
 - Stripe credits are applied only after HMAC verification with a five-minute timestamp tolerance. Event and checkout IDs enforce replay safety.
 - Registration can require server-verified Cloudflare Turnstile tokens; it is disabled unless configured.
 
@@ -47,3 +48,4 @@ All request-derived values are passed as MySQL parameters. The only values inter
 4. Terminate TLS at a trusted proxy, enable secure cookies, firewall SOAP/MySQL, rotate the admin token, and use the least-privilege grants documented in the README.
 5. The in-memory demo mode must never be enabled on the public production deployment.
 6. Dependency lockfiles and image digests should be maintained by deployment automation. Run dependency vulnerability scans whenever dependencies or base images change.
+7. The optional realm-start webhook is an outbound trust boundary. Keep its token separate from AzerothCore credentials, rotate it regularly, and allow-list the destination at the network layer.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -181,11 +182,8 @@ func (s *Server) adminModeration(w http.ResponseWriter, r *http.Request) {
 		problem(w, 422, "Reason must be 3–255 characters without quotes or line breaks")
 		return
 	}
-	if !s.soap.Enabled() {
-		problem(w, 503, "Realm administration is not configured")
-		return
-	}
 	var command string
+	useStartWebhook := false
 	var targetAccountID uint32
 	switch in.Action {
 	case "ban", "unban":
@@ -281,8 +279,15 @@ func (s *Server) adminModeration(w http.ResponseWriter, r *http.Request) {
 	case "cancel_shutdown":
 		in.Target, in.Duration = "realm", ""
 		command = "server shutdown cancel"
+	case "start":
+		in.Target, in.Duration = "realm", ""
+		useStartWebhook = true
 	default:
 		problem(w, 422, "Unsupported moderation action")
+		return
+	}
+	if !useStartWebhook && !s.soap.Enabled() {
+		problem(w, 503, "Realm administration is not configured")
 		return
 	}
 	logResult, err := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_moderation_log(actor_account_id,target_account_id,target,action,duration,reason,status) VALUES(?,?,?,?,?,?,'review')", actor.ID, targetAccountID, in.Target, in.Action, in.Duration, in.Reason)
@@ -291,7 +296,12 @@ func (s *Server) adminModeration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logID, _ := logResult.LastInsertId()
-	if _, err = s.soap.Command(r.Context(), command); err != nil {
+	if useStartWebhook {
+		err = s.startRealm(r)
+	} else {
+		_, err = s.soap.Command(r.Context(), command)
+	}
+	if err != nil {
 		message := err.Error()
 		if len(message) > 500 {
 			message = message[:500]
@@ -329,6 +339,39 @@ func (s *Server) adminModerationLog(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	jsonOut(w, 200, map[string]any{"entries": out})
+}
+
+func (s *Server) startRealm(r *http.Request) error {
+	if s.c.RealmStartWebhook == "" {
+		return fmt.Errorf("REALM_START_WEBHOOK is not configured")
+	}
+	u, err := url.ParseRequestURI(s.c.RealmStartWebhook)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		return fmt.Errorf("invalid REALM_START_WEBHOOK")
+	}
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, u.String(), strings.NewReader("{}"))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if s.c.RealmControlToken != "" {
+		req.Header.Set("Authorization", "Bearer "+s.c.RealmControlToken)
+	}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	response, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode/100 != 2 {
+		return fmt.Errorf("start webhook returned %s", response.Status)
+	}
+	return nil
 }
 
 func validAccountName(value string) bool {

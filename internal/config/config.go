@@ -28,6 +28,7 @@ type Config struct {
 	TurnstileSiteKey, TurnstileSecret      string
 	SMTPAddr, SMTPUser, SMTPPassword       string
 	SMTPFrom                               string
+	RealmStartWebhook, RealmControlToken   string
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
@@ -47,6 +48,7 @@ func Load() (Config, error) {
 		StripePriceSmall: os.Getenv("STRIPE_PRICE_SMALL"), StripePriceMedium: os.Getenv("STRIPE_PRICE_MEDIUM"), StripePriceLarge: os.Getenv("STRIPE_PRICE_LARGE"),
 		TurnstileSiteKey: os.Getenv("TURNSTILE_SITE_KEY"), TurnstileSecret: os.Getenv("TURNSTILE_SECRET"),
 		SMTPAddr: os.Getenv("SMTP_ADDR"), SMTPUser: os.Getenv("SMTP_USER"), SMTPPassword: os.Getenv("SMTP_PASSWORD"), SMTPFrom: os.Getenv("SMTP_FROM"),
+		RealmStartWebhook: os.Getenv("REALM_START_WEBHOOK"), RealmControlToken: os.Getenv("REALM_CONTROL_TOKEN"),
 	}
 	if c.AuthDSN == "" && !c.MockMode {
 		return c, fmt.Errorf("AUTH_DSN is required")

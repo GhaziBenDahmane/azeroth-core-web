@@ -490,7 +490,7 @@ func (s *Server) mockAdminModeration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Action, in.Target, in.Reason = strings.ToLower(strings.TrimSpace(in.Action)), strings.ToUpper(strings.TrimSpace(in.Target)), strings.TrimSpace(in.Reason)
-	allowed := map[string]bool{"ban": true, "unban": true, "kick": true, "mute": true, "unmute": true, "ip_ban": true, "ip_unban": true, "gm_level": true, "announce": true, "motd": true, "restart": true, "shutdown": true, "cancel_shutdown": true}
+	allowed := map[string]bool{"ban": true, "unban": true, "kick": true, "mute": true, "unmute": true, "ip_ban": true, "ip_unban": true, "gm_level": true, "announce": true, "motd": true, "start": true, "restart": true, "shutdown": true, "cancel_shutdown": true}
 	if !allowed[in.Action] {
 		problem(w, 422, "Unsupported moderation action")
 		return
@@ -498,6 +498,9 @@ func (s *Server) mockAdminModeration(w http.ResponseWriter, r *http.Request) {
 	if len(in.Reason) < 3 {
 		problem(w, 422, "Reason is required")
 		return
+	}
+	if in.Action == "start" || in.Action == "restart" || in.Action == "shutdown" || in.Action == "cancel_shutdown" || in.Action == "announce" || in.Action == "motd" {
+		in.Target = "realm"
 	}
 	s.mock.mu.Lock()
 	if in.Action == "ban" {

@@ -14,7 +14,7 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - Single-use email password recovery and optional Cloudflare Turnstile registration protection
 - Audited GM credit grants authorized from AzerothCore `account_access`
 - GM player lookup with active-ban status, audited account bans/unbans, and character kicks
-- Character mutes, IP bans, announcements, MOTD updates, guarded GM-level changes, and scheduled realm restart/shutdown controls
+- Character mutes, IP bans, announcements, MOTD updates, guarded GM-level changes, and realm start/restart/shutdown controls
 - Player support tickets with GM replies and status management
 - GM delivery queue/reconciliation view and credit ledger
 - Gold bundles, level services, and class-restricted multi-item gear packages
@@ -178,6 +178,7 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `GM_LEVEL` | Minimum AzerothCore GM level allowed to grant credits | `3` |
 | `STARTING_CREDITS` | New wallet balance | `0` |
 | `SOAP_URL`, `SOAP_USER`, `SOAP_PASSWORD` | Worldserver delivery endpoint | unset |
+| `REALM_START_WEBHOOK`, `REALM_CONTROL_TOKEN` | Optional authenticated orchestrator webhook for starting an offline worldserver | unset/disabled |
 | `ADMIN_TOKEN` | Bearer token for product creation | unset/disabled |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe API and webhook signing secrets | unset/disabled |
 | `STRIPE_PRICE_SMALL`, `STRIPE_PRICE_MEDIUM`, `STRIPE_PRICE_LARGE` | Stripe Price IDs for 100/550/1,200 credits | unset |

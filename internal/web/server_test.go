@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -138,5 +139,31 @@ func TestModerationInputAllowLists(t *testing.T) {
 	}
 	if !validModerationReason("Repeated harassment") || validModerationReason("reason\nserver shutdown") || validModerationReason(`bad "quote"`) {
 		t.Fatal("moderation reason allow-list is incorrect")
+	}
+}
+
+func TestStartRealmWebhook(t *testing.T) {
+	called := false
+	hook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		if r.Method != http.MethodPost {
+			t.Errorf("got method %s, want POST", r.Method)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer control-secret" {
+			t.Errorf("got authorization %q", got)
+		}
+		if got := r.Header.Get("Content-Type"); got != "application/json" {
+			t.Errorf("got content type %q", got)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer hook.Close()
+
+	s := &Server{c: config.Config{RealmStartWebhook: hook.URL, RealmControlToken: "control-secret"}}
+	if err := s.startRealm(httptest.NewRequest(http.MethodPost, "/api/admin/moderation", nil)); err != nil {
+		t.Fatalf("start webhook failed: %v", err)
+	}
+	if !called {
+		t.Fatal("start webhook was not called")
 	}
 }
