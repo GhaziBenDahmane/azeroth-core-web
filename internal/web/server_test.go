@@ -102,3 +102,19 @@ func TestWotLKRaceFactions(t *testing.T) {
 		t.Fatal("unknown race must not be assigned a faction")
 	}
 }
+
+func TestServiceCommandsAreAllowListed(t *testing.T) {
+	for action, want := range map[string]string{
+		"":               "",
+		"race_change":    "character changerace Arthoria",
+		"faction_change": "character changefaction Arthoria",
+	} {
+		got, err := serviceCommand(action, "Arthoria")
+		if err != nil || got != want {
+			t.Errorf("%q: got %q, %v; want %q", action, got, err, want)
+		}
+	}
+	if _, err := serviceCommand("server shutdown", "Arthoria"); err == nil {
+		t.Fatal("arbitrary service command was accepted")
+	}
+}

@@ -15,6 +15,7 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - Audited GM credit grants authorized from AzerothCore `account_access`
 - GM delivery queue/reconciliation view and credit ledger
 - Gold bundles, level services, and class-restricted multi-item gear packages
+- Queued race-change and faction-change services using AzerothCore's supported character commands
 - 51 specialization-aware, full-slot WotLK S6, S7, and T8 loadouts resolved from the installed world database
 - Stripe Checkout credit packs with signed, replay-safe webhooks
 - Categorized shop with an admin product API
@@ -132,6 +133,8 @@ Use item IDs approved for your exact AzerothCore world database. Gems and enchan
 The default specialization-aware S6, S7, and T8 catalog is populated automatically from the installed AzerothCore `item_template` table. It includes each five-piece armor set, all matching off-pieces, jewelry, trinkets, class-appropriate weapons and relics, a phase-appropriate gem kit, a full enchant kit, and level 80. See [CATALOG.md](CATALOG.md) for the exact behavior and safety rationale.
 
 Credits can be granted through the audited GM console. To sell fixed credit packs, configure the five `STRIPE_*` variables and point a Stripe webhook at `/api/billing/webhook` for `checkout.session.completed` events.
+
+Race Change and Faction Change are seeded as standard shop services. Fulfillment calls AzerothCore's allow-listed `character changerace` or `character changefaction` command through SOAP; it never writes `at_login` flags directly. The character must remain offline until delivery completes and chooses its new race or faction appearance on the next login.
 
 ```sql
 UPDATE acore_auth.portal_wallets SET balance = balance + 100 WHERE account_id = 1;

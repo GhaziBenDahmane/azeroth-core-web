@@ -58,6 +58,9 @@ func Open(c config.Config) (*Store, error) {
 	}
 	seedCtx, seedCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer seedCancel()
+	if seedErr := s.SeedDefaultServices(seedCtx); seedErr != nil {
+		slog.Warn("default services could not be seeded", "error", seedErr)
+	}
 	if seeded, seedErr := s.SeedDefaultCatalog(seedCtx); seedErr != nil {
 		slog.Warn("default shop catalog could not be fully seeded", "error", seedErr)
 	} else {
@@ -99,7 +102,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 item_id INT UNSIGNED NOT NULL, quantity INT UNSIGNED NOT NULL DEFAULT 1, price INT UNSIGNED NOT NULL,
 		 category VARCHAR(40) NOT NULL DEFAULT 'Items', image_url VARCHAR(500) NOT NULL DEFAULT '', active TINYINT(1) NOT NULL DEFAULT 1,
 		 class_id TINYINT UNSIGNED NOT NULL DEFAULT 0, tier_label VARCHAR(30) NOT NULL DEFAULT '', service_level TINYINT UNSIGNED NOT NULL DEFAULT 0,
-		 gold_amount INT UNSIGNED NOT NULL DEFAULT 0,
+		 gold_amount INT UNSIGNED NOT NULL DEFAULT 0, service_action VARCHAR(30) NOT NULL DEFAULT '',
 		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_portal_products_active (active), UNIQUE KEY idx_portal_products_seed_key (seed_key)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_product_items (
 		 product_id INT UNSIGNED NOT NULL, item_id INT UNSIGNED NOT NULL, quantity INT UNSIGNED NOT NULL DEFAULT 1,
@@ -109,6 +112,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 product_id INT UNSIGNED NOT NULL, item_id INT UNSIGNED NOT NULL, quantity INT UNSIGNED NOT NULL, total INT UNSIGNED NOT NULL,
 		 status ENUM('pending','delivering','delivered','review','failed','refunded') NOT NULL DEFAULT 'pending', error_message VARCHAR(500) NOT NULL DEFAULT '',
 		 attempts INT UNSIGNED NOT NULL DEFAULT 0, service_level TINYINT UNSIGNED NOT NULL DEFAULT 0, gold_amount INT UNSIGNED NOT NULL DEFAULT 0,
+		 service_action VARCHAR(30) NOT NULL DEFAULT '',
 		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, delivery_started_at TIMESTAMP NULL, delivered_at TIMESTAMP NULL,
 		 INDEX idx_portal_orders_account (account_id, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_order_items (
@@ -137,10 +141,12 @@ func (s *Store) Migrate(ctx context.Context) error {
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS service_level TINYINT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS gold_amount INT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS seed_key VARCHAR(80) NULL`,
+		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS service_action VARCHAR(30) NOT NULL DEFAULT ''`,
 		`ALTER TABLE portal_orders MODIFY COLUMN status ENUM('pending','delivering','delivered','review','failed','refunded') NOT NULL DEFAULT 'pending'`,
 		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS attempts INT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS service_level TINYINT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS gold_amount INT UNSIGNED NOT NULL DEFAULT 0`,
+		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS service_action VARCHAR(30) NOT NULL DEFAULT ''`,
 		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS delivery_started_at TIMESTAMP NULL`,
 		`ALTER TABLE portal_sessions ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`,
 		`ALTER TABLE portal_sessions ADD COLUMN IF NOT EXISTS ip_address VARCHAR(45) NOT NULL DEFAULT ''`,
@@ -160,5 +166,25 @@ func (s *Store) Migrate(ctx context.Context) error {
 		}
 	}
 	_, _ = s.Auth.ExecContext(ctx, `DELETE FROM portal_sessions WHERE expires_at < NOW()`)
+	return nil
+}
+
+func (s *Store) SeedDefaultServices(ctx context.Context) error {
+	services := []struct {
+		key, name, description, action string
+		price                          uint32
+	}{
+		{"service-race-change", "Race Change", "Choose a new race from your current faction on your next login.", "race_change", 35},
+		{"service-faction-change", "Faction Change", "Choose a compatible race from the opposite faction on your next login.", "faction_change", 50},
+	}
+	for _, service := range services {
+		_, err := s.Auth.ExecContext(ctx, `INSERT INTO portal_products(seed_key,name,description,item_id,quantity,price,category,tier_label,service_action,active)
+			VALUES(?,?,?,0,0,?,'Services','Character',?,1)
+			ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),price=VALUES(price),category=VALUES(category),tier_label=VALUES(tier_label),service_action=VALUES(service_action),active=1`,
+			service.key, service.name, service.description, service.price, service.action)
+		if err != nil {
+			return fmt.Errorf("seed %s: %w", service.key, err)
+		}
+	}
 	return nil
 }

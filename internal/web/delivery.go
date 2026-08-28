@@ -15,6 +15,7 @@ type queuedOrder struct {
 	AccountID, CharacterGUID uint32
 	ServiceLevel             uint8
 	Gold                     uint32
+	ServiceAction            string
 }
 
 func (s *Server) deliveryLoop() {
@@ -38,7 +39,7 @@ func (s *Server) claimOrder(ctx context.Context) (queuedOrder, bool) {
 		return o, false
 	}
 	defer tx.Rollback()
-	err = tx.QueryRowContext(ctx, "SELECT id,account_id,character_guid,service_level,gold_amount FROM portal_orders WHERE status='pending' ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED").Scan(&o.ID, &o.AccountID, &o.CharacterGUID, &o.ServiceLevel, &o.Gold)
+	err = tx.QueryRowContext(ctx, "SELECT id,account_id,character_guid,service_level,gold_amount,service_action FROM portal_orders WHERE status='pending' ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED").Scan(&o.ID, &o.AccountID, &o.CharacterGUID, &o.ServiceLevel, &o.Gold, &o.ServiceAction)
 	if err != nil {
 		return o, false
 	}
@@ -53,9 +54,14 @@ func (s *Server) claimOrder(ctx context.Context) (queuedOrder, bool) {
 
 func (s *Server) fulfillOrder(ctx context.Context, o queuedOrder) {
 	var name string
-	q := fmt.Sprintf("SELECT name FROM %s.characters WHERE guid=? AND account=? AND deleteDate IS NULL", s.c.CharactersDB)
-	if err := s.s.Characters.QueryRowContext(ctx, q, o.CharacterGUID, o.AccountID).Scan(&name); err != nil {
+	var online bool
+	q := fmt.Sprintf("SELECT name,online FROM %s.characters WHERE guid=? AND account=? AND deleteDate IS NULL", s.c.CharactersDB)
+	if err := s.s.Characters.QueryRowContext(ctx, q, o.CharacterGUID, o.AccountID).Scan(&name, &online); err != nil {
 		s.reviewOrder(ctx, o.ID, "Character no longer exists")
+		return
+	}
+	if online {
+		s.reviewOrder(ctx, o.ID, "Character must be offline for delivery")
 		return
 	}
 	if strings.ContainsAny(name, " \t\r\n\"\\") {
@@ -93,6 +99,14 @@ func (s *Server) fulfillOrder(ctx context.Context, o queuedOrder) {
 	if o.Gold > 0 {
 		commands = append(commands, fmt.Sprintf(`send money %s "Portal order %d" "Thank you for supporting %s." %d`, name, o.ID, realm, uint64(o.Gold)*10000))
 	}
+	service, serviceErr := serviceCommand(o.ServiceAction, name)
+	if serviceErr != nil {
+		s.reviewOrder(ctx, o.ID, "Unsupported service action")
+		return
+	}
+	if service != "" {
+		commands = append(commands, service)
+	}
 	for _, cmd := range commands {
 		if _, err = s.soap.Command(ctx, cmd); err != nil {
 			s.reviewOrder(ctx, o.ID, err.Error())
@@ -101,6 +115,19 @@ func (s *Server) fulfillOrder(ctx context.Context, o queuedOrder) {
 	}
 	if _, err = s.s.Auth.ExecContext(ctx, "UPDATE portal_orders SET status='delivered',delivered_at=NOW() WHERE id=? AND status='delivering'", o.ID); err != nil {
 		slog.Error("record delivery", "order", o.ID, "error", err)
+	}
+}
+
+func serviceCommand(action, characterName string) (string, error) {
+	switch action {
+	case "":
+		return "", nil
+	case "race_change":
+		return fmt.Sprintf("character changerace %s", characterName), nil
+	case "faction_change":
+		return fmt.Sprintf("character changefaction %s", characterName), nil
+	default:
+		return "", fmt.Errorf("unsupported service action %q", action)
 	}
 }
 func (s *Server) reviewOrder(ctx context.Context, id uint64, message string) {

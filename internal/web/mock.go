@@ -45,6 +45,8 @@ func buildMockProducts() []product {
 		{ID: 5, ItemID: 37719, Quantity: 5, Price: 15, Name: "Adventurer Supply Bundle", Description: "Useful supplies for your next adventure.", Category: "Utility"},
 		{ID: 6, ItemID: 50818, Quantity: 1, Price: 75, Name: "Invincible's Reins", Description: "The famed steed of the fallen prince awaits a new rider.", Category: "Mounts"},
 		{ID: 7, Price: 40, Name: "Instant Level 80", Description: "Raise one existing character to level 80 and receive a starter travel kit.", Category: "Services", Tier: "Level 80", ServiceLevel: 80, Includes: []string{"Level 80 boost", "Four 20-slot bags", "Cold Weather Flying starter gold"}},
+		{ID: 8, Price: 35, Name: "Race Change", Description: "Choose a new race from your current faction on your next login.", Category: "Services", Tier: "Character", ServiceAction: "race_change", Includes: []string{"AzerothCore race-change flag", "Same-faction races", "Applied to an offline character"}},
+		{ID: 9, Price: 50, Name: "Faction Change", Description: "Choose a compatible race from the opposite faction on your next login.", Category: "Services", Tier: "Character", ServiceAction: "faction_change", Includes: []string{"AzerothCore faction-change flag", "Alliance ↔ Horde", "Applied to an offline character"}},
 	}
 	sets := []struct {
 		ID                                 uint8
@@ -60,7 +62,7 @@ func buildMockProducts() []product {
 		{11, "Druid", "Feral", "Dragonhide", "Nightsong", "agility"}, {11, "Druid", "Balance", "Wyrmhide", "Nightsong", "caster"}, {11, "Druid", "Restoration", "Kodohide", "Nightsong", "healer"},
 	}
 	kits := map[string][]string{"strength": {"20 × primary-stat gems + meta", "DPS head, shoulder & leg enhancements", "Weapon, cloak, chest, wrist, glove & boot enchants"}, "agility": {"20 × primary-stat gems + meta", "Agility head, shoulder & leg enhancements", "Weapon, cloak, chest, wrist, glove & boot enchants"}, "caster": {"20 × spell-power gems + meta", "Caster head, shoulder & leg enhancements", "Weapon, cloak, chest, wrist, glove & boot enchants"}, "healer": {"20 × healing gems + meta", "Healer head, shoulder & leg enhancements", "Weapon, cloak, chest, wrist, glove & boot enchants"}, "tank": {"20 × stamina gems + meta", "Tank head, shoulder & leg enhancements", "Weapon, cloak, chest, wrist, glove & boot enchants"}}
-	id := uint32(8)
+	id := uint32(10)
 	for _, set := range sets {
 		for _, season := range []struct {
 			Name  string

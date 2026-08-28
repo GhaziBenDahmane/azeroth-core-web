@@ -20,21 +20,22 @@ type character struct {
 	Guild     string `json:"guild,omitempty"`
 }
 type product struct {
-	ID           uint32       `json:"id"`
-	ItemID       uint32       `json:"itemId"`
-	Quantity     uint32       `json:"quantity"`
-	Price        uint32       `json:"price"`
-	Name         string       `json:"name"`
-	Description  string       `json:"description"`
-	Category     string       `json:"category"`
-	ImageURL     string       `json:"imageUrl"`
-	ClassID      uint8        `json:"classId,omitempty"`
-	ClassName    string       `json:"className,omitempty"`
-	Tier         string       `json:"tier,omitempty"`
-	ServiceLevel uint8        `json:"serviceLevel,omitempty"`
-	Includes     []string     `json:"includes,omitempty"`
-	Items        []bundleItem `json:"items,omitempty"`
-	Gold         uint32       `json:"gold,omitempty"`
+	ID            uint32       `json:"id"`
+	ItemID        uint32       `json:"itemId"`
+	Quantity      uint32       `json:"quantity"`
+	Price         uint32       `json:"price"`
+	Name          string       `json:"name"`
+	Description   string       `json:"description"`
+	Category      string       `json:"category"`
+	ImageURL      string       `json:"imageUrl"`
+	ClassID       uint8        `json:"classId,omitempty"`
+	ClassName     string       `json:"className,omitempty"`
+	Tier          string       `json:"tier,omitempty"`
+	ServiceLevel  uint8        `json:"serviceLevel,omitempty"`
+	ServiceAction string       `json:"serviceAction,omitempty"`
+	Includes      []string     `json:"includes,omitempty"`
+	Items         []bundleItem `json:"items,omitempty"`
+	Gold          uint32       `json:"gold,omitempty"`
 }
 
 type bundleItem struct {

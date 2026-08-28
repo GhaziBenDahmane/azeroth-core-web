@@ -368,7 +368,7 @@ func (s *Server) armoryCharacter(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
-	rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount FROM portal_products WHERE active=1 ORDER BY category,class_id,price,name")
+	rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action FROM portal_products WHERE active=1 ORDER BY category,class_id,price,name")
 	if e != nil {
 		problem(w, 500, "Could not load shop")
 		return
@@ -377,7 +377,7 @@ func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
 	out := []product{}
 	for rows.Next() {
 		var p product
-		if rows.Scan(&p.ID, &p.Name, &p.Description, &p.ItemID, &p.Quantity, &p.Price, &p.Category, &p.ImageURL, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold) == nil {
+		if rows.Scan(&p.ID, &p.Name, &p.Description, &p.ItemID, &p.Quantity, &p.Price, &p.Category, &p.ImageURL, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold, &p.ServiceAction) == nil {
 			out = append(out, p)
 		}
 	}
@@ -462,7 +462,7 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	var p product
-	if e = tx.QueryRowContext(r.Context(), "SELECT id,name,item_id,quantity,price,class_id,tier_label,service_level,gold_amount FROM portal_products WHERE id=? AND active=1 FOR UPDATE", in.ProductID).Scan(&p.ID, &p.Name, &p.ItemID, &p.Quantity, &p.Price, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold); e != nil {
+	if e = tx.QueryRowContext(r.Context(), "SELECT id,name,item_id,quantity,price,class_id,tier_label,service_level,gold_amount,service_action FROM portal_products WHERE id=? AND active=1 FOR UPDATE", in.ProductID).Scan(&p.ID, &p.Name, &p.ItemID, &p.Quantity, &p.Price, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold, &p.ServiceAction); e != nil {
 		problem(w, 404, "Product not found")
 		return
 	}
@@ -495,7 +495,7 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "Could not debit wallet")
 		return
 	}
-	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_orders(account_id,character_guid,product_id,item_id,quantity,total,status,service_level,gold_amount) VALUES(?,?,?,?,?,?,'pending',?,?)", a.ID, in.CharacterGUID, p.ID, p.ItemID, p.Quantity, p.Price, p.ServiceLevel, p.Gold)
+	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_orders(account_id,character_guid,product_id,item_id,quantity,total,status,service_level,gold_amount,service_action) VALUES(?,?,?,?,?,?,'pending',?,?,?)", a.ID, in.CharacterGUID, p.ID, p.ItemID, p.Quantity, p.Price, p.ServiceLevel, p.Gold, p.ServiceAction)
 	if e != nil {
 		problem(w, 500, "Could not create order")
 		return
@@ -620,8 +620,12 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &p) {
 		return
 	}
-	if p.Name == "" || p.Price == 0 || (p.ItemID == 0 && len(p.Items) == 0 && p.ServiceLevel == 0 && p.Gold == 0) || (p.ItemID != 0 && p.Quantity == 0) {
-		problem(w, 422, "name, price, and an item bundle or service level are required")
+	if p.Name == "" || p.Price == 0 || (p.ItemID == 0 && len(p.Items) == 0 && p.ServiceLevel == 0 && p.Gold == 0 && p.ServiceAction == "") || (p.ItemID != 0 && p.Quantity == 0) {
+		problem(w, 422, "name, price, and an item bundle or service are required")
+		return
+	}
+	if p.ServiceAction != "" && p.ServiceAction != "race_change" && p.ServiceAction != "faction_change" {
+		problem(w, 422, "serviceAction must be race_change or faction_change")
 		return
 	}
 	if p.ImageURL != "" {
@@ -645,7 +649,7 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 		problem(w, 422, "Gold amount exceeds the WotLK safe limit")
 		return
 	}
-	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_products(name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount) VALUES(?,?,?,?,?,?,?,?,?,?,?)", p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL, p.ClassID, p.Tier, p.ServiceLevel, p.Gold)
+	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_products(name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL, p.ClassID, p.Tier, p.ServiceLevel, p.Gold, p.ServiceAction)
 	if e != nil {
 		problem(w, 500, "Could not create product")
 		return
