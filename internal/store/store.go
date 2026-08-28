@@ -3,12 +3,13 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/example/azeroth-portal/internal/config"
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 )
 
 type Store struct {
@@ -191,32 +192,35 @@ func (s *Store) Migrate(ctx context.Context) error {
 			return fmt.Errorf("portal setup state: %w", err)
 		}
 	}
-	for _, q := range []string{
-		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS class_id TINYINT UNSIGNED NOT NULL DEFAULT 0`,
-		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS tier_label VARCHAR(30) NOT NULL DEFAULT ''`,
-		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS service_level TINYINT UNSIGNED NOT NULL DEFAULT 0`,
-		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS gold_amount INT UNSIGNED NOT NULL DEFAULT 0`,
-		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS seed_key VARCHAR(80) NULL`,
-		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS service_action VARCHAR(30) NOT NULL DEFAULT ''`,
-		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS starts_at DATETIME NULL`,
-		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS ends_at DATETIME NULL`,
-		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS per_account_limit INT UNSIGNED NOT NULL DEFAULT 0`,
-		`ALTER TABLE portal_orders MODIFY COLUMN status ENUM('pending','delivering','delivered','review','failed','refunded') NOT NULL DEFAULT 'pending'`,
-		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS attempts INT UNSIGNED NOT NULL DEFAULT 0`,
-		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS service_level TINYINT UNSIGNED NOT NULL DEFAULT 0`,
-		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS gold_amount INT UNSIGNED NOT NULL DEFAULT 0`,
-		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS service_action VARCHAR(30) NOT NULL DEFAULT ''`,
-		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS delivery_started_at TIMESTAMP NULL`,
-		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS subtotal INT UNSIGNED NOT NULL DEFAULT 0`,
-		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS discount INT UNSIGNED NOT NULL DEFAULT 0`,
-		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(40) NOT NULL DEFAULT ''`,
-		`ALTER TABLE portal_sessions ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`,
-		`ALTER TABLE portal_sessions ADD COLUMN IF NOT EXISTS ip_address VARCHAR(45) NOT NULL DEFAULT ''`,
-		`ALTER TABLE portal_sessions ADD COLUMN IF NOT EXISTS user_agent VARCHAR(255) NOT NULL DEFAULT ''`,
-	} {
-		if _, err := s.Auth.ExecContext(ctx, q); err != nil {
-			return fmt.Errorf("portal product migration: %w", err)
+	columns := []struct{ table, column, definition string }{
+		{"portal_products", "class_id", "TINYINT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_products", "tier_label", "VARCHAR(30) NOT NULL DEFAULT ''"},
+		{"portal_products", "service_level", "TINYINT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_products", "gold_amount", "INT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_products", "seed_key", "VARCHAR(80) NULL"},
+		{"portal_products", "service_action", "VARCHAR(30) NOT NULL DEFAULT ''"},
+		{"portal_products", "starts_at", "DATETIME NULL"},
+		{"portal_products", "ends_at", "DATETIME NULL"},
+		{"portal_products", "per_account_limit", "INT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_orders", "attempts", "INT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_orders", "service_level", "TINYINT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_orders", "gold_amount", "INT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_orders", "service_action", "VARCHAR(30) NOT NULL DEFAULT ''"},
+		{"portal_orders", "delivery_started_at", "TIMESTAMP NULL"},
+		{"portal_orders", "subtotal", "INT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_orders", "discount", "INT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_orders", "coupon_code", "VARCHAR(40) NOT NULL DEFAULT ''"},
+		{"portal_sessions", "last_seen_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"},
+		{"portal_sessions", "ip_address", "VARCHAR(45) NOT NULL DEFAULT ''"},
+		{"portal_sessions", "user_agent", "VARCHAR(255) NOT NULL DEFAULT ''"},
+	}
+	for _, column := range columns {
+		if err := s.ensureColumn(ctx, column.table, column.column, column.definition); err != nil {
+			return fmt.Errorf("portal column migration %s.%s: %w", column.table, column.column, err)
 		}
+	}
+	if _, err := s.Auth.ExecContext(ctx, `ALTER TABLE portal_orders MODIFY COLUMN status ENUM('pending','delivering','delivered','review','failed','refunded') NOT NULL DEFAULT 'pending'`); err != nil {
+		return fmt.Errorf("portal order status migration: %w", err)
 	}
 	var seedIndex int
 	if err := s.Auth.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=? AND table_name='portal_products' AND index_name='idx_portal_products_seed_key'", s.C.AuthDB).Scan(&seedIndex); err != nil {
@@ -229,6 +233,24 @@ func (s *Store) Migrate(ctx context.Context) error {
 	}
 	_, _ = s.Auth.ExecContext(ctx, `DELETE FROM portal_sessions WHERE expires_at < NOW()`)
 	return nil
+}
+
+// ensureColumn avoids ADD COLUMN IF NOT EXISTS, which is unavailable on older
+// MySQL releases still commonly used by AzerothCore installations.
+func (s *Store) ensureColumn(ctx context.Context, table, column, definition string) error {
+	var exists int
+	if err := s.Auth.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=? AND table_name=? AND column_name=?`, s.C.AuthDB, table, column).Scan(&exists); err != nil {
+		return err
+	}
+	if exists > 0 {
+		return nil
+	}
+	_, err := s.Auth.ExecContext(ctx, fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN `%s` %s", table, column, definition))
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1060 { // Another instance migrated first.
+		return nil
+	}
+	return err
 }
 
 func (s *Store) SeedDefaultServices(ctx context.Context) error {
