@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -68,7 +69,8 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
-		w.Header().Set("Content-Security-Policy", "default-src 'self' blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://wow.zamimg.com; script-src 'self' 'unsafe-inline' https://wow.zamimg.com; connect-src 'self' https://nether.wowhead.com https://wow.zamimg.com; worker-src 'self' blob:")
+		w.Header().Set("Content-Security-Policy", "default-src 'self' blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://wow.zamimg.com; script-src 'self' https://wow.zamimg.com; connect-src 'self' https://nether.wowhead.com https://wow.zamimg.com; worker-src 'self' blob:")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
 		if r.Method != http.MethodGet && r.Method != http.MethodHead && !s.sameOrigin(r) {
 			problem(w, http.StatusForbidden, "Invalid request origin")
 			return
@@ -154,7 +156,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	in.Username = strings.ToUpper(strings.TrimSpace(in.Username))
 	var a account
 	var salt, verifier []byte
-	q := fmt.Sprintf("SELECT id,username,email,salt,verifier FROM `%s`.account WHERE username=?", s.c.AuthDB)
+	q := fmt.Sprintf("SELECT id,username,email,salt,verifier FROM `%s`.account a WHERE username=? AND locked=0 AND NOT EXISTS (SELECT 1 FROM `%s`.account_banned b WHERE b.id=a.id AND b.active=1)", s.c.AuthDB, s.c.AuthDB)
 	if err := s.s.Auth.QueryRowContext(r.Context(), q, in.Username).Scan(&a.ID, &a.Username, &a.Email, &salt, &verifier); err != nil || !srp.Verify(a.Username, in.Password, salt, verifier) {
 		problem(w, 401, "Invalid username or password")
 		return
@@ -190,7 +192,7 @@ func (s *Server) auth(r *http.Request) (account, error) {
 		return a, err
 	}
 	h := sha256.Sum256([]byte(c.Value))
-	q := fmt.Sprintf("SELECT a.id,a.username,a.email FROM portal_sessions s JOIN `%s`.account a ON a.id=s.account_id WHERE s.token_hash=? AND s.expires_at>NOW()", s.c.AuthDB)
+	q := fmt.Sprintf("SELECT a.id,a.username,a.email FROM portal_sessions s JOIN `%s`.account a ON a.id=s.account_id WHERE s.token_hash=? AND s.expires_at>NOW() AND a.locked=0 AND NOT EXISTS (SELECT 1 FROM `%s`.account_banned b WHERE b.id=a.id AND b.active=1)", s.c.AuthDB, s.c.AuthDB)
 	err = s.s.Auth.QueryRowContext(r.Context(), q, h[:]).Scan(&a.ID, &a.Username, &a.Email)
 	return a, err
 }
@@ -376,7 +378,15 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	orderID, _ := res.LastInsertId()
-	cmd := fmt.Sprintf(`send items %s "Portal order %d" "Thank you for supporting %s." %d:%d`, characterName, orderID, s.c.RealmName, p.ItemID, p.Quantity)
+	if strings.ContainsAny(characterName, " \t\r\n\"\\") {
+		problem(w, 422, "Character name cannot be used for delivery")
+		return
+	}
+	realmLabel := strings.NewReplacer("\"", "", "\\", "", "\r", " ", "\n", " ").Replace(s.c.RealmName)
+	if len(realmLabel) > 80 {
+		realmLabel = realmLabel[:80]
+	}
+	cmd := fmt.Sprintf(`send items %s "Portal order %d" "Thank you for supporting %s." %d:%d`, characterName, orderID, realmLabel, p.ItemID, p.Quantity)
 	_, e = s.soap.Command(r.Context(), cmd)
 	if e != nil {
 		_, _ = tx.ExecContext(r.Context(), "UPDATE portal_orders SET status='failed',error_message=? WHERE id=?", e.Error(), orderID)
@@ -423,7 +433,8 @@ func (s *Server) orders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
-	if s.c.AdminToken == "" || r.Header.Get("Authorization") != "Bearer "+s.c.AdminToken {
+	provided := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if s.c.AdminToken == "" || len(provided) != len(s.c.AdminToken) || subtle.ConstantTimeCompare([]byte(provided), []byte(s.c.AdminToken)) != 1 {
 		problem(w, 401, "Admin token required")
 		return
 	}
@@ -434,6 +445,13 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 	if p.Name == "" || p.ItemID == 0 || p.Quantity == 0 || p.Price == 0 {
 		problem(w, 422, "name, itemId, quantity and price are required")
 		return
+	}
+	if p.ImageURL != "" {
+		u, err := url.ParseRequestURI(p.ImageURL)
+		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+			problem(w, 422, "imageUrl must be an absolute HTTP or HTTPS URL")
+			return
+		}
 	}
 	res, e := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_products(name,description,item_id,quantity,price,category,image_url) VALUES(?,?,?,?,?,?,?)", p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL)
 	if e != nil {
