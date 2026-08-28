@@ -21,15 +21,13 @@ func New(url, user, password string) *Client {
 }
 func (c *Client) Enabled() bool { return c.URL != "" && c.User != "" && c.Password != "" }
 
-type envelope struct {
-	XMLName xml.Name `xml:"SOAP-ENV:Envelope"`
-	Body    body     `xml:"SOAP-ENV:Body"`
-}
-type body struct {
-	Execute execute `xml:"ns1:executeCommand"`
-}
-type execute struct {
-	Command string `xml:"command"`
+type responseEnvelope struct {
+	Body struct {
+		Fault *struct {
+			Code   string `xml:"faultcode"`
+			Reason string `xml:"faultstring"`
+		} `xml:"Fault"`
+	} `xml:"Body"`
 }
 
 func (c *Client) Command(ctx context.Context, command string) (string, error) {
@@ -53,10 +51,30 @@ func (c *Client) Command(ctx context.Context, command string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if resp.StatusCode/100 != 2 || bytes.Contains(b, []byte("SOAP-ENV:Fault")) {
+	fault := soapFault(b)
+	if resp.StatusCode/100 != 2 || fault != "" {
+		if fault != "" {
+			return "", fmt.Errorf("SOAP returned %s: %s", resp.Status, fault)
+		}
 		return "", fmt.Errorf("SOAP returned %s: %s", resp.Status, compact(string(b)))
 	}
 	return string(b), nil
+}
+
+func soapFault(payload []byte) string {
+	var envelope responseEnvelope
+	if xml.Unmarshal(payload, &envelope) != nil || envelope.Body.Fault == nil {
+		return ""
+	}
+	reason := compact(envelope.Body.Fault.Reason)
+	code := compact(envelope.Body.Fault.Code)
+	if reason == "" {
+		return code
+	}
+	if code == "" {
+		return reason
+	}
+	return code + ": " + reason
 }
 func escape(s string) string {
 	var b strings.Builder
