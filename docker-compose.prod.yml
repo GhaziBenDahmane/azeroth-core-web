@@ -1,0 +1,9 @@
+services:
+  portal:
+    image: ${PORTAL_IMAGE:-ghcr.io/ghazibendahmane/azeroth-core-web:latest}
+    restart: unless-stopped
+    ports:
+      - "${PORTAL_PORT:-8080}:8080"
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -40,6 +40,25 @@ docker compose up --build -d
 
 Open `http://localhost:8080`. The application exits early with a useful error if any database cannot be reached.
 
+### Published Docker image
+
+GitHub Actions tests every pull request plus pushes to `main` and version tags. Successful pushes publish multi-architecture images for AMD64 and ARM64 to GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/ghazibendahmane/azeroth-core-web:latest
+cp .env.example .env
+# Configure the database, public URL, branding, and optional setup wizard.
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Version tags such as `v1.0.0` also publish `1.0.0` and `1.0` image tags. The package initially follows the GitHub repository's visibility. For a private package, authenticate Docker with a GitHub token that has `read:packages`:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+```
+
+Docker Hub is not required. If desired later, a second registry login and image tag can be added to the same workflow.
+
 ### First-time administrator setup
 
 The optional web wizard creates one AzerothCore account, initializes its portal wallet and realm rows, and grants its GM access through `account_access`. Generate a one-time secret, add it to `.env`, and start the portal:
