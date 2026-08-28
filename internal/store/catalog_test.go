@@ -22,8 +22,8 @@ func TestDefaultCatalogCoversEveryWotLKClassAndTier(t *testing.T) {
 		}
 	}
 	for role, items := range roleSupplies {
-		if len(items) != 6 {
-			t.Errorf("%s has %d supply types, want 6", role, len(items))
+		if len(items) != 7 {
+			t.Errorf("%s has %d supply types, want 7", role, len(items))
 		}
 	}
 }

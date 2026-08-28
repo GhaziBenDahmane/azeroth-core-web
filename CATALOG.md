@@ -12,7 +12,7 @@ Each resolved package contains:
 
 - The complete five-piece S6, S7, or T8 armor set for its specialization.
 - Ten epic red or blue role gems plus one appropriate meta gem.
-- Four role-appropriate enchant scrolls.
+- Five role-appropriate armor enhancements: head arcanum, shoulder inscription, leg armor or spellthread, chest enchant, and glove enchant.
 - A level-80 service.
 
 The role kits use the canonical Wrath items: Bold, Delicate, or Runed Cardinal Ruby; Solid Majestic Zircon; Relentless, Chaotic, Insightful, or Austere Earthsiege Diamond; and matching level-80 enchant scrolls.
