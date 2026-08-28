@@ -19,6 +19,7 @@ type mockState struct {
 	totpEnabled bool
 	bans        map[string]string
 	moderation  []map[string]any
+	commands    []consoleEntry
 	tickets     []supportTicket
 	setupDone   bool
 }
@@ -140,6 +141,8 @@ func (s *Server) mockHandler() http.Handler {
 	m.HandleFunc("GET /api/admin/accounts", s.feature(s.c.EnableAdminPanel, "Administration", s.mockAdminAccounts))
 	m.HandleFunc("POST /api/admin/moderation", s.feature(s.c.EnableAdminPanel, "Administration", s.rate(30, time.Minute, s.mockAdminModeration)))
 	m.HandleFunc("GET /api/admin/moderation", s.feature(s.c.EnableAdminPanel, "Administration", s.mockAdminModerationLog))
+	m.HandleFunc("GET /api/admin/console", s.feature(s.c.EnableAdminPanel && s.c.EnableGMConsole, "GM console", s.mockAdminConsoleHistory))
+	m.HandleFunc("POST /api/admin/console", s.feature(s.c.EnableAdminPanel && s.c.EnableGMConsole, "GM console", s.rate(20, time.Minute, s.mockAdminConsoleExecute)))
 	m.HandleFunc("GET /api/admin/tickets", s.feature(s.c.EnableAdminPanel && s.c.EnableSupport, "Administration", s.mockAdminTickets))
 	m.HandleFunc("POST /api/admin/tickets/{id}", s.feature(s.c.EnableAdminPanel && s.c.EnableSupport, "Administration", s.mockAdminTicketUpdate))
 	m.HandleFunc("POST /api/admin/products", s.feature(s.c.EnableAdminPanel, "Administration", s.mockAdminProduct))
@@ -532,6 +535,46 @@ func (s *Server) mockAdminModerationLog(w http.ResponseWriter, r *http.Request) 
 	entries := append([]map[string]any(nil), s.mock.moderation...)
 	s.mock.mu.Unlock()
 	jsonOut(w, 200, map[string]any{"entries": entries})
+}
+
+func (s *Server) mockAdminConsoleExecute(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, http.StatusForbidden, "GM console access required")
+		return
+	}
+	var in struct {
+		Command string `json:"command"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	command, valid := normalizeConsoleCommand(in.Command)
+	if !valid {
+		problem(w, http.StatusUnprocessableEntity, "Command must contain 1–255 characters on one line")
+		return
+	}
+	if !consoleCommandAllowed(command, s.c.GMConsoleAllowAll, s.c.GMConsoleAllowed) {
+		problem(w, http.StatusForbidden, "Command is not included in GM_CONSOLE_ALLOWED_PREFIXES")
+		return
+	}
+	response := "AzerothCore demo console: " + command + " completed successfully."
+	s.mock.mu.Lock()
+	id := uint64(len(s.mock.commands) + 1)
+	entry := consoleEntry{ID: id, Actor: "DEMO", Command: auditConsoleCommand(command), Response: response, Success: true, IP: s.clientIP(r), Created: time.Now()}
+	s.mock.commands = append([]consoleEntry{entry}, s.mock.commands...)
+	s.mock.mu.Unlock()
+	jsonOut(w, http.StatusOK, map[string]any{"ok": true, "command": command, "output": response, "auditId": id})
+}
+
+func (s *Server) mockAdminConsoleHistory(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, http.StatusForbidden, "GM console access required")
+		return
+	}
+	s.mock.mu.Lock()
+	entries := append([]consoleEntry(nil), s.mock.commands...)
+	s.mock.mu.Unlock()
+	jsonOut(w, http.StatusOK, map[string]any{"entries": entries, "allowAll": s.c.GMConsoleAllowAll, "allowedPrefixes": s.c.GMConsoleAllowed})
 }
 
 func (s *Server) mockRealm(w http.ResponseWriter, _ *http.Request) {

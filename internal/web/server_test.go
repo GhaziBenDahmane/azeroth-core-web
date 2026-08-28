@@ -201,6 +201,26 @@ func TestServiceCommandsAreAllowListed(t *testing.T) {
 	}
 }
 
+func TestGMConsoleCommandPolicy(t *testing.T) {
+	command, ok := normalizeConsoleCommand(".server info")
+	if !ok || command != "server info" {
+		t.Fatalf("normalization returned %q, %v", command, ok)
+	}
+	allowed := []string{"server info", "lookup"}
+	if !consoleCommandAllowed("server info", false, allowed) || !consoleCommandAllowed("lookup item frostmourne", false, allowed) {
+		t.Fatal("allowed console command was rejected")
+	}
+	if consoleCommandAllowed("server shutdown 10", false, allowed) || consoleCommandAllowed("lookupanything", false, allowed) {
+		t.Fatal("disallowed console command was accepted")
+	}
+	if _, ok := normalizeConsoleCommand("server info\nserver shutdown 10"); ok {
+		t.Fatal("multiline console command was accepted")
+	}
+	if got := auditConsoleCommand("account set password PLAYER secret secret"); got != "account set password [arguments redacted]" {
+		t.Fatalf("sensitive command was not redacted: %q", got)
+	}
+}
+
 func TestModerationInputAllowLists(t *testing.T) {
 	for _, duration := range []string{"30m", "7d", "1w", "1d12h", "-1"} {
 		if !banDurationPattern.MatchString(duration) {

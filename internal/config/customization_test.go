@@ -57,3 +57,17 @@ func TestRejectsInvalidPublicURL(t *testing.T) {
 		t.Fatal("relative PUBLIC_URL was accepted")
 	}
 }
+
+func TestGMConsoleConfiguration(t *testing.T) {
+	t.Setenv("MOCK_MODE", "true")
+	t.Setenv("ENABLE_GM_CONSOLE", "true")
+	t.Setenv("GM_CONSOLE_LEVEL", "2")
+	t.Setenv("GM_CONSOLE_ALLOWED_PREFIXES", "server info, lookup item")
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("valid console configuration rejected: %v", err)
+	}
+	if !c.EnableGMConsole || c.GMConsoleLevel != 2 || len(c.GMConsoleAllowed) != 2 || c.GMConsoleAllowed[1] != "lookup item" {
+		t.Fatalf("unexpected console configuration: %#v", c)
+	}
+}

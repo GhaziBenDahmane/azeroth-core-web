@@ -36,6 +36,7 @@ func (s *Server) publicConfig(w http.ResponseWriter, _ *http.Request) {
 			"rankings": s.c.EnableRankings, "guilds": s.c.EnableGuilds,
 			"realm": s.c.EnableRealmStatus, "shop": s.c.EnableShop,
 			"support": s.c.EnableSupport, "admin": s.c.EnableAdminPanel,
+			"gmConsole": s.c.EnableAdminPanel && s.c.EnableGMConsole,
 		},
 		"turnstileSiteKey":     s.c.TurnstileSiteKey,
 		"passwordResetEnabled": s.c.MockMode || (s.c.SMTPAddr != "" && s.c.SMTPFrom != ""),

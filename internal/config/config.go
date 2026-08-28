@@ -46,6 +46,9 @@ type Config struct {
 	EnableRankings, EnableGuilds           bool
 	EnableRealmStatus, EnableShop          bool
 	EnableSupport, EnableAdminPanel        bool
+	EnableGMConsole, GMConsoleAllowAll     bool
+	GMConsoleLevel                         int
+	GMConsoleAllowed                       []string
 	EnableSetup                            bool
 	SetupToken                             string
 	SetupGMLevel, SetupGMRealmID           int
@@ -89,7 +92,9 @@ func Load() (Config, error) {
 		EnableRankings: envBool("ENABLE_RANKINGS", true), EnableGuilds: envBool("ENABLE_GUILDS", true),
 		EnableRealmStatus: envBool("ENABLE_REALM_STATUS", true), EnableShop: envBool("ENABLE_SHOP", true),
 		EnableSupport: envBool("ENABLE_SUPPORT", true), EnableAdminPanel: envBool("ENABLE_ADMIN_PANEL", true),
-		EnableSetup: envBool("ENABLE_SETUP", false), SetupToken: os.Getenv("SETUP_TOKEN"),
+		EnableGMConsole: envBool("ENABLE_GM_CONSOLE", false), GMConsoleAllowAll: envBool("GM_CONSOLE_ALLOW_ALL", false),
+		GMConsoleLevel: envInt("GM_CONSOLE_LEVEL", 3),
+		EnableSetup:    envBool("ENABLE_SETUP", false), SetupToken: os.Getenv("SETUP_TOKEN"),
 		SetupGMLevel: envInt("SETUP_GM_LEVEL", 3), SetupGMRealmID: envInt("SETUP_GM_REALM_ID", -1),
 	}
 	if c.AuthDSN == "" && !c.MockMode {
@@ -121,6 +126,16 @@ func Load() (Config, error) {
 	}
 	if c.SetupGMLevel < 1 || c.SetupGMLevel > 3 || c.SetupGMRealmID < -1 {
 		return c, fmt.Errorf("invalid setup GM level or realm ID")
+	}
+	if c.GMConsoleLevel < 1 || c.GMConsoleLevel > 3 {
+		return c, fmt.Errorf("GM_CONSOLE_LEVEL must be between 1 and 3")
+	}
+	for _, prefix := range strings.Split(env("GM_CONSOLE_ALLOWED_PREFIXES", "help,server info,server motd,account online list,lookup,player info"), ",") {
+		prefix = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(prefix, ".")))
+		if prefix == "" || len(prefix) > 80 || strings.ContainsAny(prefix, "\r\n\x00") {
+			return c, fmt.Errorf("GM_CONSOLE_ALLOWED_PREFIXES contains an invalid command prefix")
+		}
+		c.GMConsoleAllowed = append(c.GMConsoleAllowed, prefix)
 	}
 	return c, nil
 }

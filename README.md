@@ -14,6 +14,7 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - Single-use email password recovery and optional Cloudflare Turnstile registration protection
 - Audited GM credit grants authorized from AzerothCore `account_access`
 - GM player lookup with active-ban status, audited account bans/unbans, and character kicks
+- Optional audited GM worldserver console with configurable command prefixes and an explicit unrestricted mode
 - Character mutes, IP bans, announcements, MOTD updates, guarded GM-level changes, and realm start/restart/shutdown controls
 - Player support tickets with GM replies and status management
 - GM delivery queue/reconciliation view and credit ledger
@@ -136,6 +137,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_order_items TO 'portal
 GRANT SELECT, INSERT ON acore_auth.portal_credit_ledger TO 'portal'@'%';
 GRANT SELECT, INSERT ON acore_auth.portal_payment_events TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_moderation_log TO 'portal'@'%';
+GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_command_log TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_support_tickets TO 'portal'@'%';
 GRANT SELECT, INSERT, DELETE ON acore_auth.portal_password_resets TO 'portal'@'%';
 GRANT SELECT, INSERT ON acore_auth.account_access TO 'portal'@'%';
@@ -251,6 +253,9 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `TERMS_URL`, `PRIVACY_URL` | Optional HTTP(S) legal links shown in the footer | unset/hidden |
 | `ENABLE_REGISTRATION`, `ENABLE_ARMORY`, `ENABLE_RANKINGS`, `ENABLE_GUILDS` | Enable or disable public modules and their API endpoints | `true` |
 | `ENABLE_REALM_STATUS`, `ENABLE_SHOP`, `ENABLE_SUPPORT`, `ENABLE_ADMIN_PANEL` | Enable or disable operational modules and their API endpoints | `true` |
+| `ENABLE_GM_CONSOLE`, `GM_CONSOLE_LEVEL` | Enable the SOAP-backed browser console and set its minimum GM level | `false`, `3` |
+| `GM_CONSOLE_ALLOWED_PREFIXES` | Comma-separated command prefixes permitted by the browser console | Read-only information commands |
+| `GM_CONSOLE_ALLOW_ALL` | Permit every valid one-line command; always requires a level-3 GM | `false` |
 | `ENABLE_SETUP`, `SETUP_TOKEN` | Enable the one-time setup wizard and protect it with a 16–256 character secret | `false`, unset |
 | `SETUP_GM_LEVEL`, `SETUP_GM_REALM_ID` | Initial administrator access level and realm scope | `3`, `-1` |
 | `ACCOUNT_EXPANSION` | New account expansion field | `2` |
@@ -266,6 +271,8 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `SMTP_ADDR`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional password-recovery email transport | unset/disabled |
 
 Set `PUBLIC_URL=https://your-domain`, `COOKIE_SECURE=true`, terminate TLS at your proxy, and keep the portal and SOAP ports behind a firewall in production. Set `TRUST_PROXY=true` only when the portal cannot be reached directly and your proxy overwrites (rather than appends to) incoming client-IP headers.
+
+The GM browser console is disabled by default. When enabled, commands are executed using the configured SOAP account, so its RBAC permissions are the real upper bound. Every attempt is stored in `portal_command_log`; password-bearing account commands are redacted in that log. Prefer the prefix allow-list and enable `GM_CONSOLE_ALLOW_ALL=true` only for trusted level-3 operators with 2FA.
 
 `UI_TEXT_JSON` currently supports the shared keys `nav.home`, `nav.armory`, `nav.rankings`, `nav.guilds`, `nav.realm`, `nav.shop`, `action.signIn`, `action.register`, `action.account`, `footer.community`, `footer.terms`, `footer.privacy`, `home.heroLine1`, `home.heroLine2`, `home.createAccount`, `home.howToConnect`, `news.eyebrow`, `news.title`, and `news.readMore`. Values are inserted as text, never HTML.
 
