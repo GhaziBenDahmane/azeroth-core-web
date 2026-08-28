@@ -10,6 +10,8 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - 2v2, 3v3, and 5v5 arena team ladders with ratings, records, and rosters
 - PvE raid progression from character achievement dates, including guild-first dates
 - Account dashboard with characters, credit balance, and order history
+- Audited GM credit grants authorized from AzerothCore `account_access`
+- Gold bundles, level services, and class-restricted multi-item gear packages
 - Categorized shop with an admin product API
 - Safe shop fulfillment through AzerothCore's `send items` SOAP command
 - Responsive, dependency-light Astro UI
@@ -50,13 +52,17 @@ CREATE USER 'portal'@'%' IDENTIFIED BY 'use-a-long-password';
 GRANT SELECT ON acore_world.* TO 'portal'@'%';
 GRANT SELECT ON acore_characters.* TO 'portal'@'%';
 GRANT SELECT, INSERT ON acore_auth.account TO 'portal'@'%';
+GRANT SELECT ON acore_auth.account_banned TO 'portal'@'%';
 GRANT SELECT, INSERT ON acore_auth.realmcharacters TO 'portal'@'%';
 GRANT SELECT ON acore_auth.realmlist TO 'portal'@'%';
 GRANT CREATE ON acore_auth.* TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_sessions TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_wallets TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_products TO 'portal'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_product_items TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_orders TO 'portal'@'%';
+GRANT SELECT, INSERT ON acore_auth.portal_credit_ledger TO 'portal'@'%';
+GRANT SELECT ON acore_auth.account_access TO 'portal'@'%';
 ```
 
 For the first run, granting broader rights on `acore_auth` is easier; reduce them after the four portal tables have been created.
@@ -149,6 +155,8 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `COOKIE_SECURE` | Require HTTPS for session cookies | `false` |
 | `REALM_NAME`, `REALM_ADDRESS` | UI realm identity and realmlist address | `Azeroth`, example host |
 | `ACCOUNT_EXPANSION` | New account expansion field | `2` |
+| `REALM_ID` | Realm used when resolving GM access | `1` |
+| `GM_LEVEL` | Minimum AzerothCore GM level allowed to grant credits | `3` |
 | `STARTING_CREDITS` | New wallet balance | `0` |
 | `SOAP_URL`, `SOAP_USER`, `SOAP_PASSWORD` | Worldserver delivery endpoint | unset |
 | `ADMIN_TOKEN` | Bearer token for product creation | unset/disabled |

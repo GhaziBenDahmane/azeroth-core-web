@@ -18,6 +18,8 @@ type Config struct {
 	StartingCredits                        int
 	AdminToken                             string
 	MockMode                               bool
+	RealmID                                int
+	GMLevel                                int
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
@@ -32,6 +34,7 @@ func Load() (Config, error) {
 		CookieSecure: envBool("COOKIE_SECURE", false), Expansion: envInt("ACCOUNT_EXPANSION", 2),
 		StartingCredits: envInt("STARTING_CREDITS", 0), AdminToken: os.Getenv("ADMIN_TOKEN"),
 		MockMode: envBool("MOCK_MODE", false),
+		RealmID:  envInt("REALM_ID", 1), GMLevel: envInt("GM_LEVEL", 3),
 	}
 	if c.AuthDSN == "" && !c.MockMode {
 		return c, fmt.Errorf("AUTH_DSN is required")

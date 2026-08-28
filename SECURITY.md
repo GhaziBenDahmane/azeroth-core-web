@@ -24,6 +24,7 @@ All request-derived values are passed as MySQL parameters. The only values inter
 - Dynamic UI values are escaped or assigned through `textContent`.
 - Product image URLs are limited to absolute HTTP(S) URLs.
 - The admin bearer token is compared in constant time.
+- GM credit grants require a live authenticated session and the configured `account_access` level. Every grant is recorded in the append-only `portal_credit_ledger` table.
 
 ### Shop delivery
 

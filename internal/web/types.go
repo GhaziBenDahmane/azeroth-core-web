@@ -4,6 +4,7 @@ type account struct {
 	ID       uint32 `json:"id"`
 	Username string `json:"username"`
 	Email    string `json:"email"`
+	GMLevel  uint8  `json:"gmLevel,omitempty"`
 }
 type character struct {
 	GUID      uint32 `json:"guid"`
@@ -33,6 +34,7 @@ type product struct {
 	ServiceLevel uint8        `json:"serviceLevel,omitempty"`
 	Includes     []string     `json:"includes,omitempty"`
 	Items        []bundleItem `json:"items,omitempty"`
+	Gold         uint32       `json:"gold,omitempty"`
 }
 
 type bundleItem struct {

@@ -86,6 +86,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 item_id INT UNSIGNED NOT NULL, quantity INT UNSIGNED NOT NULL DEFAULT 1, price INT UNSIGNED NOT NULL,
 		 category VARCHAR(40) NOT NULL DEFAULT 'Items', image_url VARCHAR(500) NOT NULL DEFAULT '', active TINYINT(1) NOT NULL DEFAULT 1,
 		 class_id TINYINT UNSIGNED NOT NULL DEFAULT 0, tier_label VARCHAR(30) NOT NULL DEFAULT '', service_level TINYINT UNSIGNED NOT NULL DEFAULT 0,
+		 gold_amount INT UNSIGNED NOT NULL DEFAULT 0,
 		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_portal_products_active (active)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_product_items (
 		 product_id INT UNSIGNED NOT NULL, item_id INT UNSIGNED NOT NULL, quantity INT UNSIGNED NOT NULL DEFAULT 1,
@@ -96,6 +97,10 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 status ENUM('processing','delivered','failed') NOT NULL DEFAULT 'processing', error_message VARCHAR(500) NOT NULL DEFAULT '',
 		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, delivered_at TIMESTAMP NULL,
 		 INDEX idx_portal_orders_account (account_id, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS portal_credit_ledger (
+		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, actor_account_id INT UNSIGNED NOT NULL, target_account_id INT UNSIGNED NOT NULL,
+		 amount INT NOT NULL, reason VARCHAR(255) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		 INDEX idx_portal_credit_target (target_account_id,created_at), INDEX idx_portal_credit_actor (actor_account_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, q := range statements {
 		if _, err := s.Auth.ExecContext(ctx, q); err != nil {
@@ -106,6 +111,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS class_id TINYINT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS tier_label VARCHAR(30) NOT NULL DEFAULT ''`,
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS service_level TINYINT UNSIGNED NOT NULL DEFAULT 0`,
+		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS gold_amount INT UNSIGNED NOT NULL DEFAULT 0`,
 	} {
 		if _, err := s.Auth.ExecContext(ctx, q); err != nil {
 			return fmt.Errorf("portal product migration: %w", err)

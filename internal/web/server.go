@@ -60,6 +60,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("POST /api/shop/purchase", s.rate(10, time.Minute, s.purchase))
 	m.HandleFunc("GET /api/orders", s.orders)
 	m.HandleFunc("POST /api/admin/products", s.adminProduct)
+	m.HandleFunc("POST /api/admin/credits", s.rate(30, time.Minute, s.adminCredits))
 	m.Handle("/", spaHandler(s.static))
 	return s.middleware(m)
 }
@@ -204,6 +205,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	}
 	var balance uint32
 	_ = s.s.Auth.QueryRowContext(r.Context(), "SELECT balance FROM portal_wallets WHERE account_id=?", a.ID).Scan(&balance)
+	a.GMLevel = s.gmLevel(r.Context(), a.ID)
 	jsonOut(w, 200, map[string]any{"account": a, "balance": balance})
 }
 
@@ -311,7 +313,7 @@ func (s *Server) armoryCharacter(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
-	rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level FROM portal_products WHERE active=1 ORDER BY category,class_id,price,name")
+	rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount FROM portal_products WHERE active=1 ORDER BY category,class_id,price,name")
 	if e != nil {
 		problem(w, 500, "Could not load shop")
 		return
@@ -320,7 +322,7 @@ func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
 	out := []product{}
 	for rows.Next() {
 		var p product
-		if rows.Scan(&p.ID, &p.Name, &p.Description, &p.ItemID, &p.Quantity, &p.Price, &p.Category, &p.ImageURL, &p.ClassID, &p.Tier, &p.ServiceLevel) == nil {
+		if rows.Scan(&p.ID, &p.Name, &p.Description, &p.ItemID, &p.Quantity, &p.Price, &p.Category, &p.ImageURL, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold) == nil {
 			out = append(out, p)
 		}
 	}
@@ -344,7 +346,7 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	var p product
-	if e = tx.QueryRowContext(r.Context(), "SELECT id,name,item_id,quantity,price,class_id,tier_label,service_level FROM portal_products WHERE id=? AND active=1 FOR UPDATE", in.ProductID).Scan(&p.ID, &p.Name, &p.ItemID, &p.Quantity, &p.Price, &p.ClassID, &p.Tier, &p.ServiceLevel); e != nil {
+	if e = tx.QueryRowContext(r.Context(), "SELECT id,name,item_id,quantity,price,class_id,tier_label,service_level,gold_amount FROM portal_products WHERE id=? AND active=1 FOR UPDATE", in.ProductID).Scan(&p.ID, &p.Name, &p.ItemID, &p.Quantity, &p.Price, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold); e != nil {
 		problem(w, 404, "Product not found")
 		return
 	}
@@ -416,6 +418,9 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	if e == nil && p.ServiceLevel > 0 {
 		_, e = s.soap.Command(r.Context(), fmt.Sprintf("character level %s %d", characterName, p.ServiceLevel))
 	}
+	if e == nil && p.Gold > 0 {
+		_, e = s.soap.Command(r.Context(), fmt.Sprintf(`send money %s "Portal order %d" "Thank you for supporting %s." %d`, characterName, orderID, realmLabel, uint64(p.Gold)*10000))
+	}
 	if e != nil {
 		_, _ = tx.ExecContext(r.Context(), "UPDATE portal_orders SET status='failed',error_message=? WHERE id=?", e.Error(), orderID)
 		problem(w, 502, "Delivery failed; your balance was not charged")
@@ -470,7 +475,7 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &p) {
 		return
 	}
-	if p.Name == "" || p.Price == 0 || (p.ItemID == 0 && len(p.Items) == 0 && p.ServiceLevel == 0) {
+	if p.Name == "" || p.Price == 0 || (p.ItemID == 0 && len(p.Items) == 0 && p.ServiceLevel == 0 && p.Gold == 0) || (p.ItemID != 0 && p.Quantity == 0) {
 		problem(w, 422, "name, price, and an item bundle or service level are required")
 		return
 	}
@@ -491,7 +496,11 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_products(name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level) VALUES(?,?,?,?,?,?,?,?,?,?)", p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL, p.ClassID, p.Tier, p.ServiceLevel)
+	if p.Gold > 200000 {
+		problem(w, 422, "Gold amount exceeds the WotLK safe limit")
+		return
+	}
+	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_products(name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount) VALUES(?,?,?,?,?,?,?,?,?,?,?)", p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL, p.ClassID, p.Tier, p.ServiceLevel, p.Gold)
 	if e != nil {
 		problem(w, 500, "Could not create product")
 		return
@@ -512,6 +521,69 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOut(w, 201, map[string]any{"id": id})
+}
+
+func (s *Server) gmLevel(ctx context.Context, accountID uint32) uint8 {
+	q := fmt.Sprintf("SELECT COALESCE(MAX(gmlevel),0) FROM `%s`.account_access WHERE id=? AND (RealmID=-1 OR RealmID=?)", s.c.AuthDB)
+	var level uint8
+	_ = s.s.Auth.QueryRowContext(ctx, q, accountID, s.c.RealmID).Scan(&level)
+	return level
+}
+
+func (s *Server) adminCredits(w http.ResponseWriter, r *http.Request) {
+	actor, err := s.auth(r)
+	if err != nil {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	if int(s.gmLevel(r.Context(), actor.ID)) < s.c.GMLevel {
+		problem(w, 403, "GM access required")
+		return
+	}
+	var in struct {
+		Username string `json:"username"`
+		Amount   uint32 `json:"amount"`
+		Reason   string `json:"reason"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	in.Username = strings.ToUpper(strings.TrimSpace(in.Username))
+	in.Reason = strings.TrimSpace(in.Reason)
+	if in.Username == "" || in.Amount == 0 || in.Amount > 1000000 || len(in.Reason) < 3 || len(in.Reason) > 255 {
+		problem(w, 422, "Username, 1–1,000,000 credits, and a reason are required")
+		return
+	}
+	tx, err := s.s.Auth.BeginTx(r.Context(), nil)
+	if err != nil {
+		problem(w, 503, "Database unavailable")
+		return
+	}
+	defer tx.Rollback()
+	var targetID uint32
+	q := fmt.Sprintf("SELECT id FROM `%s`.account WHERE username=?", s.c.AuthDB)
+	if err = tx.QueryRowContext(r.Context(), q, in.Username).Scan(&targetID); err != nil {
+		problem(w, 404, "Account not found")
+		return
+	}
+	if _, err = tx.ExecContext(r.Context(), "INSERT INTO portal_wallets(account_id,balance) VALUES(?,?) ON DUPLICATE KEY UPDATE balance=balance+VALUES(balance)", targetID, in.Amount); err != nil {
+		problem(w, 500, "Could not update wallet")
+		return
+	}
+	if _, err = tx.ExecContext(r.Context(), "INSERT INTO portal_credit_ledger(actor_account_id,target_account_id,amount,reason) VALUES(?,?,?,?)", actor.ID, targetID, in.Amount, in.Reason); err != nil {
+		problem(w, 500, "Could not record credit grant")
+		return
+	}
+	var balance uint32
+	if err = tx.QueryRowContext(r.Context(), "SELECT balance FROM portal_wallets WHERE account_id=?", targetID).Scan(&balance); err != nil {
+		problem(w, 500, "Could not read wallet")
+		return
+	}
+	if err = tx.Commit(); err != nil {
+		problem(w, 500, "Could not commit credit grant")
+		return
+	}
+	jsonOut(w, 200, map[string]any{"ok": true, "username": in.Username, "amount": in.Amount, "balance": balance})
 }
 
 func (s *Server) rate(max int, window time.Duration, next http.HandlerFunc) http.HandlerFunc {

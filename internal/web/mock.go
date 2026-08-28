@@ -58,6 +58,11 @@ func buildMockProducts() []product {
 			id++
 		}
 	}
+	products = append(products,
+		product{ID: id, Price: 20, Name: "5,000 Gold", Description: "A starter gold package delivered safely by in-game mail.", Category: "Gold", Tier: "5K", Gold: 5000, Includes: []string{"5,000 in-game gold", "Mailbox delivery", "Any class"}},
+		product{ID: id + 1, Price: 65, Name: "20,000 Gold", Description: "Enough gold for professions, consumables, and raid preparation.", Category: "Gold", Tier: "20K", Gold: 20000, Includes: []string{"20,000 in-game gold", "Mailbox delivery", "Any class"}},
+		product{ID: id + 2, Price: 140, Name: "50,000 Gold", Description: "A treasury package for established adventurers.", Category: "Gold", Tier: "50K", Gold: 50000, Includes: []string{"50,000 in-game gold", "Mailbox delivery", "Any class"}},
+	)
 	return products
 }
 
@@ -80,6 +85,7 @@ func (s *Server) mockHandler() http.Handler {
 	})
 	m.HandleFunc("POST /api/shop/purchase", s.mockPurchase)
 	m.HandleFunc("GET /api/orders", s.mockOrders)
+	m.HandleFunc("POST /api/admin/credits", s.rate(30, time.Minute, s.mockCredits))
 	m.Handle("/", spaHandler(s.static))
 	return m
 }
@@ -134,7 +140,7 @@ func (s *Server) mockMe(w http.ResponseWriter, r *http.Request) {
 	s.mock.mu.Lock()
 	balance := s.mock.balance
 	s.mock.mu.Unlock()
-	jsonOut(w, 200, map[string]any{"account": account{ID: 1, Username: u, Email: "demo@example.com"}, "balance": balance})
+	jsonOut(w, 200, map[string]any{"account": account{ID: 1, Username: u, Email: "demo@example.com", GMLevel: 3}, "balance": balance})
 }
 func (s *Server) mockOwnCharacters(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.mockUser(r); !ok {
@@ -280,4 +286,28 @@ func (s *Server) mockOrders(w http.ResponseWriter, r *http.Request) {
 	orders := append([]map[string]any(nil), s.mock.orders...)
 	s.mock.mu.Unlock()
 	jsonOut(w, 200, map[string]any{"orders": orders})
+}
+
+func (s *Server) mockCredits(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.mockUser(r); !ok {
+		problem(w, 401, "Sign in required")
+		return
+	}
+	var in struct {
+		Username string `json:"username"`
+		Amount   uint32 `json:"amount"`
+		Reason   string `json:"reason"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if in.Amount == 0 || in.Amount > 1000000 || len(strings.TrimSpace(in.Reason)) < 3 {
+		problem(w, 422, "Enter an account, amount, and reason")
+		return
+	}
+	s.mock.mu.Lock()
+	s.mock.balance += in.Amount
+	balance := s.mock.balance
+	s.mock.mu.Unlock()
+	jsonOut(w, 200, map[string]any{"ok": true, "username": strings.ToUpper(in.Username), "amount": in.Amount, "balance": balance})
 }
