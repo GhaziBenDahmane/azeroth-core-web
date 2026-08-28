@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -25,6 +26,7 @@ type Config struct {
 	News                                   []NewsItem
 	SOAPURL, SOAPUser, SOAPPassword        string
 	CookieSecure                           bool
+	TrustProxy                             bool
 	Expansion                              int
 	StartingCredits                        int
 	AdminToken                             string
@@ -74,7 +76,7 @@ func Load() (Config, error) {
 		ThemePrimary: env("THEME_PRIMARY", "#d3ae68"), ThemeSecondary: env("THEME_SECONDARY", "#f3d89c"), ThemeAccent: env("THEME_ACCENT", "#3fd0be"), ThemeBackground: env("THEME_BACKGROUND", "#07110f"),
 		Locale: env("PORTAL_LOCALE", "en"), TermsURL: strings.TrimSpace(os.Getenv("TERMS_URL")), PrivacyURL: strings.TrimSpace(os.Getenv("PRIVACY_URL")),
 		SOAPURL: os.Getenv("SOAP_URL"), SOAPUser: os.Getenv("SOAP_USER"), SOAPPassword: os.Getenv("SOAP_PASSWORD"),
-		CookieSecure: envBool("COOKIE_SECURE", false), Expansion: envInt("ACCOUNT_EXPANSION", 2),
+		CookieSecure: envBool("COOKIE_SECURE", false), TrustProxy: envBool("TRUST_PROXY", false), Expansion: envInt("ACCOUNT_EXPANSION", 2),
 		StartingCredits: envInt("STARTING_CREDITS", 0), AdminToken: os.Getenv("ADMIN_TOKEN"),
 		MockMode: envBool("MOCK_MODE", false),
 		RealmID:  envInt("REALM_ID", 1), GMLevel: envInt("GM_LEVEL", 3),
@@ -92,6 +94,13 @@ func Load() (Config, error) {
 	}
 	if c.AuthDSN == "" && !c.MockMode {
 		return c, fmt.Errorf("AUTH_DSN is required")
+	}
+	publicURL, err := url.ParseRequestURI(c.PublicURL)
+	if err != nil || publicURL.Host == "" || (publicURL.Scheme != "http" && publicURL.Scheme != "https") {
+		return c, fmt.Errorf("PUBLIC_URL must be an absolute HTTP or HTTPS URL")
+	}
+	if publicURL.Scheme == "https" && !c.CookieSecure {
+		return c, fmt.Errorf("COOKIE_SECURE must be true when PUBLIC_URL uses HTTPS")
 	}
 	if c.CharactersDSN == "" {
 		c.CharactersDSN = c.AuthDSN

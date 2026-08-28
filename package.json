@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": { "dev": "astro dev", "build": "astro build", "preview": "astro preview" },
-  "dependencies": { "astro": "6.4.6" },
+  "dependencies": { "astro": "7.2.9" },
   "devDependencies": {}
 }

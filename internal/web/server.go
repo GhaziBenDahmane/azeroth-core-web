@@ -40,8 +40,9 @@ type portalMetrics struct {
 	orders   atomic.Uint64
 }
 type limiter struct {
-	mu   sync.Mutex
-	hits map[string][]time.Time
+	mu        sync.Mutex
+	hits      map[string][]time.Time
+	lastSweep time.Time
 }
 
 func New(s *store.Store, c config.Config, static fs.FS) *Server {
@@ -124,6 +125,9 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("Content-Security-Policy", "default-src 'self' blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://wow.zamimg.com; script-src 'self' https://wow.zamimg.com https://challenges.cloudflare.com; connect-src 'self' https://nether.wowhead.com https://wow.zamimg.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; worker-src 'self' blob:")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
+		if s.c.CookieSecure {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead && !s.sameOrigin(r) {
 			problem(w, http.StatusForbidden, "Invalid request origin")
 			return
@@ -164,7 +168,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if !s.verifyTurnstile(r.Context(), in.TurnstileToken, r.RemoteAddr) {
+	if !s.verifyTurnstile(r.Context(), in.TurnstileToken, s.clientIP(r)) {
 		problem(w, 422, "Human verification failed")
 		return
 	}
@@ -247,7 +251,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if len(ua) > 255 {
 		ua = ua[:255]
 	}
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	ip := s.clientIP(r)
 	if _, err := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_sessions (token_hash,account_id,expires_at,ip_address,user_agent) VALUES (?,?,?,?,?)", hash[:], a.ID, expires, ip, ua); err != nil {
 		problem(w, 500, "Could not create session")
 		return
@@ -763,10 +767,26 @@ func (s *Server) adminCredits(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) rate(max int, window time.Duration, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		host, _, _ := net.SplitHostPort(r.RemoteAddr)
+		host := s.clientIP(r)
 		key := host + ":" + r.URL.Path
 		now := time.Now()
 		s.limiter.mu.Lock()
+		if s.limiter.lastSweep.IsZero() || now.Sub(s.limiter.lastSweep) >= 5*time.Minute {
+			for candidate, timestamps := range s.limiter.hits {
+				fresh := timestamps[:0]
+				for _, timestamp := range timestamps {
+					if now.Sub(timestamp) < time.Hour {
+						fresh = append(fresh, timestamp)
+					}
+				}
+				if len(fresh) == 0 {
+					delete(s.limiter.hits, candidate)
+				} else {
+					s.limiter.hits[candidate] = fresh
+				}
+			}
+			s.limiter.lastSweep = now
+		}
 		old := s.limiter.hits[key]
 		keep := old[:0]
 		for _, t := range old {
@@ -786,6 +806,25 @@ func (s *Server) rate(max int, window time.Duration, next http.HandlerFunc) http
 		}
 		next(w, r)
 	}
+}
+
+func (s *Server) clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	if !s.c.TrustProxy {
+		return host
+	}
+	forwarded := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0])
+	if net.ParseIP(forwarded) != nil {
+		return forwarded
+	}
+	realIP := strings.TrimSpace(r.Header.Get("X-Real-IP"))
+	if net.ParseIP(realIP) != nil {
+		return realIP
+	}
+	return host
 }
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)

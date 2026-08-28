@@ -25,10 +25,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: npm install --no-audit --no-fund
+          cache: npm
+      - run: npm ci --no-audit --no-fund
       - run: npm run build
-      - run: go test ./...
+      - run: npm audit --omit=dev --audit-level=high
+      - run: go test -race ./...
       - run: go vet ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
 
   publish:
     if: github.event_name != 'pull_request'

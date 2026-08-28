@@ -36,3 +36,24 @@ func TestSetupRequiresStrongToken(t *testing.T) {
 		t.Fatal("setup accepted a short token")
 	}
 }
+
+func TestHTTPSPublicURLRequiresSecureCookies(t *testing.T) {
+	t.Setenv("MOCK_MODE", "true")
+	t.Setenv("PUBLIC_URL", "https://portal.example.com")
+	t.Setenv("COOKIE_SECURE", "false")
+	if _, err := Load(); err == nil {
+		t.Fatal("HTTPS public URL accepted insecure cookies")
+	}
+	t.Setenv("COOKIE_SECURE", "true")
+	if _, err := Load(); err != nil {
+		t.Fatalf("secure HTTPS configuration rejected: %v", err)
+	}
+}
+
+func TestRejectsInvalidPublicURL(t *testing.T) {
+	t.Setenv("MOCK_MODE", "true")
+	t.Setenv("PUBLIC_URL", "portal.example.com")
+	if _, err := Load(); err == nil {
+		t.Fatal("relative PUBLIC_URL was accepted")
+	}
+}

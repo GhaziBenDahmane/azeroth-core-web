@@ -42,12 +42,11 @@ func (s *Server) publicConfig(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func (s *Server) verifyTurnstile(ctx context.Context, token, remoteAddr string) bool {
+func (s *Server) verifyTurnstile(ctx context.Context, token, remoteIP string) bool {
 	if s.c.TurnstileSecret == "" {
 		return true
 	}
-	ip, _, _ := net.SplitHostPort(remoteAddr)
-	form := url.Values{"secret": {s.c.TurnstileSecret}, "response": {token}, "remoteip": {ip}}
+	form := url.Values{"secret": {s.c.TurnstileSecret}, "response": {token}, "remoteip": {remoteIP}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://challenges.cloudflare.com/turnstile/v0/siteverify", strings.NewReader(form.Encode()))
 	if err != nil {
 		return false

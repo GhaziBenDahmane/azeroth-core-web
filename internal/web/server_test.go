@@ -116,6 +116,30 @@ func TestDisabledFeatureReturnsNotFound(t *testing.T) {
 	}
 }
 
+func TestTrustedProxyClientIP(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "10.0.0.2:4321"
+	r.Header.Set("X-Forwarded-For", "203.0.113.8, 10.0.0.2")
+
+	untrusted := &Server{c: config.Config{TrustProxy: false}}
+	if got := untrusted.clientIP(r); got != "10.0.0.2" {
+		t.Fatalf("untrusted proxy address = %q", got)
+	}
+	trusted := &Server{c: config.Config{TrustProxy: true}}
+	if got := trusted.clientIP(r); got != "203.0.113.8" {
+		t.Fatalf("trusted proxy address = %q", got)
+	}
+}
+
+func TestSecureResponsesIncludeHSTS(t *testing.T) {
+	s := &Server{c: config.Config{MockMode: true, CookieSecure: true}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if got := w.Header().Get("Strict-Transport-Security"); got == "" {
+		t.Fatal("secure response did not include HSTS")
+	}
+}
+
 func TestMockFirstRunSetupLocksAfterCreation(t *testing.T) {
 	s := &Server{c: config.Config{MockMode: true, EnableSetup: true, EnableRegistration: true, SetupToken: "0123456789abcdef", SetupGMLevel: 3}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
 	h := s.Handler()

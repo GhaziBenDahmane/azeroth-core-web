@@ -59,6 +59,20 @@ echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-std
 
 Docker Hub is not required. If desired later, a second registry login and image tag can be added to the same workflow.
 
+### Production checklist
+
+Before exposing the portal publicly:
+
+1. Use a versioned image such as `:1.0.0`, rather than `:latest`, after testing it against a staging copy of your AzerothCore databases.
+2. Set `PUBLIC_URL=https://your-domain` and `COOKIE_SECURE=true`; place a TLS reverse proxy in front of the default `127.0.0.1:8080` binding.
+3. Set `TRUST_PROXY=true` only when direct access to port 8080 is blocked and the proxy overwrites client-IP headers.
+4. Keep `MOCK_MODE=false`, `ENABLE_SETUP=false`, and `SETUP_TOKEN` empty after onboarding.
+5. Leave `ADMIN_TOKEN` empty unless API automation needs it. If enabled, generate it with `openssl rand -hex 32`.
+6. Keep MySQL and SOAP private, use the least-privilege database grants below, and use a dedicated restricted SOAP account.
+7. Back up the AzerothCore databases before the first migration and before portal upgrades.
+
+The production Compose file runs the container read-only, drops Linux capabilities, prevents privilege escalation, and binds only to localhost by default. Set `PORTAL_BIND=0.0.0.0` only when an external firewall or container network provides equivalent isolation.
+
 ### First-time administrator setup
 
 The optional web wizard creates one AzerothCore account, initializes its portal wallet and realm rows, and grants its GM access through `account_access`. Generate a one-time secret, add it to `.env`, and start the portal:
@@ -93,20 +107,24 @@ Use a dedicated MySQL user. It needs to read the three core databases, insert ac
 CREATE USER 'portal'@'%' IDENTIFIED BY 'use-a-long-password';
 GRANT SELECT ON acore_world.* TO 'portal'@'%';
 GRANT SELECT ON acore_characters.* TO 'portal'@'%';
-GRANT SELECT, INSERT ON acore_auth.account TO 'portal'@'%';
+GRANT SELECT, INSERT, UPDATE ON acore_auth.account TO 'portal'@'%';
 GRANT SELECT ON acore_auth.account_banned TO 'portal'@'%';
 GRANT SELECT, INSERT ON acore_auth.realmcharacters TO 'portal'@'%';
 GRANT SELECT ON acore_auth.realmlist TO 'portal'@'%';
-GRANT CREATE ON acore_auth.* TO 'portal'@'%';
+GRANT CREATE, ALTER, INDEX ON acore_auth.* TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_sessions TO 'portal'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_account_security TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_settings TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_wallets TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_products TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_product_items TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_orders TO 'portal'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_order_items TO 'portal'@'%';
 GRANT SELECT, INSERT ON acore_auth.portal_credit_ledger TO 'portal'@'%';
+GRANT SELECT, INSERT ON acore_auth.portal_payment_events TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_moderation_log TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_support_tickets TO 'portal'@'%';
+GRANT SELECT, INSERT, DELETE ON acore_auth.portal_password_resets TO 'portal'@'%';
 GRANT SELECT, INSERT ON acore_auth.account_access TO 'portal'@'%';
 ```
 
@@ -200,10 +218,12 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | Variable | Purpose | Default |
 |---|---|---|
 | `AUTH_DSN` | Go MySQL DSN for auth DB | required |
+| `PORTAL_BIND`, `PORTAL_PORT` | Host interface and port used by production Compose | `127.0.0.1`, `8080` |
 | `CHARACTERS_DSN`, `WORLD_DSN` | DSNs for other core DBs | `AUTH_DSN` |
 | `AUTH_DB`, `CHARACTERS_DB`, `WORLD_DB` | Qualified schema names | AzerothCore defaults |
 | `PUBLIC_URL` | Canonical origin used for CSRF checks | `http://localhost:8080` |
-| `COOKIE_SECURE` | Require HTTPS for session cookies | `false` |
+| `COOKIE_SECURE` | Require HTTPS for session cookies; mandatory with an HTTPS `PUBLIC_URL` | `false` |
+| `TRUST_PROXY` | Trust proxy-provided client IP headers for sessions and rate limiting | `false` |
 | `REALM_NAME`, `REALM_ADDRESS` | UI realm identity and realmlist address | `Azeroth`, example host |
 | `PORTAL_NAME`, `BRAND_MARK` | Site-wide display name and short sigil (up to 3 characters recommended) | realm name, `A` |
 | `PORTAL_TAGLINE`, `FOOTER_TEXT` | Home-page introduction and footer copy | community-oriented defaults |
@@ -232,7 +252,7 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Optional registration bot protection | unset/disabled |
 | `SMTP_ADDR`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional password-recovery email transport | unset/disabled |
 
-Set `PUBLIC_URL=https://your-domain`, `COOKIE_SECURE=true`, terminate TLS at your proxy, and keep the portal and SOAP ports behind a firewall in production.
+Set `PUBLIC_URL=https://your-domain`, `COOKIE_SECURE=true`, terminate TLS at your proxy, and keep the portal and SOAP ports behind a firewall in production. Set `TRUST_PROXY=true` only when the portal cannot be reached directly and your proxy overwrites (rather than appends to) incoming client-IP headers.
 
 `UI_TEXT_JSON` currently supports the shared keys `nav.home`, `nav.armory`, `nav.rankings`, `nav.guilds`, `nav.realm`, `nav.shop`, `action.signIn`, `action.register`, `action.account`, `footer.community`, `footer.terms`, `footer.privacy`, `home.heroLine1`, `home.heroLine2`, `home.createAccount`, `home.howToConnect`, `news.eyebrow`, `news.title`, and `news.readMore`. Values are inserted as text, never HTML.
 

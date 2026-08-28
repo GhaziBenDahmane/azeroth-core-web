@@ -50,5 +50,5 @@ All request-derived values are passed as MySQL parameters. The only values inter
 3. TOTP secrets are stored in the portal database. Protect database backups and access as production credentials.
 4. Terminate TLS at a trusted proxy, enable secure cookies, firewall SOAP/MySQL, rotate the admin token, and use the least-privilege grants documented in the README.
 5. The in-memory demo mode must never be enabled on the public production deployment.
-6. Dependency lockfiles and image digests should be maintained by deployment automation. Run dependency vulnerability scans whenever dependencies or base images change.
+6. JavaScript dependencies are lockfile-pinned, and CI runs npm and Go vulnerability checks before publishing an image. Continue reviewing base-image scan results and update pinned release tags regularly.
 7. The optional realm-start webhook is an outbound trust boundary. Keep its token separate from AzerothCore credentials, rotate it regularly, and allow-list the destination at the network layer.
