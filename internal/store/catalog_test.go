@@ -22,8 +22,42 @@ func TestDefaultCatalogCoversEveryWotLKClassAndTier(t *testing.T) {
 		}
 	}
 	for role, items := range roleSupplies {
-		if len(items) != 7 {
-			t.Errorf("%s has %d supply types, want 7", role, len(items))
+		if len(items) != 11 {
+			t.Errorf("%s has %d supply types, want 11", role, len(items))
+		}
+	}
+}
+
+func TestEveryPackageHasCompleteUniqueEquipmentLoadout(t *testing.T) {
+	for _, d := range defaultCatalog() {
+		items, err := equipmentLoadout(d)
+		if err != nil {
+			t.Fatalf("%s: %v", d.key, err)
+		}
+		if len(items) < 11 {
+			t.Errorf("%s has only %d non-set equipment items", d.key, len(items))
+		}
+		slots := map[string]bool{}
+		names := map[string]bool{}
+		for _, item := range items {
+			if item.slot == "" || item.name == "" || item.quantity == 0 {
+				t.Errorf("%s has incomplete item: %#v", d.key, item)
+			}
+			if slots[item.slot] {
+				t.Errorf("%s has duplicate slot %q", d.key, item.slot)
+			}
+			if names[item.name] {
+				t.Errorf("%s has duplicate item %q", d.key, item.name)
+			}
+			slots[item.slot], names[item.name] = true, true
+		}
+		for _, slot := range []string{"neck", "back", "wrist", "waist", "feet", "finger 1", "finger 2", "trinket 1", "trinket 2"} {
+			if !slots[slot] {
+				t.Errorf("%s is missing %s", d.key, slot)
+			}
+		}
+		if !slots["two hand"] && !slots["main hand"] {
+			t.Errorf("%s has no weapon", d.key)
 		}
 	}
 }

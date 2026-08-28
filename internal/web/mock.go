@@ -59,7 +59,7 @@ func buildMockProducts() []product {
 		{8, "Mage", "Frost", "Silk", "Kirin Tor", "caster"}, {9, "Warlock", "Affliction", "Felweave", "Deathbringer", "caster"},
 		{11, "Druid", "Feral", "Dragonhide", "Nightsong", "agility"}, {11, "Druid", "Balance", "Wyrmhide", "Nightsong", "caster"}, {11, "Druid", "Restoration", "Kodohide", "Nightsong", "healer"},
 	}
-	kits := map[string][]string{"strength": {"10 × Bold Cardinal Ruby", "1 × Relentless Earthsiege Diamond", "Arcanum of Torment", "Greater Inscription of the Axe", "Icescale Leg Armor", "Powerful Stats chest scroll", "Crusher glove scroll"}, "agility": {"10 × Delicate Cardinal Ruby", "1 × Relentless Earthsiege Diamond", "Arcanum of Torment", "Greater Inscription of the Axe", "Icescale Leg Armor", "Powerful Stats chest scroll", "Crusher glove scroll"}, "caster": {"10 × Runed Cardinal Ruby", "1 × Chaotic Skyflare Diamond", "Arcanum of Burning Mysteries", "Greater Inscription of the Storm", "Brilliant Spellthread", "Powerful Stats chest scroll", "Exceptional Spellpower glove scroll"}, "healer": {"10 × Runed Cardinal Ruby", "1 × Insightful Earthsiege Diamond", "Arcanum of Blissful Mending", "Greater Inscription of the Crag", "Sapphire Spellthread", "Powerful Stats chest scroll", "Exceptional Spellpower glove scroll"}, "tank": {"10 × Solid Majestic Zircon", "1 × Austere Earthsiege Diamond", "Arcanum of the Stalwart Protector", "Greater Inscription of the Pinnacle", "Frosthide Leg Armor", "Super Health chest scroll", "Armsman glove scroll"}}
+	kits := map[string][]string{"strength": {"20 × primary-stat gems + meta", "DPS head, shoulder & leg enhancements", "Weapon, cloak, chest, wrist, glove & boot enchants"}, "agility": {"20 × primary-stat gems + meta", "Agility head, shoulder & leg enhancements", "Weapon, cloak, chest, wrist, glove & boot enchants"}, "caster": {"20 × spell-power gems + meta", "Caster head, shoulder & leg enhancements", "Weapon, cloak, chest, wrist, glove & boot enchants"}, "healer": {"20 × healing gems + meta", "Healer head, shoulder & leg enhancements", "Weapon, cloak, chest, wrist, glove & boot enchants"}, "tank": {"20 × stamina gems + meta", "Tank head, shoulder & leg enhancements", "Weapon, cloak, chest, wrist, glove & boot enchants"}}
 	id := uint32(8)
 	for _, set := range sets {
 		for _, season := range []struct {
@@ -70,12 +70,14 @@ func buildMockProducts() []product {
 				continue
 			}
 			gladiator := map[string]string{"S6": "Furious", "S7": "Relentless"}[season.Name] + " Gladiator's " + set.PvPArmor
-			includes := append([]string{"Complete 5-piece " + gladiator + " set"}, kits[set.Role]...)
+			includes := []string{"Complete 5-piece " + gladiator + " set", "Matching neck, cloak, wrists, belt & boots", "2 rings and 2 PvP trinkets", "Spec weapon set + ranged weapon or relic"}
+			includes = append(includes, kits[set.Role]...)
 			includes = append(includes, "Level 80 service")
 			products = append(products, product{ID: id, Price: season.Price, Name: set.Class + " " + set.Spec + " " + season.Name + " Package", Description: "WotLK " + gladiator + " starter loadout for " + set.Spec + ".", Category: "PvP", ClassID: set.ID, ClassName: set.Class, Tier: season.Name, ServiceLevel: 80, Includes: includes})
 			id++
 		}
-		includes := append([]string{"Complete 5-piece Conqueror's " + set.T8Set + " set"}, kits[set.Role]...)
+		includes := []string{"Complete 5-piece Conqueror's " + set.T8Set + " set", "Ulduar neck, cloak, wrists, belt & boots", "2 Ulduar rings and 2 trinkets", "Spec weapon set + ranged weapon or relic"}
+		includes = append(includes, kits[set.Role]...)
 		includes = append(includes, "Level 80 service")
 		products = append(products, product{ID: id, Price: 135, Name: set.Class + " " + set.Spec + " T8 Package", Description: "Ulduar raid-ready WotLK tier 8 loadout for " + set.Spec + ".", Category: "PvE", ClassID: set.ID, ClassName: set.Class, Tier: "T8", ServiceLevel: 80, Includes: includes})
 		id++

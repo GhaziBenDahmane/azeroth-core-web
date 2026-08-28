@@ -15,7 +15,7 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - Audited GM credit grants authorized from AzerothCore `account_access`
 - GM delivery queue/reconciliation view and credit ledger
 - Gold bundles, level services, and class-restricted multi-item gear packages
-- 51 specialization-aware WotLK S6, S7, and T8 starter packages resolved from the installed world database
+- 51 specialization-aware, full-slot WotLK S6, S7, and T8 loadouts resolved from the installed world database
 - Stripe Checkout credit packs with signed, replay-safe webhooks
 - Categorized shop with an admin product API
 - Durable queued fulfillment through AzerothCore SOAP, with review/refund controls
@@ -129,7 +129,7 @@ curl -X POST http://localhost:8080/api/admin/products \
 
 Use item IDs approved for your exact AzerothCore world database. Gems and enchant scrolls are ordinary bundle items and arrive in the same mail; the portal deliberately does not write enchantment data directly into character inventory tables.
 
-The default specialization-aware S6, S7, and T8 catalog is populated automatically from the installed AzerothCore `item_template` table. It includes each five-piece armor set, a role-specific epic gem kit, four enchant scrolls, and level 80. See [CATALOG.md](CATALOG.md) for the exact behavior and safety rationale.
+The default specialization-aware S6, S7, and T8 catalog is populated automatically from the installed AzerothCore `item_template` table. It includes each five-piece armor set, all matching off-pieces, jewelry, trinkets, class-appropriate weapons and relics, a phase-appropriate gem kit, a full enchant kit, and level 80. See [CATALOG.md](CATALOG.md) for the exact behavior and safety rationale.
 
 Credits can be granted through the audited GM console. To sell fixed credit packs, configure the five `STRIPE_*` variables and point a Stripe webhook at `/api/billing/webhook` for `checkout.session.completed` events.
 

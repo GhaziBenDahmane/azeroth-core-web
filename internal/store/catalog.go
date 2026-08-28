@@ -37,15 +37,25 @@ var t8Catalog = []catalogSet{
 	{class: "Druid", spec: "Feral", prefix: "Conqueror's Nightsong", anchor: "Headguard", role: "agility", classID: 11}, {class: "Druid", spec: "Balance", prefix: "Conqueror's Nightsong", anchor: "Headpiece", role: "caster", classID: 11}, {class: "Druid", spec: "Restoration", prefix: "Conqueror's Nightsong", anchor: "Cover", role: "healer", classID: 11},
 }
 
-var roleSupplies = map[string][]struct {
+type catalogSupply struct {
 	name     string
 	quantity uint32
-}{
-	"strength": {{"Bold Cardinal Ruby", 10}, {"Relentless Earthsiege Diamond", 1}, {"Arcanum of Torment", 1}, {"Greater Inscription of the Axe", 1}, {"Icescale Leg Armor", 1}, {"Scroll of Enchant Chest - Powerful Stats", 1}, {"Scroll of Enchant Gloves - Crusher", 1}},
-	"agility":  {{"Delicate Cardinal Ruby", 10}, {"Relentless Earthsiege Diamond", 1}, {"Arcanum of Torment", 1}, {"Greater Inscription of the Axe", 1}, {"Icescale Leg Armor", 1}, {"Scroll of Enchant Chest - Powerful Stats", 1}, {"Scroll of Enchant Gloves - Crusher", 1}},
-	"caster":   {{"Runed Cardinal Ruby", 10}, {"Chaotic Skyflare Diamond", 1}, {"Arcanum of Burning Mysteries", 1}, {"Greater Inscription of the Storm", 1}, {"Brilliant Spellthread", 1}, {"Scroll of Enchant Chest - Powerful Stats", 1}, {"Scroll of Enchant Gloves - Exceptional Spellpower", 1}},
-	"healer":   {{"Runed Cardinal Ruby", 10}, {"Insightful Earthsiege Diamond", 1}, {"Arcanum of Blissful Mending", 1}, {"Greater Inscription of the Crag", 1}, {"Sapphire Spellthread", 1}, {"Scroll of Enchant Chest - Powerful Stats", 1}, {"Scroll of Enchant Gloves - Exceptional Spellpower", 1}},
-	"tank":     {{"Solid Majestic Zircon", 10}, {"Austere Earthsiege Diamond", 1}, {"Arcanum of the Stalwart Protector", 1}, {"Greater Inscription of the Pinnacle", 1}, {"Frosthide Leg Armor", 1}, {"Scroll of Enchant Chest - Super Health", 1}, {"Scroll of Enchant Gloves - Armsman", 1}},
+}
+
+var roleSupplies = map[string][]catalogSupply{
+	"strength": {{"Bold Cardinal Ruby", 20}, {"Relentless Earthsiege Diamond", 1}, {"Arcanum of Torment", 1}, {"Greater Inscription of the Axe", 1}, {"Icescale Leg Armor", 1}, {"Scroll of Enchant Chest - Powerful Stats", 1}, {"Scroll of Enchant Gloves - Crusher", 1}, {"Scroll of Enchant Weapon - Berserking", 2}, {"Scroll of Enchant Cloak - Major Agility", 1}, {"Scroll of Enchant Bracers - Greater Assault", 1}, {"Scroll of Enchant Boots - Greater Assault", 1}},
+	"agility":  {{"Delicate Cardinal Ruby", 20}, {"Relentless Earthsiege Diamond", 1}, {"Arcanum of Torment", 1}, {"Greater Inscription of the Axe", 1}, {"Icescale Leg Armor", 1}, {"Scroll of Enchant Chest - Powerful Stats", 1}, {"Scroll of Enchant Gloves - Crusher", 1}, {"Scroll of Enchant Weapon - Berserking", 2}, {"Scroll of Enchant Cloak - Major Agility", 1}, {"Scroll of Enchant Bracers - Greater Assault", 1}, {"Scroll of Enchant Boots - Greater Assault", 1}},
+	"caster":   {{"Runed Cardinal Ruby", 20}, {"Chaotic Skyflare Diamond", 1}, {"Arcanum of Burning Mysteries", 1}, {"Greater Inscription of the Storm", 1}, {"Brilliant Spellthread", 1}, {"Scroll of Enchant Chest - Powerful Stats", 1}, {"Scroll of Enchant Gloves - Exceptional Spellpower", 1}, {"Scroll of Enchant Weapon - Mighty Spellpower", 1}, {"Scroll of Enchant Cloak - Greater Speed", 1}, {"Scroll of Enchant Bracer - Superior Spellpower", 1}, {"Scroll of Enchant Boots - Icewalker", 1}},
+	"healer":   {{"Runed Cardinal Ruby", 20}, {"Insightful Earthsiege Diamond", 1}, {"Arcanum of Blissful Mending", 1}, {"Greater Inscription of the Crag", 1}, {"Sapphire Spellthread", 1}, {"Scroll of Enchant Chest - Powerful Stats", 1}, {"Scroll of Enchant Gloves - Exceptional Spellpower", 1}, {"Scroll of Enchant Weapon - Mighty Spellpower", 1}, {"Scroll of Enchant Cloak - Greater Speed", 1}, {"Scroll of Enchant Bracer - Superior Spellpower", 1}, {"Scroll of Enchant Boots - Tuskarr's Vitality", 1}},
+	"tank":     {{"Solid Majestic Zircon", 20}, {"Austere Earthsiege Diamond", 1}, {"Arcanum of the Stalwart Protector", 1}, {"Greater Inscription of the Pinnacle", 1}, {"Frosthide Leg Armor", 1}, {"Scroll of Enchant Chest - Super Health", 1}, {"Scroll of Enchant Gloves - Armsman", 1}, {"Scroll of Enchant Weapon - Blood Draining", 1}, {"Scroll of Enchant Cloak - Titanweave", 1}, {"Scroll of Enchant Bracer - Major Stamina", 1}, {"Scroll of Enchant Boots - Tuskarr's Vitality", 1}},
+}
+
+func suppliesFor(d catalogSet) []catalogSupply {
+	supplies := append([]catalogSupply(nil), roleSupplies[d.role]...)
+	if d.tier != "S7" {
+		supplies[0].name = map[string]string{"strength": "Bold Scarlet Ruby", "agility": "Delicate Scarlet Ruby", "caster": "Runed Scarlet Ruby", "healer": "Runed Scarlet Ruby", "tank": "Solid Sky Sapphire"}[d.role]
+	}
+	return supplies
 }
 
 func defaultCatalog() []catalogSet {
@@ -100,14 +110,28 @@ func (s *Store) resolveSet(ctx context.Context, d catalogSet) ([]catalogItem, er
 	if len(items) != 5 {
 		return nil, nil
 	}
-	for _, supply := range roleSupplies[d.role] {
+	loadout, err := equipmentLoadout(d)
+	if err != nil {
+		return nil, err
+	}
+	for _, gear := range loadout {
+		q = fmt.Sprintf("SELECT entry FROM `%s`.item_template WHERE name=? AND RequiredLevel<=80 AND VerifiedBuild>1 ORDER BY ItemLevel DESC,entry DESC LIMIT 1", s.C.WorldDB)
+		var id uint32
+		if err := s.World.QueryRowContext(ctx, q, gear.name).Scan(&id); err == sql.ErrNoRows {
+			return nil, nil
+		} else if err != nil {
+			return nil, err
+		}
+		items = append(items, catalogItem{id, gear.quantity})
+	}
+	for _, supply := range suppliesFor(d) {
 		q = fmt.Sprintf("SELECT entry FROM `%s`.item_template WHERE name=? AND VerifiedBuild>1 ORDER BY ItemLevel DESC LIMIT 1", s.C.WorldDB)
 		var id uint32
 		if s.World.QueryRowContext(ctx, q, supply.name).Scan(&id) == nil {
 			items = append(items, catalogItem{id, supply.quantity})
 		}
 	}
-	if len(items) != 12 {
+	if len(items) != 5+len(loadout)+len(suppliesFor(d)) {
 		return nil, nil
 	}
 	return items, nil
@@ -124,7 +148,7 @@ func (s *Store) SeedDefaultCatalog(ctx context.Context) (int, error) {
 			continue
 		}
 		name := fmt.Sprintf("%s %s %s Package", d.class, d.spec, d.tier)
-		description := fmt.Sprintf("Complete %s five-piece set for %s %s, plus a role-appropriate epic gem and armor enhancement kit.", d.tier, d.spec, d.class)
+		description := fmt.Sprintf("Complete %s level-80 loadout for %s %s: five-piece set, matching off-pieces, jewelry, trinkets, weapons, gems, and armor enhancements.", d.tier, d.spec, d.class)
 		var id int64
 		if err = s.Auth.QueryRowContext(ctx, "SELECT id FROM portal_products WHERE seed_key=? LIMIT 1", d.key).Scan(&id); err == sql.ErrNoRows {
 			res, insertErr := s.Auth.ExecContext(ctx, `INSERT INTO portal_products(seed_key,name,description,item_id,quantity,price,category,class_id,tier_label,service_level,active) VALUES(?,?,?,0,0,?,?,?,?,80,1)`, d.key, name, description, d.price, d.category, d.classID, d.tier)
