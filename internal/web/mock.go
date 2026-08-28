@@ -46,20 +46,39 @@ func buildMockProducts() []product {
 		{ID: 6, ItemID: 50818, Quantity: 1, Price: 75, Name: "Invincible's Reins", Description: "The famed steed of the fallen prince awaits a new rider.", Category: "Mounts"},
 		{ID: 7, Price: 40, Name: "Instant Level 80", Description: "Raise one existing character to level 80 and receive a starter travel kit.", Category: "Services", Tier: "Level 80", ServiceLevel: 80, Includes: []string{"Level 80 boost", "Four 20-slot bags", "Cold Weather Flying starter gold"}},
 	}
-	classes := []struct {
-		ID   uint8
-		Name string
-	}{{1, "Warrior"}, {2, "Paladin"}, {3, "Hunter"}, {4, "Rogue"}, {5, "Priest"}, {6, "Death Knight"}, {7, "Shaman"}, {8, "Mage"}, {9, "Warlock"}, {11, "Druid"}}
-	tiers := []struct {
-		Name, Category, Description string
-		Price                       uint32
-	}{{"S6", "PvP", "Furious Gladiator loadout", 110}, {"S7", "PvP", "Relentless Gladiator loadout", 155}, {"T8", "PvE", "Ulduar raid-ready tier loadout", 135}}
+	sets := []struct {
+		ID                                 uint8
+		Class, Spec, PvPArmor, T8Set, Role string
+	}{
+		{1, "Warrior", "Arms", "Plate", "Siegebreaker", "strength"}, {1, "Warrior", "Protection", "", "Siegebreaker", "tank"},
+		{2, "Paladin", "Retribution", "Scaled", "Aegis", "strength"}, {2, "Paladin", "Holy", "Ornamented", "Aegis", "healer"}, {2, "Paladin", "Protection", "", "Aegis", "tank"},
+		{3, "Hunter", "Marksmanship", "Chain", "Scourgestalker", "agility"}, {4, "Rogue", "Assassination", "Leather", "Terrorblade", "agility"},
+		{5, "Priest", "Shadow", "Satin", "Sanctification", "caster"}, {5, "Priest", "Holy", "Mooncloth", "Sanctification", "healer"},
+		{6, "Death Knight", "Unholy", "Dreadplate", "Darkruned", "strength"}, {6, "Death Knight", "Blood", "", "Darkruned", "tank"},
+		{7, "Shaman", "Enhancement", "Linked", "Worldbreaker", "agility"}, {7, "Shaman", "Elemental", "Mail", "Worldbreaker", "caster"}, {7, "Shaman", "Restoration", "Ringmail", "Worldbreaker", "healer"},
+		{8, "Mage", "Frost", "Silk", "Kirin Tor", "caster"}, {9, "Warlock", "Affliction", "Felweave", "Deathbringer", "caster"},
+		{11, "Druid", "Feral", "Dragonhide", "Nightsong", "agility"}, {11, "Druid", "Balance", "Wyrmhide", "Nightsong", "caster"}, {11, "Druid", "Restoration", "Kodohide", "Nightsong", "healer"},
+	}
+	kits := map[string][]string{"strength": {"10 × Bold Cardinal Ruby", "1 × Relentless Earthsiege Diamond", "Powerful Stats, Greater Assault, Crusher, and Berserking scrolls"}, "agility": {"10 × Delicate Cardinal Ruby", "1 × Relentless Earthsiege Diamond", "Powerful Stats, Major Agility, Greater Assault, and Berserking scrolls"}, "caster": {"10 × Runed Cardinal Ruby", "1 × Chaotic Skyflare Diamond", "Powerful Stats, Tuskarr's Vitality, Exceptional Spellpower, and Mighty Spellpower scrolls"}, "healer": {"10 × Runed Cardinal Ruby", "1 × Insightful Earthsiege Diamond", "Powerful Stats, Tuskarr's Vitality, Exceptional Spellpower, and Mighty Spellpower scrolls"}, "tank": {"10 × Solid Majestic Zircon", "1 × Austere Earthsiege Diamond", "Super Health, Titanweave, Armsman, and Blood Draining scrolls"}}
 	id := uint32(8)
-	for _, class := range classes {
-		for _, tier := range tiers {
-			products = append(products, product{ID: id, Price: tier.Price, Name: class.Name + " " + tier.Name + " Package", Description: tier.Description + " selected for your class, with matching accessories and upgrades.", Category: tier.Category, ClassID: class.ID, ClassName: class.Name, Tier: tier.Name, ServiceLevel: 80, Includes: []string{"5-piece class armor set", "Class-appropriate weapon set", "Matching off-pieces and accessories", "Cut epic gem package", "Complete enchant scroll kit"}})
+	for _, set := range sets {
+		for _, season := range []struct {
+			Name  string
+			Price uint32
+		}{{"S6", 110}, {"S7", 155}} {
+			if set.PvPArmor == "" {
+				continue
+			}
+			gladiator := map[string]string{"S6": "Furious", "S7": "Relentless"}[season.Name] + " Gladiator's " + set.PvPArmor
+			includes := append([]string{"Complete 5-piece " + gladiator + " set"}, kits[set.Role]...)
+			includes = append(includes, "Level 80 service")
+			products = append(products, product{ID: id, Price: season.Price, Name: set.Class + " " + set.Spec + " " + season.Name + " Package", Description: "WotLK " + gladiator + " starter loadout for " + set.Spec + ".", Category: "PvP", ClassID: set.ID, ClassName: set.Class, Tier: season.Name, ServiceLevel: 80, Includes: includes})
 			id++
 		}
+		includes := append([]string{"Complete 5-piece Conqueror's " + set.T8Set + " set"}, kits[set.Role]...)
+		includes = append(includes, "Level 80 service")
+		products = append(products, product{ID: id, Price: 135, Name: set.Class + " " + set.Spec + " T8 Package", Description: "Ulduar raid-ready WotLK tier 8 loadout for " + set.Spec + ".", Category: "PvE", ClassID: set.ID, ClassName: set.Class, Tier: "T8", ServiceLevel: 80, Includes: includes})
+		id++
 	}
 	products = append(products,
 		product{ID: id, Price: 20, Name: "5,000 Gold", Description: "A starter gold package delivered safely by in-game mail.", Category: "Gold", Tier: "5K", Gold: 5000, Includes: []string{"5,000 in-game gold", "Mailbox delivery", "Any class"}},

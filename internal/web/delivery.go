@@ -80,8 +80,12 @@ func (s *Server) fulfillOrder(ctx context.Context, o queuedOrder) {
 	}
 	rows.Close()
 	commands := []string{}
-	if len(items) > 0 {
-		commands = append(commands, fmt.Sprintf(`send items %s "Portal order %d" "Thank you for supporting %s." %s`, name, o.ID, realm, strings.Join(items, " ")))
+	for start := 0; start < len(items); start += 12 {
+		end := start + 12
+		if end > len(items) {
+			end = len(items)
+		}
+		commands = append(commands, fmt.Sprintf(`send items %s "Portal order %d" "Thank you for supporting %s." %s`, name, o.ID, realm, strings.Join(items[start:end], " ")))
 	}
 	if o.ServiceLevel > 0 {
 		commands = append(commands, fmt.Sprintf("character level %s %d", name, o.ServiceLevel))

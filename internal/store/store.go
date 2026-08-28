@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/example/azeroth-portal/internal/config"
@@ -55,6 +56,13 @@ func Open(c config.Config) (*Store, error) {
 		s.Close()
 		return nil, err
 	}
+	seedCtx, seedCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer seedCancel()
+	if seeded, seedErr := s.SeedDefaultCatalog(seedCtx); seedErr != nil {
+		slog.Warn("default shop catalog could not be fully seeded", "error", seedErr)
+	} else {
+		slog.Info("default WotLK shop catalog ready", "packages", seeded)
+	}
 	return s, nil
 }
 func dsnOptions(d string) string {
@@ -87,7 +95,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 account_id INT UNSIGNED PRIMARY KEY, balance INT UNSIGNED NOT NULL DEFAULT 0,
 		 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB`,
 		`CREATE TABLE IF NOT EXISTS portal_products (
-		 id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100) NOT NULL, description VARCHAR(500) NOT NULL DEFAULT '',
+		 id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, seed_key VARCHAR(80) NULL UNIQUE, name VARCHAR(100) NOT NULL, description VARCHAR(500) NOT NULL DEFAULT '',
 		 item_id INT UNSIGNED NOT NULL, quantity INT UNSIGNED NOT NULL DEFAULT 1, price INT UNSIGNED NOT NULL,
 		 category VARCHAR(40) NOT NULL DEFAULT 'Items', image_url VARCHAR(500) NOT NULL DEFAULT '', active TINYINT(1) NOT NULL DEFAULT 1,
 		 class_id TINYINT UNSIGNED NOT NULL DEFAULT 0, tier_label VARCHAR(30) NOT NULL DEFAULT '', service_level TINYINT UNSIGNED NOT NULL DEFAULT 0,
@@ -128,6 +136,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS tier_label VARCHAR(30) NOT NULL DEFAULT ''`,
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS service_level TINYINT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS gold_amount INT UNSIGNED NOT NULL DEFAULT 0`,
+		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS seed_key VARCHAR(80) NULL`,
 		`ALTER TABLE portal_orders MODIFY COLUMN status ENUM('pending','delivering','delivered','review','failed','refunded') NOT NULL DEFAULT 'pending'`,
 		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS attempts INT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS service_level TINYINT UNSIGNED NOT NULL DEFAULT 0`,

@@ -381,6 +381,64 @@ func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
 			out = append(out, p)
 		}
 	}
+	rows.Close()
+	byID := make(map[uint32]*product, len(out))
+	for i := range out {
+		byID[out[i].ID] = &out[i]
+	}
+	type productItemRef struct {
+		productID uint32
+		item      bundleItem
+	}
+	refs := []productItemRef{}
+	itemIDs := []uint32{}
+	seenIDs := map[uint32]bool{}
+	itemRows, itemErr := s.s.Auth.QueryContext(r.Context(), "SELECT product_id,item_id,quantity FROM portal_product_items ORDER BY product_id,item_id")
+	if itemErr == nil {
+		for itemRows.Next() {
+			var productID uint32
+			var item bundleItem
+			if itemRows.Scan(&productID, &item.ItemID, &item.Quantity) != nil {
+				continue
+			}
+			p := byID[productID]
+			if p == nil {
+				continue
+			}
+			p.Items = append(p.Items, item)
+			refs = append(refs, productItemRef{productID, item})
+			if !seenIDs[item.ItemID] {
+				seenIDs[item.ItemID] = true
+				itemIDs = append(itemIDs, item.ItemID)
+			}
+		}
+		itemRows.Close()
+	}
+	names := map[uint32]string{}
+	if len(itemIDs) > 0 {
+		args := make([]any, len(itemIDs))
+		for i, id := range itemIDs {
+			args[i] = id
+		}
+		q := fmt.Sprintf("SELECT entry,name FROM `%s`.item_template WHERE entry IN (?%s)", s.c.WorldDB, strings.Repeat(",?", len(itemIDs)-1))
+		if nameRows, err := s.s.World.QueryContext(r.Context(), q, args...); err == nil {
+			for nameRows.Next() {
+				var id uint32
+				var name string
+				if nameRows.Scan(&id, &name) == nil {
+					names[id] = name
+				}
+			}
+			nameRows.Close()
+		}
+	}
+	for _, ref := range refs {
+		name := names[ref.item.ItemID]
+		if name == "" {
+			name = fmt.Sprintf("item %d", ref.item.ItemID)
+		}
+		byID[ref.productID].Includes = append(byID[ref.productID].Includes, fmt.Sprintf("%d × %s", ref.item.Quantity, name))
+	}
 	jsonOut(w, 200, map[string]any{"products": out, "deliveryEnabled": s.soap.Enabled()})
 }
 
@@ -526,8 +584,8 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if len(p.Items) > 12 {
-		problem(w, 422, "A mail bundle supports at most 12 distinct items")
+	if len(p.Items) > 48 {
+		problem(w, 422, "A package supports at most 48 distinct items")
 		return
 	}
 	tx, e := s.s.Auth.BeginTx(r.Context(), nil)
