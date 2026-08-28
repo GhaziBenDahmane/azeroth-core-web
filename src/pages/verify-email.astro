@@ -1,0 +1,4 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Verify email — Azeroth" page="verify-email"><section class="auth-shell wrap compact"><div class="auth-aside"><p class="eyebrow">ACCOUNT VERIFICATION</p><h1>OPEN THE<br/><em>GATE.</em></h1><p>Confirm your email address before entering the realm.</p></div><div class="form-card"><p class="eyebrow">VERIFY EMAIL</p><h2>Activating your account</h2><p id="verification-status" class="form-message" aria-live="polite">Checking your verification link…</p><a id="verification-login" class="button full hidden" href="/login">Sign in →</a><form id="verification-resend" class="hidden"><hr/><h3>Request a new link</h3><label>Email<input name="email" type="email" maxlength="255" autocomplete="email" required/></label><button class="button full" type="submit">Resend verification email →</button><p class="form-message" aria-live="polite"></p></form></div></section></Layout>

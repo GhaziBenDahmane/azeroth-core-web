@@ -38,8 +38,9 @@ func (s *Server) publicConfig(w http.ResponseWriter, _ *http.Request) {
 			"support": s.c.EnableSupport, "admin": s.c.EnableAdminPanel,
 			"gmConsole": s.c.EnableAdminPanel && s.c.EnableGMConsole,
 		},
-		"turnstileSiteKey":     s.c.TurnstileSiteKey,
-		"passwordResetEnabled": s.c.MockMode || (s.c.SMTPAddr != "" && s.c.SMTPFrom != ""),
+		"turnstileSiteKey":          s.c.TurnstileSiteKey,
+		"passwordResetEnabled":      s.c.MockMode || (s.c.SMTPAddr != "" && s.c.SMTPFrom != ""),
+		"emailVerificationRequired": s.c.RequireEmailVerification,
 	})
 }
 

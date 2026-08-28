@@ -66,6 +66,8 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("POST /api/auth/logout", s.logout)
 	m.HandleFunc("POST /api/auth/password/request", s.rate(5, time.Hour, s.passwordResetRequest))
 	m.HandleFunc("POST /api/auth/password/reset", s.rate(10, time.Hour, s.passwordResetConfirm))
+	m.HandleFunc("POST /api/auth/email/verify", s.rate(10, time.Hour, s.emailVerificationConfirm))
+	m.HandleFunc("POST /api/auth/email/resend", s.rate(5, time.Hour, s.emailVerificationResend))
 	m.HandleFunc("GET /api/public-config", s.publicConfig)
 	m.HandleFunc("GET /api/me", s.me)
 	m.HandleFunc("GET /api/characters", s.characters)
@@ -180,7 +182,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		problem(w, 422, err.Error())
 		return
 	}
-	if len(in.Email) > 255 || !strings.Contains(in.Email, "@") {
+	if !validEmailAddress(in.Email) {
 		problem(w, 422, "Enter a valid email address")
 		return
 	}
@@ -195,8 +197,8 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	q := fmt.Sprintf("INSERT INTO `%s`.account (username,salt,verifier,email,reg_mail,expansion) VALUES (?,?,?,?,?,?)", s.c.AuthDB)
-	res, err := tx.ExecContext(r.Context(), q, in.Username, salt, verifier, in.Email, in.Email, s.c.Expansion)
+	q := fmt.Sprintf("INSERT INTO `%s`.account (username,salt,verifier,email,reg_mail,expansion,locked) VALUES (?,?,?,?,?,?,?)", s.c.AuthDB)
+	res, err := tx.ExecContext(r.Context(), q, in.Username, salt, verifier, in.Email, in.Email, s.c.Expansion, s.c.RequireEmailVerification)
 	if err != nil {
 		if strings.Contains(err.Error(), "Duplicate") {
 			problem(w, 409, "That username is already taken")
@@ -206,6 +208,14 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := res.LastInsertId()
+	var verificationToken string
+	if s.c.RequireEmailVerification {
+		verificationToken, err = createEmailVerification(r.Context(), tx, uint32(id))
+		if err != nil {
+			problem(w, 500, "Could not initialize email verification")
+			return
+		}
+	}
 	_, err = tx.ExecContext(r.Context(), "INSERT INTO portal_wallets (account_id,balance) VALUES (?,?)", id, s.c.StartingCredits)
 	if err != nil {
 		problem(w, 500, "Could not initialize account")
@@ -220,7 +230,16 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "Could not create account")
 		return
 	}
-	jsonOut(w, 201, map[string]any{"ok": true, "message": "Account created. You can now sign in."})
+	if s.c.RequireEmailVerification {
+		go func() {
+			if err := s.sendVerificationEmail(in.Email, in.Username, verificationToken); err != nil {
+				slog.Error("send registration verification", "error", err)
+			}
+		}()
+		jsonOut(w, 201, map[string]any{"ok": true, "verificationRequired": true, "message": "Account created. Check your email to activate it."})
+		return
+	}
+	jsonOut(w, 201, map[string]any{"ok": true, "verificationRequired": false, "message": "Account created. You can now sign in."})
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {

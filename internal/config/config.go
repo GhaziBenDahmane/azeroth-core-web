@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"net"
+	"net/mail"
 	"net/url"
 	"os"
 	"regexp"
@@ -41,6 +43,7 @@ type Config struct {
 	TurnstileSiteKey, TurnstileSecret      string
 	SMTPAddr, SMTPUser, SMTPPassword       string
 	SMTPFrom                               string
+	RequireEmailVerification               bool
 	RealmStartWebhook, RealmControlToken   string
 	EnableRegistration, EnableArmory       bool
 	EnableRankings, EnableGuilds           bool
@@ -87,7 +90,8 @@ func Load() (Config, error) {
 		StripePriceSmall: os.Getenv("STRIPE_PRICE_SMALL"), StripePriceMedium: os.Getenv("STRIPE_PRICE_MEDIUM"), StripePriceLarge: os.Getenv("STRIPE_PRICE_LARGE"),
 		TurnstileSiteKey: os.Getenv("TURNSTILE_SITE_KEY"), TurnstileSecret: os.Getenv("TURNSTILE_SECRET"),
 		SMTPAddr: os.Getenv("SMTP_ADDR"), SMTPUser: os.Getenv("SMTP_USER"), SMTPPassword: os.Getenv("SMTP_PASSWORD"), SMTPFrom: os.Getenv("SMTP_FROM"),
-		RealmStartWebhook: os.Getenv("REALM_START_WEBHOOK"), RealmControlToken: os.Getenv("REALM_CONTROL_TOKEN"),
+		RequireEmailVerification: envBool("REQUIRE_EMAIL_VERIFICATION", false),
+		RealmStartWebhook:        os.Getenv("REALM_START_WEBHOOK"), RealmControlToken: os.Getenv("REALM_CONTROL_TOKEN"),
 		EnableRegistration: envBool("ENABLE_REGISTRATION", true), EnableArmory: envBool("ENABLE_ARMORY", true),
 		EnableRankings: envBool("ENABLE_RANKINGS", true), EnableGuilds: envBool("ENABLE_GUILDS", true),
 		EnableRealmStatus: envBool("ENABLE_REALM_STATUS", true), EnableShop: envBool("ENABLE_SHOP", true),
@@ -129,6 +133,15 @@ func Load() (Config, error) {
 	}
 	if c.GMConsoleLevel < 1 || c.GMConsoleLevel > 3 {
 		return c, fmt.Errorf("GM_CONSOLE_LEVEL must be between 1 and 3")
+	}
+	if c.EnableRegistration && c.RequireEmailVerification && !c.MockMode {
+		if _, _, err := net.SplitHostPort(c.SMTPAddr); err != nil {
+			return c, fmt.Errorf("SMTP_ADDR must be a host:port when email verification is required")
+		}
+		from, err := mail.ParseAddress(c.SMTPFrom)
+		if err != nil || from.Address != c.SMTPFrom {
+			return c, fmt.Errorf("SMTP_FROM must be a plain email address when email verification is required")
+		}
 	}
 	for _, prefix := range strings.Split(env("GM_CONSOLE_ALLOWED_PREFIXES", "help,server info,server motd,account online list,lookup,player info"), ",") {
 		prefix = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(prefix, ".")))

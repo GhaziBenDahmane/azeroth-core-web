@@ -140,6 +140,7 @@ GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_moderation_log TO 'portal'@'%'
 GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_command_log TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_support_tickets TO 'portal'@'%';
 GRANT SELECT, INSERT, DELETE ON acore_auth.portal_password_resets TO 'portal'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_email_verifications TO 'portal'@'%';
 GRANT SELECT, INSERT ON acore_auth.account_access TO 'portal'@'%';
 ```
 
@@ -268,7 +269,8 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe API and webhook signing secrets | unset/disabled |
 | `STRIPE_PRICE_SMALL`, `STRIPE_PRICE_MEDIUM`, `STRIPE_PRICE_LARGE` | Stripe Price IDs for 100/550/1,200 credits | unset |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Optional registration bot protection | unset/disabled |
-| `SMTP_ADDR`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional password-recovery email transport | unset/disabled |
+| `REQUIRE_EMAIL_VERIFICATION` | Lock new accounts until their one-time email link is confirmed; requires SMTP configuration | `false` |
+| `SMTP_ADDR`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | SMTP transport for password recovery and account verification (`SMTP_ADDR` is `host:port`) | unset/disabled |
 
 Set `PUBLIC_URL=https://your-domain`, `COOKIE_SECURE=true`, terminate TLS at your proxy, and keep the portal and SOAP ports behind a firewall in production. Set `TRUST_PROXY=true` only when the portal cannot be reached directly and your proxy overwrites (rather than appends to) incoming client-IP headers.
 

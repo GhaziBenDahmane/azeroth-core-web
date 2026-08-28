@@ -22,10 +22,14 @@ type mockState struct {
 	commands    []consoleEntry
 	tickets     []supportTicket
 	setupDone   bool
+	settings    siteSettings
+	news        []newsEntry
+	coupons     []coupon
+	deleted     []deletedCharacter
 }
 
 func newMockState() *mockState {
-	return &mockState{balance: 500, users: map[string]string{"DEMO": "demo1234"}, bans: map[string]string{}, tickets: []supportTicket{{ID: 1, AccountID: 1, Username: "DEMO", CharacterGUID: 1, Subject: "Missing quest item", Message: "The quest item did not drop after the boss encounter.", Status: "open", Created: time.Now().Add(-2 * time.Hour), Updated: time.Now().Add(-2 * time.Hour)}}, orders: []map[string]any{{"id": 1042, "itemId": 49623, "quantity": 1, "total": 85, "status": "delivered", "created": time.Now().Add(-24 * time.Hour)}}}
+	return &mockState{balance: 500, users: map[string]string{"DEMO": "demo1234"}, bans: map[string]string{}, tickets: []supportTicket{{ID: 1, AccountID: 1, Username: "DEMO", CharacterGUID: 1, Subject: "Missing quest item", Message: "The quest item did not drop after the boss encounter.", Status: "open", Created: time.Now().Add(-2 * time.Hour), Updated: time.Now().Add(-2 * time.Hour)}}, orders: []map[string]any{{"id": 1042, "itemId": 49623, "quantity": 1, "total": 85, "status": "delivered", "created": time.Now().Add(-24 * time.Hour)}}, news: []newsEntry{{ID: 1, Title: "Welcome to Azeroth", Summary: "The portal is ready for your community.", Kind: "news", Active: true, PublishAt: time.Now().Add(-time.Hour)}}, deleted: []deletedCharacter{{GUID: 99, Name: "Oldhero", DeletedAt: uint64(time.Now().Add(-24 * time.Hour).Unix())}}}
 }
 
 var mockCharacters = []character{
@@ -113,6 +117,12 @@ func (s *Server) mockHandler() http.Handler {
 		jsonOut(w, 200, map[string]string{"message": "Demo recovery request accepted. No email was sent."})
 	})
 	m.HandleFunc("POST /api/auth/password/reset", func(w http.ResponseWriter, r *http.Request) { jsonOut(w, 200, map[string]bool{"ok": true}) })
+	m.HandleFunc("POST /api/auth/email/verify", func(w http.ResponseWriter, r *http.Request) {
+		jsonOut(w, 200, map[string]any{"ok": true, "message": "Demo email verified."})
+	})
+	m.HandleFunc("POST /api/auth/email/resend", func(w http.ResponseWriter, r *http.Request) {
+		jsonOut(w, 200, map[string]string{"message": "If that address is awaiting verification, a new link has been sent."})
+	})
 	m.HandleFunc("GET /api/public-config", s.publicConfig)
 	m.HandleFunc("GET /api/me", s.mockMe)
 	m.HandleFunc("GET /api/characters", s.mockOwnCharacters)
@@ -181,7 +191,7 @@ func (s *Server) mockRegister(w http.ResponseWriter, r *http.Request) {
 	s.mock.mu.Lock()
 	s.mock.users[strings.ToUpper(in.Username)] = in.Password
 	s.mock.mu.Unlock()
-	jsonOut(w, 201, map[string]any{"ok": true, "message": "Demo account created."})
+	jsonOut(w, 201, map[string]any{"ok": true, "verificationRequired": s.c.RequireEmailVerification, "message": "Demo account created."})
 }
 func (s *Server) mockLogin(w http.ResponseWriter, r *http.Request) {
 	var in struct{ Username, Password, OTP string }

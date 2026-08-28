@@ -72,7 +72,7 @@ if(page==='home'){
   $('.code-copy')?.addEventListener('click',e=>{navigator.clipboard.writeText(e.currentTarget.dataset.copy);toast('Realmlist copied')});
 }
 if(page==='register'){
-  submitJSON($('#register-form'),'/api/auth/register',()=>{setMessage($('#register-form'),'Account created. Taking you to sign in…',true);setTimeout(()=>location.href='/login',900)});
+  submitJSON($('#register-form'),'/api/auth/register',result=>{setMessage($('#register-form'),result.message,true);if(!result.verificationRequired)setTimeout(()=>location.href='/login',900)});
   publicConfigPromise.then(c=>{if(!c.turnstileSiteKey)return;const script=document.createElement('script');script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';script.async=true;script.onload=()=>window.turnstile.render('#turnstile',{sitekey:c.turnstileSiteKey,callback:token=>$('[name=turnstileToken]').value=token});document.head.append(script)}).catch(()=>{});
 }
 if(page==='setup'){
@@ -84,6 +84,12 @@ if(page==='setup'){
 if(page==='login') submitJSON($('#login-form'),'/api/auth/login',()=>{location.href='/account'});
 if(page==='forgot-password') submitJSON($('#forgot-form'),'/api/auth/password/request',result=>setMessage($('#forgot-form'),result.message,true));
 if(page==='reset-password'){const form=$('#reset-form');form.onsubmit=async e=>{e.preventDefault();const token=new URLSearchParams(location.search).get('token')||'';try{await api('/api/auth/password/reset',{method:'POST',body:JSON.stringify({token,password:new FormData(form).get('password')})});setMessage(form,'Password reset. Taking you to sign in…',true);setTimeout(()=>location.href='/login',900)}catch(err){setMessage(form,err.message)}}}
+if(page==='verify-email'){
+  const status=$('#verification-status'),resend=$('#verification-resend'),token=new URLSearchParams(location.search).get('token')||'';
+  const verify=async()=>{if(!token){status.textContent='This verification link is missing its token.';resend.classList.remove('hidden');return}try{const result=await api('/api/auth/email/verify',{method:'POST',body:JSON.stringify({token})});status.textContent=result.message;status.classList.add('success');$('#verification-login').classList.remove('hidden')}catch(err){status.textContent=err.message;resend.classList.remove('hidden')}};
+  resend.onsubmit=async e=>{e.preventDefault();const button=$('button',resend);button.disabled=true;try{const result=await api('/api/auth/email/resend',{method:'POST',body:JSON.stringify({email:new FormData(resend).get('email')})});setMessage(resend,result.message,true)}catch(err){setMessage(resend,err.message)}finally{button.disabled=false}};
+  verify();
+}
 
 if(page==='armory'){
   const form=$('#armory-search'),grid=$('#armory-results'),detail=$('#character-detail'),tooltip=$('#item-tooltip');

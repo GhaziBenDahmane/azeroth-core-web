@@ -145,6 +145,10 @@ func (s *Store) Migrate(ctx context.Context) error {
 		`CREATE TABLE IF NOT EXISTS portal_password_resets (
 		 token_hash BINARY(32) PRIMARY KEY, account_id INT UNSIGNED NOT NULL, expires_at TIMESTAMP NOT NULL,
 		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_portal_reset_account (account_id)) ENGINE=InnoDB`,
+		`CREATE TABLE IF NOT EXISTS portal_email_verifications (
+		 token_hash BINARY(32) PRIMARY KEY, account_id INT UNSIGNED NOT NULL, expires_at TIMESTAMP NOT NULL,
+		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		 UNIQUE KEY idx_portal_verification_account (account_id), INDEX idx_portal_verification_expiry (expires_at)) ENGINE=InnoDB`,
 	}
 	for _, q := range statements {
 		if _, err := s.Auth.ExecContext(ctx, q); err != nil {
