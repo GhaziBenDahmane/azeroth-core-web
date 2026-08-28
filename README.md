@@ -40,6 +40,18 @@ docker compose up --build -d
 
 Open `http://localhost:8080`. The application exits early with a useful error if any database cannot be reached.
 
+### First-time administrator setup
+
+The optional web wizard creates one AzerothCore account, initializes its portal wallet and realm rows, and grants its GM access through `account_access`. Generate a one-time secret, add it to `.env`, and start the portal:
+
+```bash
+openssl rand -hex 32
+# Set ENABLE_SETUP=true and SETUP_TOKEN=<generated value> in .env
+docker compose up --build -d
+```
+
+Open `/setup`. The wizard locks permanently after the first successful administrator creation. It also treats an existing AzerothCore GM account as completed setup, preventing an upgraded installation from being claimed. After setup, set `ENABLE_SETUP=false`, remove `SETUP_TOKEN`, and restart the container.
+
 ### Self-contained demo
 
 To preview every screen without AzerothCore or MySQL:
@@ -68,6 +80,7 @@ GRANT SELECT, INSERT ON acore_auth.realmcharacters TO 'portal'@'%';
 GRANT SELECT ON acore_auth.realmlist TO 'portal'@'%';
 GRANT CREATE ON acore_auth.* TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_sessions TO 'portal'@'%';
+GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_settings TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_wallets TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_products TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_product_items TO 'portal'@'%';
@@ -75,10 +88,10 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_orders TO 'portal'@'%'
 GRANT SELECT, INSERT ON acore_auth.portal_credit_ledger TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_moderation_log TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_support_tickets TO 'portal'@'%';
-GRANT SELECT ON acore_auth.account_access TO 'portal'@'%';
+GRANT SELECT, INSERT ON acore_auth.account_access TO 'portal'@'%';
 ```
 
-For the first run, granting broader rights on `acore_auth` is easier; reduce them after the four portal tables have been created.
+For the first run, granting broader rights on `acore_auth` is easier; reduce them after the portal tables have been created. The `account_access` insert permission is needed only by the optional setup wizard and may be revoked after setup.
 
 ## Enable shop delivery
 
@@ -186,6 +199,8 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `TERMS_URL`, `PRIVACY_URL` | Optional HTTP(S) legal links shown in the footer | unset/hidden |
 | `ENABLE_REGISTRATION`, `ENABLE_ARMORY`, `ENABLE_RANKINGS`, `ENABLE_GUILDS` | Enable or disable public modules and their API endpoints | `true` |
 | `ENABLE_REALM_STATUS`, `ENABLE_SHOP`, `ENABLE_SUPPORT`, `ENABLE_ADMIN_PANEL` | Enable or disable operational modules and their API endpoints | `true` |
+| `ENABLE_SETUP`, `SETUP_TOKEN` | Enable the one-time setup wizard and protect it with a 16–256 character secret | `false`, unset |
+| `SETUP_GM_LEVEL`, `SETUP_GM_REALM_ID` | Initial administrator access level and realm scope | `3`, `-1` |
 | `ACCOUNT_EXPANSION` | New account expansion field | `2` |
 | `REALM_ID` | Realm used when resolving GM access | `1` |
 | `GM_LEVEL` | Minimum AzerothCore GM level allowed to grant credits | `3` |

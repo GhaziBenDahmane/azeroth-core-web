@@ -20,6 +20,7 @@ type mockState struct {
 	bans        map[string]string
 	moderation  []map[string]any
 	tickets     []supportTicket
+	setupDone   bool
 }
 
 func newMockState() *mockState {
@@ -99,6 +100,8 @@ func buildMockProducts() []product {
 
 func (s *Server) mockHandler() http.Handler {
 	m := http.NewServeMux()
+	m.HandleFunc("GET /api/setup/status", s.setupStatus)
+	m.HandleFunc("POST /api/setup", s.rate(5, time.Hour, s.setup))
 	m.HandleFunc("GET /api/status", func(w http.ResponseWriter, _ *http.Request) {
 		jsonOut(w, 200, map[string]any{"online": true, "realm": s.c.RealmName, "address": s.c.RealmAddress, "shopDelivery": true, "demo": true})
 	})
@@ -157,6 +160,13 @@ func (s *Server) mockHandler() http.Handler {
 }
 
 func (s *Server) mockRegister(w http.ResponseWriter, r *http.Request) {
+	if s.c.EnableSetup {
+		complete, err := s.isSetupComplete(r)
+		if err != nil || !complete {
+			problem(w, http.StatusServiceUnavailable, "Complete first-time setup before registering accounts")
+			return
+		}
+	}
 	var in struct{ Username, Password, Email, TurnstileToken string }
 	if !decode(w, r, &in) {
 		return

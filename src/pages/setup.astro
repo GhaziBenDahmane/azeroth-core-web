@@ -1,0 +1,18 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="First-time setup — Azeroth" page="setup">
+  <section class="auth-shell wrap compact">
+    <div class="auth-aside"><p class="eyebrow">FIRST-TIME SETUP</p><h1>CLAIM YOUR<br/><em>REALM.</em></h1><p>Create the initial AzerothCore administrator. Setup locks permanently after the first successful completion.</p></div>
+    <form id="setup-form" class="form-card">
+      <p class="eyebrow">REALM OWNER</p><h2>Administrator account</h2>
+      <p class="muted" id="setup-description">Enter the one-time token configured by the server operator.</p>
+      <label>Setup token<input name="token" type="password" autocomplete="one-time-code" required/></label>
+      <label>GM username<input name="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9]+" autocomplete="username" required/></label>
+      <label>Email<input name="email" type="email" maxlength="255" autocomplete="email" required/></label>
+      <label>Password<input name="password" type="password" minlength="8" maxlength="32" autocomplete="new-password" required/></label>
+      <label>Confirm password<input name="confirmPassword" type="password" minlength="8" maxlength="32" autocomplete="new-password" required/></label>
+      <button class="button full" type="submit">Create realm administrator →</button><p class="form-message" aria-live="polite"></p>
+    </form>
+  </section>
+</Layout>

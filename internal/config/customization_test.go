@@ -27,3 +27,12 @@ func TestLoadCustomizationRejectsUnsafeValues(t *testing.T) {
 		t.Fatal("unsafe asset URL was accepted")
 	}
 }
+
+func TestSetupRequiresStrongToken(t *testing.T) {
+	t.Setenv("MOCK_MODE", "true")
+	t.Setenv("ENABLE_SETUP", "true")
+	t.Setenv("SETUP_TOKEN", "short")
+	if _, err := Load(); err == nil {
+		t.Fatal("setup accepted a short token")
+	}
+}

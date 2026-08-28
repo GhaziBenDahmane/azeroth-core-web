@@ -44,6 +44,9 @@ type Config struct {
 	EnableRankings, EnableGuilds           bool
 	EnableRealmStatus, EnableShop          bool
 	EnableSupport, EnableAdminPanel        bool
+	EnableSetup                            bool
+	SetupToken                             string
+	SetupGMLevel, SetupGMRealmID           int
 }
 
 type NewsItem struct {
@@ -84,6 +87,8 @@ func Load() (Config, error) {
 		EnableRankings: envBool("ENABLE_RANKINGS", true), EnableGuilds: envBool("ENABLE_GUILDS", true),
 		EnableRealmStatus: envBool("ENABLE_REALM_STATUS", true), EnableShop: envBool("ENABLE_SHOP", true),
 		EnableSupport: envBool("ENABLE_SUPPORT", true), EnableAdminPanel: envBool("ENABLE_ADMIN_PANEL", true),
+		EnableSetup: envBool("ENABLE_SETUP", false), SetupToken: os.Getenv("SETUP_TOKEN"),
+		SetupGMLevel: envInt("SETUP_GM_LEVEL", 3), SetupGMRealmID: envInt("SETUP_GM_REALM_ID", -1),
 	}
 	if c.AuthDSN == "" && !c.MockMode {
 		return c, fmt.Errorf("AUTH_DSN is required")
@@ -101,6 +106,12 @@ func Load() (Config, error) {
 	}
 	if err := loadCustomization(&c); err != nil {
 		return c, err
+	}
+	if c.EnableSetup && (len(c.SetupToken) < 16 || len(c.SetupToken) > 256) {
+		return c, fmt.Errorf("SETUP_TOKEN must contain 16–256 characters when setup is enabled")
+	}
+	if c.SetupGMLevel < 1 || c.SetupGMLevel > 3 || c.SetupGMRealmID < -1 {
+		return c, fmt.Errorf("invalid setup GM level or realm ID")
 	}
 	return c, nil
 }

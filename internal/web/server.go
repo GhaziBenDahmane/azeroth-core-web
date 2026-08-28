@@ -57,6 +57,8 @@ func (s *Server) Handler() http.Handler {
 		return s.middleware(s.mockHandler())
 	}
 	m := http.NewServeMux()
+	m.HandleFunc("GET /api/setup/status", s.setupStatus)
+	m.HandleFunc("POST /api/setup", s.rate(5, time.Hour, s.setup))
 	m.HandleFunc("GET /api/status", s.status)
 	m.HandleFunc("POST /api/auth/register", s.feature(s.c.EnableRegistration, "Registration", s.rate(5, time.Hour, s.register)))
 	m.HandleFunc("POST /api/auth/login", s.rate(10, 10*time.Minute, s.login))
@@ -151,6 +153,13 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
+	if s.c.EnableSetup {
+		complete, err := s.isSetupComplete(r)
+		if err != nil || !complete {
+			problem(w, http.StatusServiceUnavailable, "Complete first-time setup before registering accounts")
+			return
+		}
+	}
 	var in struct{ Username, Password, Email, TurnstileToken string }
 	if !decode(w, r, &in) {
 		return

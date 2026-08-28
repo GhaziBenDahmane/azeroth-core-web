@@ -56,6 +56,8 @@ function applyPublicConfig(c){
 }
 const publicConfigPromise=api('/api/public-config');
 publicConfigPromise.then(applyPublicConfig).catch(()=>{});
+const setupStatePromise=api('/api/setup/status');
+if(page!=='setup')setupStatePromise.then(s=>{if(s.required)location.replace('/setup')}).catch(()=>{});
 function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2600)}
 function setMessage(form,message,success=false){const el=$('.form-message',form);el.textContent=message;el.classList.toggle('success',success)}
 function submitJSON(form,path,onSuccess){form?.addEventListener('submit',async e=>{e.preventDefault();const button=$('button[type=submit]',form);button.disabled=true;setMessage(form,'');try{const data=Object.fromEntries(new FormData(form));const result=await api(path,{method:'POST',body:JSON.stringify(data)});await onSuccess(result)}catch(err){setMessage(form,err.message)}finally{button.disabled=false}})}
@@ -72,6 +74,12 @@ if(page==='home'){
 if(page==='register'){
   submitJSON($('#register-form'),'/api/auth/register',()=>{setMessage($('#register-form'),'Account created. Taking you to sign in…',true);setTimeout(()=>location.href='/login',900)});
   publicConfigPromise.then(c=>{if(!c.turnstileSiteKey)return;const script=document.createElement('script');script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';script.async=true;script.onload=()=>window.turnstile.render('#turnstile',{sitekey:c.turnstileSiteKey,callback:token=>$('[name=turnstileToken]').value=token});document.head.append(script)}).catch(()=>{});
+}
+if(page==='setup'){
+  const form=$('#setup-form');
+  const showSetupState=(titleText,messageText,withLogin=false)=>{form.innerHTML='';const title=document.createElement('h2');title.textContent=titleText;const message=document.createElement('p');message.className='muted';message.textContent=messageText;form.append(title,message);if(withLogin){const link=document.createElement('a');link.className='button full';link.href='/login';link.textContent='Sign in →';form.append(link)}};
+  setupStatePromise.then(state=>{if(!state.enabled)showSetupState('Setup disabled','Configure ENABLE_SETUP=true and a SETUP_TOKEN to use the web setup wizard.');else if(state.complete)showSetupState('Setup complete','The initial realm administrator has already been created.',true)}).catch(e=>setMessage(form,e.message));
+  form.onsubmit=async e=>{e.preventDefault();const values=Object.fromEntries(new FormData(form));if(values.password!==values.confirmPassword){setMessage(form,'Passwords do not match');return}delete values.confirmPassword;const button=$('button[type=submit]',form);button.disabled=true;try{const result=await api('/api/setup',{method:'POST',body:JSON.stringify(values)});form.reset();form.innerHTML='';const title=document.createElement('h2');title.textContent='Setup complete';const message=document.createElement('p');message.className='success';message.textContent=`${result.username} is now a level ${result.gmLevel} GM.`;const link=document.createElement('a');link.className='button full';link.href='/login';link.textContent='Sign in →';form.append(title,message,link)}catch(err){setMessage(form,err.message)}finally{button.disabled=false}};
 }
 if(page==='login') submitJSON($('#login-form'),'/api/auth/login',()=>{location.href='/account'});
 if(page==='forgot-password') submitJSON($('#forgot-form'),'/api/auth/password/request',result=>setMessage($('#forgot-form'),result.message,true));

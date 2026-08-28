@@ -146,6 +146,20 @@ func (s *Store) Migrate(ctx context.Context) error {
 			return fmt.Errorf("portal migration: %w", err)
 		}
 	}
+	if s.C.EnableSetup {
+		if _, err := s.Auth.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS portal_settings (
+		 setting_key VARCHAR(80) PRIMARY KEY, setting_value TEXT NOT NULL,
+		 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`); err != nil {
+			return fmt.Errorf("portal setup migration: %w", err)
+		}
+		if _, err := s.Auth.ExecContext(ctx, "INSERT IGNORE INTO portal_settings(setting_key,setting_value) VALUES('setup_complete','0')"); err != nil {
+			return fmt.Errorf("portal setup migration: %w", err)
+		}
+		markExistingGM := fmt.Sprintf("UPDATE portal_settings SET setting_value='1' WHERE setting_key='setup_complete' AND setting_value='0' AND EXISTS(SELECT 1 FROM `%s`.account_access WHERE gmlevel>0)", s.C.AuthDB)
+		if _, err := s.Auth.ExecContext(ctx, markExistingGM); err != nil {
+			return fmt.Errorf("portal setup state: %w", err)
+		}
+	}
 	for _, q := range []string{
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS class_id TINYINT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS tier_label VARCHAR(30) NOT NULL DEFAULT ''`,

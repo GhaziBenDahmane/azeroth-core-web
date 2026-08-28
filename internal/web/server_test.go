@@ -116,6 +116,35 @@ func TestDisabledFeatureReturnsNotFound(t *testing.T) {
 	}
 }
 
+func TestMockFirstRunSetupLocksAfterCreation(t *testing.T) {
+	s := &Server{c: config.Config{MockMode: true, EnableSetup: true, EnableRegistration: true, SetupToken: "0123456789abcdef", SetupGMLevel: 3}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	h := s.Handler()
+
+	status := httptest.NewRecorder()
+	h.ServeHTTP(status, httptest.NewRequest(http.MethodGet, "/api/setup/status", nil))
+	if status.Code != http.StatusOK || !strings.Contains(status.Body.String(), `"required":true`) {
+		t.Fatalf("unexpected initial setup status: %d %s", status.Code, status.Body.String())
+	}
+	blockedRegistration := httptest.NewRecorder()
+	h.ServeHTTP(blockedRegistration, httptest.NewRequest(http.MethodPost, "/api/auth/register", strings.NewReader(`{"username":"PLAYER","password":"securepass","email":"player@example.com"}`)))
+	if blockedRegistration.Code != http.StatusServiceUnavailable {
+		t.Fatalf("registration before setup returned %d, want 503", blockedRegistration.Code)
+	}
+
+	body := `{"token":"0123456789abcdef","username":"OWNER","password":"securepass","email":"owner@example.com"}`
+	created := httptest.NewRecorder()
+	h.ServeHTTP(created, httptest.NewRequest(http.MethodPost, "/api/setup", strings.NewReader(body)))
+	if created.Code != http.StatusCreated || !strings.Contains(created.Body.String(), `"gmLevel":3`) {
+		t.Fatalf("setup failed: %d %s", created.Code, created.Body.String())
+	}
+
+	repeated := httptest.NewRecorder()
+	h.ServeHTTP(repeated, httptest.NewRequest(http.MethodPost, "/api/setup", strings.NewReader(body)))
+	if repeated.Code != http.StatusConflict {
+		t.Fatalf("repeated setup returned %d, want 409", repeated.Code)
+	}
+}
+
 func TestWotLKRaceFactions(t *testing.T) {
 	for _, race := range []uint8{1, 3, 4, 7, 11} {
 		if !isAllianceRace(race) || isHordeRace(race) {

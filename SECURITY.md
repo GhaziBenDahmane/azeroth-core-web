@@ -26,6 +26,7 @@ All request-derived values are passed as MySQL parameters. The only values inter
 - Dynamic UI values are escaped or assigned through `textContent`.
 - Runtime theme colors are restricted to six-digit hex values; brand assets require HTTPS or same-origin paths, and configurable links reject non-HTTP(S) schemes.
 - Disabled portal modules are rejected by their API endpoints as well as hidden in navigation; feature switches are not treated as client-side authorization.
+- First-time setup is disabled by default, requires a 16–256 character operator-supplied token, is rate limited, creates the account and GM grant atomically, and permanently locks after completion or detection of an existing GM account.
 - Product image URLs are limited to absolute HTTP(S) URLs.
 - The admin bearer token is compared in constant time.
 - GM credit grants require a live authenticated session and the configured `account_access` level. Every grant is recorded in the append-only `portal_credit_ledger` table.
