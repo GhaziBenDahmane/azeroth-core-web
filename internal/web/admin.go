@@ -79,23 +79,16 @@ func (s *Server) adminProducts(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "GM access required")
 		return
 	}
-	rows, err := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,price,category,active FROM portal_products ORDER BY id DESC LIMIT 200")
+	rows, err := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit FROM portal_products ORDER BY id DESC LIMIT 200")
 	if err != nil {
 		problem(w, 500, "Could not load products")
 		return
 	}
 	defer rows.Close()
-	type row struct {
-		ID       uint32 `json:"id"`
-		Name     string `json:"name"`
-		Price    uint32 `json:"price"`
-		Category string `json:"category"`
-		Active   bool   `json:"active"`
-	}
-	out := []row{}
+	out := []product{}
 	for rows.Next() {
-		var x row
-		if rows.Scan(&x.ID, &x.Name, &x.Price, &x.Category, &x.Active) == nil {
+		var x product
+		if rows.Scan(&x.ID, &x.Name, &x.Description, &x.ItemID, &x.Quantity, &x.Price, &x.Category, &x.ImageURL, &x.ClassID, &x.Tier, &x.ServiceLevel, &x.Gold, &x.ServiceAction, &x.Active, &x.StartsAt, &x.EndsAt, &x.PerAccountLimit) == nil {
 			out = append(out, x)
 		}
 	}

@@ -92,6 +92,89 @@ func (s *Server) arenaRankings(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, 200, map[string]any{"bracket": bracket, "teams": teams})
 }
 
+func (s *Server) expandedRankings(w http.ResponseWriter, r *http.Request) {
+	metric := r.URL.Query().Get("metric")
+	if metric == "" {
+		metric = "honorable-kills"
+	}
+	type row struct {
+		Rank   uint32 `json:"rank"`
+		Name   string `json:"name"`
+		Class  uint8  `json:"class,omitempty"`
+		Level  uint8  `json:"level,omitempty"`
+		Value  uint64 `json:"value"`
+		Online bool   `json:"online,omitempty"`
+	}
+	out := []row{}
+	var query string
+	switch metric {
+	case "honorable-kills":
+		query = fmt.Sprintf("SELECT name,class,level,totalKills,online FROM `%s`.characters WHERE deleteDate IS NULL ORDER BY totalKills DESC,guid LIMIT 100", s.c.CharactersDB)
+	case "played-time":
+		query = fmt.Sprintf("SELECT name,class,level,totaltime,online FROM `%s`.characters WHERE deleteDate IS NULL ORDER BY totaltime DESC,guid LIMIT 100", s.c.CharactersDB)
+	case "level":
+		query = fmt.Sprintf("SELECT name,class,level,level,online FROM `%s`.characters WHERE deleteDate IS NULL ORDER BY level DESC,totaltime DESC,guid LIMIT 100", s.c.CharactersDB)
+	case "achievements":
+		query = fmt.Sprintf("SELECT c.name,c.class,c.level,COUNT(a.achievement),c.online FROM `%s`.characters c LEFT JOIN `%s`.character_achievement a ON a.guid=c.guid WHERE c.deleteDate IS NULL GROUP BY c.guid,c.name,c.class,c.level,c.online ORDER BY COUNT(a.achievement) DESC,c.guid LIMIT 100", s.c.CharactersDB, s.c.CharactersDB)
+	case "guild-members":
+		query = fmt.Sprintf("SELECT g.name,0,0,COUNT(gm.guid),0 FROM `%s`.guild g LEFT JOIN `%s`.guild_member gm ON gm.guildid=g.guildid GROUP BY g.guildid,g.name ORDER BY COUNT(gm.guid) DESC,g.guildid LIMIT 100", s.c.CharactersDB, s.c.CharactersDB)
+	default:
+		problem(w, 422, "Unknown ranking metric")
+		return
+	}
+	rows, e := s.s.Characters.QueryContext(r.Context(), query)
+	if e != nil {
+		problem(w, 500, "Could not load rankings")
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var x row
+		x.Rank = uint32(len(out) + 1)
+		if rows.Scan(&x.Name, &x.Class, &x.Level, &x.Value, &x.Online) == nil {
+			out = append(out, x)
+		}
+	}
+	jsonOut(w, 200, map[string]any{"metric": metric, "rows": out, "source": "AzerothCore character data"})
+}
+
+func (s *Server) mockExpandedRankings(w http.ResponseWriter, r *http.Request) {
+	metric := r.URL.Query().Get("metric")
+	if metric == "" {
+		metric = "honorable-kills"
+	}
+	valid := map[string]bool{"honorable-kills": true, "played-time": true, "level": true, "achievements": true, "guild-members": true}
+	if !valid[metric] {
+		problem(w, 422, "Unknown ranking metric")
+		return
+	}
+	rows := []map[string]any{}
+	if metric == "guild-members" {
+		for i, g := range []struct {
+			Name    string
+			Members uint64
+		}{{"Keepers of Dawn", 84}, {"Ashen Vanguard", 61}, {"Silver Covenant", 43}} {
+			rows = append(rows, map[string]any{"rank": i + 1, "name": g.Name, "value": g.Members})
+		}
+		jsonOut(w, 200, map[string]any{"metric": metric, "rows": rows, "source": "Demo AzerothCore data"})
+		return
+	}
+	for i, c := range mockCharacters {
+		value := uint64(12000 - i*713)
+		if metric == "played-time" {
+			value = uint64(c.TotalTime)
+		} else if metric == "level" {
+			value = uint64(c.Level)
+		} else if metric == "achievements" {
+			value = uint64(164 - i*9)
+		} else if metric == "guild-members" {
+			value = uint64(80 - i*5)
+		}
+		rows = append(rows, map[string]any{"rank": i + 1, "name": c.Name, "class": c.Class, "level": c.Level, "value": value, "online": c.Online})
+	}
+	jsonOut(w, 200, map[string]any{"metric": metric, "rows": rows, "source": "Demo AzerothCore data"})
+}
+
 type progressDefinition struct {
 	Achievement               uint32
 	Raid, Section, Difficulty string

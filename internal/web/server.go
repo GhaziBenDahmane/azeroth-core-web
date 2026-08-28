@@ -74,6 +74,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /api/armory", s.feature(s.c.EnableArmory, "Armory", s.armorySearch))
 	m.HandleFunc("GET /api/armory/{name}", s.feature(s.c.EnableArmory, "Armory", s.armoryCharacter))
 	m.HandleFunc("GET /api/arena", s.feature(s.c.EnableRankings, "Rankings", s.arenaRankings))
+	m.HandleFunc("GET /api/rankings", s.feature(s.c.EnableRankings, "Rankings", s.expandedRankings))
 	m.HandleFunc("GET /api/progression/{name}", s.feature(s.c.EnableArmory, "Armory", s.raidProgression))
 	m.HandleFunc("GET /api/realm", s.feature(s.c.EnableRealmStatus, "Realm status", s.realmOverview))
 	m.HandleFunc("GET /api/guilds", s.feature(s.c.EnableGuilds, "Guilds", s.guildList))
@@ -83,6 +84,8 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /metrics", s.prometheusMetrics)
 	m.HandleFunc("GET /api/shop", s.feature(s.c.EnableShop, "Shop", s.shop))
 	m.HandleFunc("POST /api/shop/purchase", s.feature(s.c.EnableShop, "Shop", s.rate(10, time.Minute, s.purchase)))
+	m.HandleFunc("GET /api/characters/deleted", s.deletedCharacters)
+	m.HandleFunc("POST /api/characters/{guid}/service", s.rate(8, time.Hour, s.characterService))
 	m.HandleFunc("GET /api/orders", s.orders)
 	m.HandleFunc("GET /api/tickets", s.feature(s.c.EnableSupport, "Support", s.tickets))
 	m.HandleFunc("POST /api/tickets", s.feature(s.c.EnableSupport, "Support", s.rate(5, time.Hour, s.createTicket)))
@@ -93,6 +96,17 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /api/admin/orders", s.feature(s.c.EnableAdminPanel, "Administration", s.adminOrders))
 	m.HandleFunc("GET /api/admin/ledger", s.feature(s.c.EnableAdminPanel, "Administration", s.adminLedger))
 	m.HandleFunc("GET /api/admin/products", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProducts))
+	m.HandleFunc("PUT /api/admin/products/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProductUpdate))
+	m.HandleFunc("DELETE /api/admin/products/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProductDelete))
+	m.HandleFunc("GET /api/admin/coupons", s.feature(s.c.EnableAdminPanel, "Administration", s.adminCoupons))
+	m.HandleFunc("POST /api/admin/coupons", s.feature(s.c.EnableAdminPanel, "Administration", s.adminCoupons))
+	m.HandleFunc("DELETE /api/admin/coupons/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminCouponDelete))
+	m.HandleFunc("GET /api/admin/news", s.feature(s.c.EnableAdminPanel, "Administration", s.adminNews))
+	m.HandleFunc("POST /api/admin/news", s.feature(s.c.EnableAdminPanel, "Administration", s.adminNews))
+	m.HandleFunc("PUT /api/admin/news/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminNewsItem))
+	m.HandleFunc("DELETE /api/admin/news/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminNewsItem))
+	m.HandleFunc("GET /api/admin/settings", s.feature(s.c.EnableAdminPanel, "Administration", s.adminSettings))
+	m.HandleFunc("PUT /api/admin/settings", s.feature(s.c.EnableAdminPanel, "Administration", s.adminSettings))
 	m.HandleFunc("GET /api/admin/accounts", s.feature(s.c.EnableAdminPanel, "Administration", s.adminAccounts))
 	m.HandleFunc("POST /api/admin/moderation", s.feature(s.c.EnableAdminPanel, "Administration", s.rate(30, time.Minute, s.adminModeration)))
 	m.HandleFunc("GET /api/admin/moderation", s.feature(s.c.EnableAdminPanel, "Administration", s.adminModerationLog))
@@ -114,7 +128,7 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) feature(enabled bool, name string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !enabled {
+		if !s.featureEnabled(r, name, enabled) {
 			problem(w, http.StatusNotFound, name+" is disabled")
 			return
 		}
@@ -135,6 +149,17 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead && !s.sameOrigin(r) {
 			problem(w, http.StatusForbidden, "Invalid request origin")
 			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !strings.HasPrefix(r.URL.Path, "/api/admin/") && r.URL.Path != "/api/auth/login" && r.URL.Path != "/api/auth/logout" && r.URL.Path != "/api/billing/webhook" {
+			if active, message := s.maintenanceActive(r); active {
+				if _, gm := s.requireGM(r); !gm {
+					if strings.TrimSpace(message) == "" {
+						message = "Scheduled maintenance is in progress"
+					}
+					problem(w, http.StatusServiceUnavailable, message)
+					return
+				}
+			}
 		}
 		start := time.Now()
 		rw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
@@ -157,7 +182,16 @@ func (s *Server) sameOrigin(r *http.Request) bool {
 }
 
 func (s *Server) status(w http.ResponseWriter, r *http.Request) {
-	jsonOut(w, 200, map[string]any{"online": true, "realm": s.c.RealmName, "address": s.c.RealmAddress, "shopDelivery": s.soap.Enabled()})
+	cfg := s.runtimeSettings(r)
+	dbOK := s.s.Auth.PingContext(r.Context()) == nil
+	realmOnline := false
+	if dbOK {
+		q := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM `%s`.uptime WHERE realmid=? AND starttime+uptime>=UNIX_TIMESTAMP()-300)", s.c.AuthDB)
+		_ = s.s.Auth.QueryRowContext(r.Context(), q, s.c.RealmID).Scan(&realmOnline)
+	}
+	now := time.Now()
+	maintenance := cfg.MaintenanceEnabled && (cfg.MaintenanceStarts == nil || !now.Before(*cfg.MaintenanceStarts)) && (cfg.MaintenanceEnds == nil || now.Before(*cfg.MaintenanceEnds))
+	jsonOut(w, 200, map[string]any{"online": realmOnline, "realm": cfg.RealmName, "address": cfg.RealmAddress, "shopDelivery": s.soap.Enabled(), "portal": true, "database": dbOK, "soapConfigured": s.soap.Enabled(), "maintenance": maintenance, "maintenanceMessage": cfg.MaintenanceMessage, "checkedAt": now})
 }
 
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
@@ -419,7 +453,7 @@ func (s *Server) armoryCharacter(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
-	rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action FROM portal_products WHERE active=1 ORDER BY category,class_id,price,name")
+	rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit FROM portal_products WHERE active=1 AND (starts_at IS NULL OR starts_at<=NOW()) AND (ends_at IS NULL OR ends_at>NOW()) ORDER BY category,class_id,price,name")
 	if e != nil {
 		problem(w, 500, "Could not load shop")
 		return
@@ -428,7 +462,7 @@ func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
 	out := []product{}
 	for rows.Next() {
 		var p product
-		if rows.Scan(&p.ID, &p.Name, &p.Description, &p.ItemID, &p.Quantity, &p.Price, &p.Category, &p.ImageURL, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold, &p.ServiceAction) == nil {
+		if rows.Scan(&p.ID, &p.Name, &p.Description, &p.ItemID, &p.Quantity, &p.Price, &p.Category, &p.ImageURL, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold, &p.ServiceAction, &p.Active, &p.StartsAt, &p.EndsAt, &p.PerAccountLimit) == nil {
 			out = append(out, p)
 		}
 	}
@@ -502,7 +536,10 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 		problem(w, 401, "Sign in required")
 		return
 	}
-	var in struct{ ProductID, CharacterGUID uint32 }
+	var in struct {
+		ProductID, CharacterGUID uint32
+		Coupon                   string `json:"coupon"`
+	}
 	if !decode(w, r, &in) {
 		return
 	}
@@ -513,12 +550,29 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	var p product
-	if e = tx.QueryRowContext(r.Context(), "SELECT id,name,item_id,quantity,price,class_id,tier_label,service_level,gold_amount,service_action FROM portal_products WHERE id=? AND active=1 FOR UPDATE", in.ProductID).Scan(&p.ID, &p.Name, &p.ItemID, &p.Quantity, &p.Price, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold, &p.ServiceAction); e != nil {
+	if e = tx.QueryRowContext(r.Context(), "SELECT id,name,item_id,quantity,price,class_id,tier_label,service_level,gold_amount,service_action,per_account_limit FROM portal_products WHERE id=? AND active=1 AND (starts_at IS NULL OR starts_at<=NOW()) AND (ends_at IS NULL OR ends_at>NOW()) FOR UPDATE", in.ProductID).Scan(&p.ID, &p.Name, &p.ItemID, &p.Quantity, &p.Price, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold, &p.ServiceAction, &p.PerAccountLimit); e != nil {
 		problem(w, 404, "Product not found")
 		return
 	}
+	if p.PerAccountLimit > 0 {
+		var count uint32
+		if e = tx.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM portal_orders WHERE account_id=? AND product_id=? AND status NOT IN ('failed','refunded')", a.ID, p.ID).Scan(&count); e != nil {
+			problem(w, 500, "Could not validate purchase limit")
+			return
+		}
+		if count >= p.PerAccountLimit {
+			problem(w, 409, "This product's account purchase limit has been reached")
+			return
+		}
+	}
+	discount, couponID, couponCode, e := s.applyCoupon(r, tx, a.ID, in.Coupon, p.Price)
+	if e != nil {
+		problem(w, 422, e.Error())
+		return
+	}
+	total := p.Price - discount
 	var balance uint32
-	if e = tx.QueryRowContext(r.Context(), "SELECT balance FROM portal_wallets WHERE account_id=? FOR UPDATE", a.ID).Scan(&balance); e != nil || balance < p.Price {
+	if e = tx.QueryRowContext(r.Context(), "SELECT balance FROM portal_wallets WHERE account_id=? FOR UPDATE", a.ID).Scan(&balance); e != nil || balance < total {
 		problem(w, 422, "Not enough credits")
 		return
 	}
@@ -542,16 +596,22 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 		problem(w, 503, "Shop delivery is not configured")
 		return
 	}
-	if _, e = tx.ExecContext(r.Context(), "UPDATE portal_wallets SET balance=balance-? WHERE account_id=?", p.Price, a.ID); e != nil {
+	if _, e = tx.ExecContext(r.Context(), "UPDATE portal_wallets SET balance=balance-? WHERE account_id=?", total, a.ID); e != nil {
 		problem(w, 500, "Could not debit wallet")
 		return
 	}
-	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_orders(account_id,character_guid,product_id,item_id,quantity,total,status,service_level,gold_amount,service_action) VALUES(?,?,?,?,?,?,'pending',?,?,?)", a.ID, in.CharacterGUID, p.ID, p.ItemID, p.Quantity, p.Price, p.ServiceLevel, p.Gold, p.ServiceAction)
+	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_orders(account_id,character_guid,product_id,item_id,quantity,total,subtotal,discount,coupon_code,status,service_level,gold_amount,service_action) VALUES(?,?,?,?,?,?,?,?,?,'pending',?,?,?)", a.ID, in.CharacterGUID, p.ID, p.ItemID, p.Quantity, total, p.Price, discount, couponCode, p.ServiceLevel, p.Gold, p.ServiceAction)
 	if e != nil {
 		problem(w, 500, "Could not create order")
 		return
 	}
 	orderID, _ := res.LastInsertId()
+	if couponID > 0 {
+		if _, e = tx.ExecContext(r.Context(), "INSERT INTO portal_coupon_uses(coupon_id,account_id,order_id) VALUES(?,?,?)", couponID, a.ID, orderID); e != nil {
+			problem(w, 500, "Could not redeem coupon")
+			return
+		}
+	}
 	if strings.ContainsAny(characterName, " \t\r\n\"\\") {
 		problem(w, 422, "Character name cannot be used for delivery")
 		return
@@ -671,8 +731,8 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &p) {
 		return
 	}
-	if p.Name == "" || p.Price == 0 || (p.ItemID == 0 && len(p.Items) == 0 && p.ServiceLevel == 0 && p.Gold == 0 && p.ServiceAction == "") || (p.ItemID != 0 && p.Quantity == 0) {
-		problem(w, 422, "name, price, and an item bundle or service are required")
+	if err := validateManagedProduct(p); err != nil {
+		problem(w, 422, err.Error())
 		return
 	}
 	if p.ServiceAction != "" && p.ServiceAction != "race_change" && p.ServiceAction != "faction_change" {
@@ -700,7 +760,7 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 		problem(w, 422, "Gold amount exceeds the WotLK safe limit")
 		return
 	}
-	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_products(name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL, p.ClassID, p.Tier, p.ServiceLevel, p.Gold, p.ServiceAction)
+	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_products(name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)", p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL, p.ClassID, p.Tier, p.ServiceLevel, p.Gold, p.ServiceAction, p.StartsAt, p.EndsAt, p.PerAccountLimit)
 	if e != nil {
 		problem(w, 500, "Could not create product")
 		return

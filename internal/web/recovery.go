@@ -18,25 +18,35 @@ import (
 	"github.com/example/azeroth-portal/internal/srp"
 )
 
-func (s *Server) publicConfig(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
+	cfg := s.runtimeSettings(r)
+	news := s.publicNews(r)
+	if len(news) == 0 {
+		for i, item := range s.c.News {
+			news = append(news, newsEntry{ID: uint64(i + 1), Title: item.Title, Summary: item.Summary, URL: item.URL, Kind: "news", Active: true})
+		}
+	}
+	now := time.Now()
+	maintenance := cfg.MaintenanceEnabled && (cfg.MaintenanceStarts == nil || !now.Before(*cfg.MaintenanceStarts)) && (cfg.MaintenanceEnds == nil || now.Before(*cfg.MaintenanceEnds))
 	jsonOut(w, 200, map[string]any{
-		"portalName": s.c.PortalName, "realmName": s.c.RealmName, "brandMark": s.c.BrandMark,
-		"tagline": s.c.PortalTagline, "expansionName": s.c.ExpansionName,
+		"portalName": cfg.PortalName, "realmName": cfg.RealmName, "brandMark": cfg.BrandMark,
+		"tagline": cfg.Tagline, "expansionName": s.c.ExpansionName,
 		"clientVersion": s.c.ClientVersion, "clientBuild": s.c.ClientBuild,
 		"experienceRate": s.c.ExperienceRate, "uptimeLabel": s.c.UptimeLabel,
-		"footerText": s.c.FooterText, "realmAddress": s.c.RealmAddress,
-		"downloadUrl": s.c.DownloadURL, "communityUrl": s.c.CommunityURL,
+		"footerText": s.c.FooterText, "realmAddress": cfg.RealmAddress,
+		"downloadUrl": cfg.DownloadURL, "communityUrl": cfg.CommunityURL,
 		"logoUrl": s.c.LogoURL, "heroImageUrl": s.c.HeroImageURL, "faviconUrl": s.c.FaviconURL,
-		"themePrimary": s.c.ThemePrimary, "themeSecondary": s.c.ThemeSecondary,
-		"themeAccent": s.c.ThemeAccent, "themeBackground": s.c.ThemeBackground,
-		"locale": s.c.Locale, "translations": s.c.UIText, "news": s.c.News,
-		"termsUrl": s.c.TermsURL, "privacyUrl": s.c.PrivacyURL,
+		"themePrimary": cfg.ThemePrimary, "themeSecondary": cfg.ThemeSecondary,
+		"themeAccent": cfg.ThemeAccent, "themeBackground": cfg.ThemeBackground,
+		"locale": s.c.Locale, "translations": s.c.UIText, "news": news,
+		"termsUrl": cfg.TermsURL, "privacyUrl": cfg.PrivacyURL,
+		"maintenance": map[string]any{"active": maintenance, "enabled": cfg.MaintenanceEnabled, "message": cfg.MaintenanceMessage, "starts": cfg.MaintenanceStarts, "ends": cfg.MaintenanceEnds},
 		"features": map[string]bool{
-			"registration": s.c.EnableRegistration, "armory": s.c.EnableArmory,
-			"rankings": s.c.EnableRankings, "guilds": s.c.EnableGuilds,
-			"realm": s.c.EnableRealmStatus, "shop": s.c.EnableShop,
-			"support": s.c.EnableSupport, "admin": s.c.EnableAdminPanel,
-			"gmConsole": s.c.EnableAdminPanel && s.c.EnableGMConsole,
+			"registration": s.c.EnableRegistration && settingBool(cfg.Registration, true), "armory": s.c.EnableArmory && settingBool(cfg.Armory, true),
+			"rankings": s.c.EnableRankings && settingBool(cfg.Rankings, true), "guilds": s.c.EnableGuilds && settingBool(cfg.Guilds, true),
+			"realm": s.c.EnableRealmStatus && settingBool(cfg.Realm, true), "shop": s.c.EnableShop && settingBool(cfg.Shop, true),
+			"support": s.c.EnableSupport && settingBool(cfg.Support, true), "admin": s.c.EnableAdminPanel && settingBool(cfg.Admin, true),
+			"gmConsole": s.c.EnableAdminPanel && s.c.EnableGMConsole && settingBool(cfg.Admin, true) && settingBool(cfg.GMConsole, true),
 		},
 		"turnstileSiteKey":          s.c.TurnstileSiteKey,
 		"passwordResetEnabled":      s.c.MockMode || (s.c.SMTPAddr != "" && s.c.SMTPFrom != ""),

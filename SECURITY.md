@@ -29,6 +29,9 @@ All request-derived values are passed as MySQL parameters. The only values inter
 - First-time setup is disabled by default, requires a 16–256 character operator-supplied token, is rate limited, creates the account and GM grant atomically, and permanently locks after completion or detection of an existing GM account.
 - Product image URLs are limited to absolute HTTP(S) URLs.
 - The admin bearer token is compared in constant time.
+- CMS, runtime settings, coupons, and product mutations require an AzerothCore GM session and are recorded in the portal audit tables.
+- Character self-service accepts only four fixed actions, verifies character ownership (including `deleteInfos_Account` for restoration), requires active characters to be offline, and never accepts a raw worldserver command.
+- Coupon limits and wallet debits are checked while the relevant rows are locked in one transaction; product removal is a soft archive so order history remains intact.
 - GM credit grants require a live authenticated session and the configured `account_access` level. Every grant is recorded in the append-only `portal_credit_ledger` table.
 - Moderation and realm-operation endpoints require the configured AzerothCore GM level. Only fixed commands for bans, mutes, kicks, announcements, MOTD, GM levels, and guarded start/shutdown/restart operations can be issued; inputs are allow-listed, privilege escalation and self-role changes are rejected, and every attempt is recorded in `portal_moderation_log`.
 - The optional browser console is disabled by default, requires a live GM session, is rate limited, accepts only one-line commands, and records commands, results, actor, and IP in `portal_command_log`. Its default prefix list is informational; unrestricted mode is explicit and always requires GM level 3.

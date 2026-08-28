@@ -139,6 +139,12 @@ func (s *Server) reviewOrder(ctx context.Context, id uint64, message string) {
 }
 
 func (s *Server) requireGM(r *http.Request) (account, bool) {
+	if s.c.MockMode {
+		if username, ok := s.mockUser(r); ok {
+			return account{ID: 1, Username: username, Email: "demo@example.com", GMLevel: 3}, true
+		}
+		return account{}, false
+	}
 	a, e := s.auth(r)
 	return a, e == nil && int(s.gmLevel(r.Context(), a.ID)) >= s.c.GMLevel
 }

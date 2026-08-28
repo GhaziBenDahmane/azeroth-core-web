@@ -149,6 +149,33 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 token_hash BINARY(32) PRIMARY KEY, account_id INT UNSIGNED NOT NULL, expires_at TIMESTAMP NOT NULL,
 		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		 UNIQUE KEY idx_portal_verification_account (account_id), INDEX idx_portal_verification_expiry (expires_at)) ENGINE=InnoDB`,
+		`CREATE TABLE IF NOT EXISTS portal_settings (
+		 setting_key VARCHAR(80) PRIMARY KEY, setting_value TEXT NOT NULL,
+		 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS portal_news (
+		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(120) NOT NULL, summary VARCHAR(1000) NOT NULL DEFAULT '', url VARCHAR(500) NOT NULL DEFAULT '',
+		 kind ENUM('news','announcement','maintenance') NOT NULL DEFAULT 'news', publish_at DATETIME NULL, expires_at DATETIME NULL,
+		 active TINYINT(1) NOT NULL DEFAULT 1, created_by INT UNSIGNED NOT NULL DEFAULT 0,
+		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		 INDEX idx_portal_news_publish (active,publish_at,expires_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS portal_coupons (
+		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, code VARCHAR(40) NOT NULL, discount_percent TINYINT UNSIGNED NOT NULL DEFAULT 0,
+		 discount_credits INT UNSIGNED NOT NULL DEFAULT 0, starts_at DATETIME NULL, ends_at DATETIME NULL, max_uses INT UNSIGNED NOT NULL DEFAULT 0,
+		 per_account_limit INT UNSIGNED NOT NULL DEFAULT 1, active TINYINT(1) NOT NULL DEFAULT 1, created_by INT UNSIGNED NOT NULL DEFAULT 0,
+		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY idx_portal_coupon_code (code)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS portal_coupon_uses (
+		 coupon_id BIGINT UNSIGNED NOT NULL, account_id INT UNSIGNED NOT NULL, order_id BIGINT UNSIGNED NOT NULL,
+		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(coupon_id,order_id),
+		 INDEX idx_portal_coupon_account(coupon_id,account_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS portal_character_services (
+		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, account_id INT UNSIGNED NOT NULL, character_guid INT UNSIGNED NOT NULL,
+		 action VARCHAR(30) NOT NULL, character_name VARCHAR(32) NOT NULL DEFAULT '', success TINYINT(1) NOT NULL DEFAULT 0,
+		 response VARCHAR(500) NOT NULL DEFAULT '', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		 INDEX idx_portal_character_service(account_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS portal_admin_audit (
+		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, actor_account_id INT UNSIGNED NOT NULL, action VARCHAR(50) NOT NULL,
+		 target VARCHAR(120) NOT NULL DEFAULT '', details VARCHAR(500) NOT NULL DEFAULT '', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		 INDEX idx_portal_admin_audit(actor_account_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, q := range statements {
 		if _, err := s.Auth.ExecContext(ctx, q); err != nil {
@@ -156,11 +183,6 @@ func (s *Store) Migrate(ctx context.Context) error {
 		}
 	}
 	if s.C.EnableSetup {
-		if _, err := s.Auth.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS portal_settings (
-		 setting_key VARCHAR(80) PRIMARY KEY, setting_value TEXT NOT NULL,
-		 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`); err != nil {
-			return fmt.Errorf("portal setup migration: %w", err)
-		}
 		if _, err := s.Auth.ExecContext(ctx, "INSERT IGNORE INTO portal_settings(setting_key,setting_value) VALUES('setup_complete','0')"); err != nil {
 			return fmt.Errorf("portal setup migration: %w", err)
 		}
@@ -176,12 +198,18 @@ func (s *Store) Migrate(ctx context.Context) error {
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS gold_amount INT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS seed_key VARCHAR(80) NULL`,
 		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS service_action VARCHAR(30) NOT NULL DEFAULT ''`,
+		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS starts_at DATETIME NULL`,
+		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS ends_at DATETIME NULL`,
+		`ALTER TABLE portal_products ADD COLUMN IF NOT EXISTS per_account_limit INT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_orders MODIFY COLUMN status ENUM('pending','delivering','delivered','review','failed','refunded') NOT NULL DEFAULT 'pending'`,
 		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS attempts INT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS service_level TINYINT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS gold_amount INT UNSIGNED NOT NULL DEFAULT 0`,
 		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS service_action VARCHAR(30) NOT NULL DEFAULT ''`,
 		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS delivery_started_at TIMESTAMP NULL`,
+		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS subtotal INT UNSIGNED NOT NULL DEFAULT 0`,
+		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS discount INT UNSIGNED NOT NULL DEFAULT 0`,
+		`ALTER TABLE portal_orders ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(40) NOT NULL DEFAULT ''`,
 		`ALTER TABLE portal_sessions ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`,
 		`ALTER TABLE portal_sessions ADD COLUMN IF NOT EXISTS ip_address VARCHAR(45) NOT NULL DEFAULT ''`,
 		`ALTER TABLE portal_sessions ADD COLUMN IF NOT EXISTS user_agent VARCHAR(255) NOT NULL DEFAULT ''`,

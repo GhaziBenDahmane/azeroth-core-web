@@ -12,11 +12,12 @@ const { title = 'Azeroth Portal', page = 'home' } = Astro.props;
   <title>{title}</title>
 </head>
 <body data-page={page}>
+	<div id="maintenance-banner" class="maintenance-banner hidden"></div>
   <div class="sky" aria-hidden="true"><i></i><i></i><i></i></div>
   <header class="nav wrap">
     <a class="brand" href="/"><img class="brand-logo hidden" data-brand-logo alt=""/><span class="brand-mark" data-brand-mark>A</span><span data-brand-name>AZEROTH<small>REALM PORTAL</small></span></a>
     <nav aria-label="Primary navigation">
-      <a href="/" data-i18n="nav.home">Home</a><a href="/armory" data-i18n="nav.armory">Armory</a><a href="/rankings" data-i18n="nav.rankings">Rankings</a><a href="/guilds" data-i18n="nav.guilds">Guilds</a><a href="/realm" data-i18n="nav.realm">Realm</a><a href="/shop" data-i18n="nav.shop">Shop</a>
+      <a href="/" data-i18n="nav.home">Home</a><a href="/armory" data-i18n="nav.armory">Armory</a><a href="/rankings" data-i18n="nav.rankings">Rankings</a><a href="/guilds" data-i18n="nav.guilds">Guilds</a><a href="/realm" data-i18n="nav.realm">Realm</a><a href="/shop" data-i18n="nav.shop">Shop</a><a href="/status">Status</a>
     </nav>
     <div class="nav-actions"><a class="text-link signed-out" href="/login" data-i18n="action.signIn">Sign in</a><a class="button small signed-out" href="/register" data-i18n="action.register">Join realm</a><a class="button small signed-in hidden" href="/account" data-i18n="action.account">My account</a></div>
   </header>

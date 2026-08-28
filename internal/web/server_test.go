@@ -89,6 +89,57 @@ func TestMockCommunityAndOperations(t *testing.T) {
 	}
 }
 
+func TestMockPortalManagementAndSelfService(t *testing.T) {
+	c := config.Config{MockMode: true, PortalName: "Azeroth", RealmName: "Azeroth", RealmAddress: "logon.test", BrandMark: "A", ThemePrimary: "#d3ae68", ThemeSecondary: "#f3d89c", ThemeAccent: "#3fd0be", ThemeBackground: "#07110f", EnableArmory: true, EnableRankings: true, EnableShop: true, EnableAdminPanel: true}
+	s := &Server{c: c, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	h := s.Handler()
+	login := httptest.NewRecorder()
+	h.ServeHTTP(login, httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"username":"DEMO","password":"demo1234"}`)))
+	if login.Code != http.StatusOK || len(login.Result().Cookies()) == 0 {
+		t.Fatalf("mock login failed: %d %s", login.Code, login.Body.String())
+	}
+	cookie := login.Result().Cookies()[0]
+	do := func(method, path, body string) *httptest.ResponseRecorder {
+		t.Helper()
+		r := httptest.NewRequest(method, path, strings.NewReader(body))
+		r.AddCookie(cookie)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	for _, path := range []string{"/api/rankings?metric=achievements", "/api/rankings?metric=guild-members", "/api/characters/deleted", "/api/admin/settings", "/api/admin/news", "/api/admin/coupons"} {
+		if w := do(http.MethodGet, path, ""); w.Code != http.StatusOK {
+			t.Fatalf("%s returned %d: %s", path, w.Code, w.Body.String())
+		}
+	}
+	if w := do(http.MethodPost, "/api/characters/1/service", `{"action":"unstuck"}`); w.Code != http.StatusOK {
+		t.Fatalf("unstuck returned %d: %s", w.Code, w.Body.String())
+	}
+	if w := do(http.MethodPost, "/api/characters/99/service", `{"action":"restore"}`); w.Code != http.StatusOK {
+		t.Fatalf("restore returned %d: %s", w.Code, w.Body.String())
+	}
+	settings := `{"portalName":"Frosthold","realmName":"Frosthold","brandMark":"F","tagline":"Test realm","realmAddress":"logon.frosthold.test","downloadUrl":"","communityUrl":"","termsUrl":"","privacyUrl":"","themePrimary":"#d3ae68","themeSecondary":"#f3d89c","themeAccent":"#3fd0be","themeBackground":"#07110f","maintenanceEnabled":true,"maintenanceMessage":"Restart in progress","registration":true,"armory":true,"rankings":true,"guilds":true,"realm":true,"shop":true,"support":true,"admin":true,"gmConsole":false}`
+	if w := do(http.MethodPut, "/api/admin/settings", settings); w.Code != http.StatusOK {
+		t.Fatalf("settings update returned %d: %s", w.Code, w.Body.String())
+	}
+	if w := do(http.MethodGet, "/api/public-config", ""); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"portalName":"Frosthold"`) || !strings.Contains(w.Body.String(), `"active":true`) {
+		t.Fatalf("runtime settings not public: %d %s", w.Code, w.Body.String())
+	}
+	if w := do(http.MethodPost, "/api/admin/news", `{"title":"Patch notes","summary":"A new season begins.","kind":"announcement","active":true}`); w.Code != http.StatusCreated {
+		t.Fatalf("news create returned %d: %s", w.Code, w.Body.String())
+	}
+	if w := do(http.MethodPost, "/api/admin/coupons", `{"code":"WELCOME10","discountPercent":10,"perAccountLimit":1}`); w.Code != http.StatusCreated {
+		t.Fatalf("coupon create returned %d: %s", w.Code, w.Body.String())
+	}
+	if w := do(http.MethodPost, "/api/shop/purchase", `{"productId":1,"characterGuid":1,"coupon":"WELCOME10"}`); w.Code != http.StatusCreated {
+		t.Fatalf("discounted purchase returned %d: %s", w.Code, w.Body.String())
+	}
+	me := do(http.MethodGet, "/api/me", "")
+	if !strings.Contains(me.Body.String(), `"balance":392`) {
+		t.Fatalf("coupon was not applied transactionally: %s", me.Body.String())
+	}
+}
+
 func TestPublicBrandingConfig(t *testing.T) {
 	s := &Server{c: config.Config{MockMode: true, PortalName: "Frosthold", RealmName: "Frosthold One", RealmAddress: "logon.frosthold.test", BrandMark: "FH", ExpansionName: "Wrath", ClientVersion: "3.3.5a"}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
 	r := httptest.NewRequest("GET", "/api/public-config", nil)

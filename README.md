@@ -8,8 +8,10 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - Secure HTTP-only sessions, same-origin checks, request limits, and security headers
 - Public armory search, 19-slot equipment paper-doll, item tooltips/icons, guilds, and play time
 - 2v2, 3v3, and 5v5 arena team ladders with ratings, records, and rosters
+- Character ladders for honorable kills, achievements, played time, and level
 - PvE raid progression from character achievement dates, including guild-first dates
 - Account dashboard with characters, credit balance, and order history
+- Safe self-service rename, customization, unstuck, and deleted-character restoration through AzerothCore SOAP
 - Password changes, TOTP two-factor authentication, and session revocation
 - Single-use email password recovery and optional Cloudflare Turnstile registration protection
 - Audited GM credit grants authorized from AzerothCore `account_access`
@@ -22,9 +24,10 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - Queued race-change and faction-change services using AzerothCore's supported character commands
 - 51 specialization-aware, full-slot WotLK S6, S7, and T8 loadouts resolved from the installed world database
 - Stripe Checkout credit packs with signed, replay-safe webhooks
-- Categorized shop with an admin product API
+- Categorized shop with product editing/archival, scheduling, purchase limits, and limited-use coupons
 - Durable queued fulfillment through AzerothCore SOAP, with review/refund controls
 - Realm status, faction population, guild directory, and guild rosters
+- Database-backed news/announcement editor, live website configuration, scheduled maintenance, and a public status page
 - Health, readiness, and Prometheus metrics endpoints
 - Responsive, dependency-light Astro UI
 - One multi-stage Docker image; no Node runtime in production
@@ -141,6 +144,11 @@ GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_command_log TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE ON acore_auth.portal_support_tickets TO 'portal'@'%';
 GRANT SELECT, INSERT, DELETE ON acore_auth.portal_password_resets TO 'portal'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_email_verifications TO 'portal'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_news TO 'portal'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_coupons TO 'portal'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON acore_auth.portal_coupon_uses TO 'portal'@'%';
+GRANT SELECT, INSERT ON acore_auth.portal_character_services TO 'portal'@'%';
+GRANT SELECT, INSERT ON acore_auth.portal_admin_audit TO 'portal'@'%';
 GRANT SELECT, INSERT ON acore_auth.account_access TO 'portal'@'%';
 ```
 
@@ -214,6 +222,10 @@ UPDATE acore_auth.portal_wallets SET balance = balance + 100 WHERE account_id = 
 Purchases commit the debit and an immutable item snapshot before entering the delivery queue. Ambiguous SOAP failures move to `review` instead of being retried automatically, preventing duplicate mail. A GM can inspect, retry, or refund them from the account console.
 
 Operational probes are available at `/healthz`, `/readyz`, and `/metrics`.
+
+The public `/status` page reports portal, database, realm, and shop-delivery state. GMs can edit branding and links, disable feature modules, schedule maintenance, publish announcements, manage products, and create coupons from the account dashboard. Environment feature flags remain hard security gates; saved settings in `portal_settings` take effect immediately and can be reset by deleting the `site_config` row.
+
+Character services verify account ownership and offline state before issuing a fixed, allow-listed AzerothCore command. The browser never supplies a raw command. Every attempted real service is recorded in `portal_character_services`.
 
 ## Local development
 
