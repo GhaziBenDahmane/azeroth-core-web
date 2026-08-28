@@ -65,6 +65,55 @@ func loadCustomization(c *Config) error {
 			}
 		}
 	}
+	if !textKey.MatchString(c.RealmKey) {
+		return fmt.Errorf("REALM_KEY must contain lowercase letters, numbers, dots, underscores, or hyphens")
+	}
+	c.Realms = []RealmConfig{{Key: c.RealmKey, Name: c.RealmName, Address: c.RealmAddress, ExperienceRate: c.ExperienceRate, ID: c.RealmID, CharactersDSN: c.CharactersDSN, WorldDSN: c.WorldDSN, CharactersDB: c.CharactersDB, WorldDB: c.WorldDB, SOAPURL: c.SOAPURL, SOAPUser: c.SOAPUser, SOAPPassword: c.SOAPPassword, StartWebhook: c.RealmStartWebhook, ControlToken: c.RealmControlToken}}
+	if raw := strings.TrimSpace(os.Getenv("REALMS_JSON")); raw != "" {
+		if len(raw) > 32*1024 || json.Unmarshal([]byte(raw), &c.Realms) != nil || len(c.Realms) == 0 || len(c.Realms) > 20 {
+			return fmt.Errorf("REALMS_JSON must be an array of 1–20 realms smaller than 32 KiB")
+		}
+		seen, seenIDs, current := map[string]bool{}, map[int]bool{}, false
+		for i := range c.Realms {
+			realm := &c.Realms[i]
+			if realm.Address == "" {
+				realm.Address = c.RealmAddress
+			}
+			if realm.ExperienceRate == "" {
+				realm.ExperienceRate = c.ExperienceRate
+			}
+			if realm.ID == 0 {
+				realm.ID = c.RealmID
+			}
+			if realm.CharactersDSN == "" {
+				realm.CharactersDSN = c.CharactersDSN
+			}
+			if realm.WorldDSN == "" {
+				realm.WorldDSN = c.WorldDSN
+			}
+			if realm.CharactersDB == "" {
+				realm.CharactersDB = c.CharactersDB
+			}
+			if realm.WorldDB == "" {
+				realm.WorldDB = c.WorldDB
+			}
+			if realm.SOAPURL == "" {
+				realm.SOAPURL, realm.SOAPUser, realm.SOAPPassword = c.SOAPURL, c.SOAPUser, c.SOAPPassword
+			}
+			if realm.StartWebhook == "" {
+				realm.StartWebhook, realm.ControlToken = c.RealmStartWebhook, c.RealmControlToken
+			}
+			if !identifier.MatchString(realm.CharactersDB) || !identifier.MatchString(realm.WorldDB) || !textKey.MatchString(realm.Key) || strings.TrimSpace(realm.Name) == "" || len(realm.Name) > 80 || realm.ID < 1 || seen[realm.Key] || seenIDs[realm.ID] {
+				return fmt.Errorf("REALMS_JSON contains an invalid or duplicate realm")
+			}
+			seen[realm.Key] = true
+			seenIDs[realm.ID] = true
+			current = current || realm.Key == c.RealmKey
+		}
+		if !current {
+			return fmt.Errorf("REALMS_JSON must contain the active REALM_KEY")
+		}
+	}
 	return nil
 }
 

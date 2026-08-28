@@ -95,6 +95,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("POST /api/admin/orders/{id}/retry", s.feature(s.c.EnableAdminPanel, "Administration", s.adminRetryOrder))
 	m.HandleFunc("POST /api/admin/orders/{id}/refund", s.feature(s.c.EnableAdminPanel, "Administration", s.adminRefundOrder))
 	m.HandleFunc("GET /api/admin/orders", s.feature(s.c.EnableAdminPanel, "Administration", s.adminOrders))
+	m.HandleFunc("GET /api/admin/status", s.feature(s.c.EnableAdminPanel, "Administration", s.adminStatus))
 	m.HandleFunc("GET /api/admin/ledger", s.feature(s.c.EnableAdminPanel, "Administration", s.adminLedger))
 	m.HandleFunc("GET /api/admin/products", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProducts))
 	m.HandleFunc("GET /api/admin/products/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProductDetail))
@@ -144,7 +145,7 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
-		w.Header().Set("Content-Security-Policy", "default-src 'self' blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://wow.zamimg.com; script-src 'self' https://wow.zamimg.com https://challenges.cloudflare.com; connect-src 'self' https://nether.wowhead.com https://wow.zamimg.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; worker-src 'self' blob:")
+		w.Header().Set("Content-Security-Policy", "default-src 'self' blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://wow.zamimg.com; script-src 'self' https://code.jquery.com https://wow.zamimg.com https://challenges.cloudflare.com; connect-src 'self' https://nether.wowhead.com https://wow.zamimg.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; worker-src 'self' blob:")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
 		if s.c.CookieSecure {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
@@ -185,6 +186,19 @@ func (s *Server) sameOrigin(r *http.Request) bool {
 }
 
 func (s *Server) status(w http.ResponseWriter, r *http.Request) {
+	status := s.serviceStatus(r)
+	jsonOut(w, 200, map[string]any{"online": status["online"], "realm": status["realm"], "address": status["address"], "maintenance": status["maintenance"], "maintenanceMessage": status["maintenanceMessage"], "checkedAt": status["checkedAt"]})
+}
+
+func (s *Server) adminStatus(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireGM(r); !ok {
+		problem(w, http.StatusForbidden, "GM access required")
+		return
+	}
+	jsonOut(w, 200, s.serviceStatus(r))
+}
+
+func (s *Server) serviceStatus(r *http.Request) map[string]any {
 	cfg := s.runtimeSettings(r)
 	dbOK := s.s.Auth.PingContext(r.Context()) == nil
 	realmOnline := false
@@ -194,7 +208,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	maintenance := cfg.MaintenanceEnabled && (cfg.MaintenanceStarts == nil || !now.Before(*cfg.MaintenanceStarts)) && (cfg.MaintenanceEnds == nil || now.Before(*cfg.MaintenanceEnds))
-	jsonOut(w, 200, map[string]any{"online": realmOnline, "realm": cfg.RealmName, "address": cfg.RealmAddress, "shopDelivery": s.soap.Enabled(), "portal": true, "database": dbOK, "soapConfigured": s.soap.Enabled(), "maintenance": maintenance, "maintenanceMessage": cfg.MaintenanceMessage, "checkedAt": now})
+	return map[string]any{"online": realmOnline, "realm": cfg.RealmName, "address": cfg.RealmAddress, "shopDelivery": s.soap.Enabled(), "portal": true, "database": dbOK, "soapConfigured": s.soap.Enabled(), "maintenance": maintenance, "maintenanceMessage": cfg.MaintenanceMessage, "checkedAt": now}
 }
 
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
@@ -559,7 +573,7 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	}
 	if p.PerAccountLimit > 0 {
 		var count uint32
-		if e = tx.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM portal_orders WHERE account_id=? AND product_id=? AND status NOT IN ('failed','refunded')", a.ID, p.ID).Scan(&count); e != nil {
+		if e = tx.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM portal_orders WHERE account_id=? AND product_id=? AND realm_key=? AND status NOT IN ('failed','refunded')", a.ID, p.ID, s.c.RealmKey).Scan(&count); e != nil {
 			problem(w, 500, "Could not validate purchase limit")
 			return
 		}
@@ -603,7 +617,7 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "Could not debit wallet")
 		return
 	}
-	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_orders(account_id,character_guid,product_id,item_id,quantity,total,subtotal,discount,coupon_code,status,service_level,gold_amount,service_action) VALUES(?,?,?,?,?,?,?,?,?,'pending',?,?,?)", a.ID, in.CharacterGUID, p.ID, p.ItemID, p.Quantity, total, p.Price, discount, couponCode, p.ServiceLevel, p.Gold, p.ServiceAction)
+	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_orders(account_id,character_guid,realm_key,product_id,item_id,quantity,total,subtotal,discount,coupon_code,status,service_level,gold_amount,service_action) VALUES(?,?,?,?,?,?,?,?,?,?,'pending',?,?,?)", a.ID, in.CharacterGUID, s.c.RealmKey, p.ID, p.ItemID, p.Quantity, total, p.Price, discount, couponCode, p.ServiceLevel, p.Gold, p.ServiceAction)
 	if e != nil {
 		problem(w, 500, "Could not create order")
 		return
@@ -697,7 +711,7 @@ func (s *Server) orders(w http.ResponseWriter, r *http.Request) {
 		problem(w, 401, "Sign in required")
 		return
 	}
-	rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,item_id,quantity,total,status,created_at FROM portal_orders WHERE account_id=? ORDER BY id DESC LIMIT 50", a.ID)
+	rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,item_id,quantity,total,status,created_at FROM portal_orders WHERE account_id=? AND realm_key=? ORDER BY id DESC LIMIT 50", a.ID, s.c.RealmKey)
 	if e != nil {
 		problem(w, 500, "Could not load orders")
 		return
@@ -965,6 +979,13 @@ func spaHandler(root fs.FS) http.Handler {
 		if strings.Contains(p, ".") {
 			http.NotFound(w, r)
 			return
+		}
+		if strings.HasPrefix(p, "admin/") {
+			if data, e := fs.ReadFile(root, "admin/index.html"); e == nil {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				_, _ = w.Write(data)
+				return
+			}
 		}
 		data, e := fs.ReadFile(root, "index.html")
 		if e != nil {

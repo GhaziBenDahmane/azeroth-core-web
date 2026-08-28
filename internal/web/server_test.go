@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -23,6 +24,7 @@ import (
 func TestSPAHandlerServesRouteIndexes(t *testing.T) {
 	root := fstest.MapFS{
 		"index.html":        {Data: []byte("home")},
+		"admin/index.html":  {Data: []byte("admin")},
 		"armory/index.html": {Data: []byte("armory")},
 		"app.js":            {Data: []byte("script")},
 	}
@@ -34,6 +36,35 @@ func TestSPAHandlerServesRouteIndexes(t *testing.T) {
 		if w.Code != 200 || strings.TrimSpace(w.Body.String()) != want {
 			t.Errorf("%s: got %d %q, want 200 %q", route, w.Code, w.Body.String(), want)
 		}
+	}
+	w := httptest.NewRecorder()
+	spaHandler(root).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/admin/catalog/42/edit", nil))
+	if w.Code != http.StatusOK || w.Body.String() != "admin" {
+		t.Fatalf("nested admin route = %d %q", w.Code, w.Body.String())
+	}
+}
+
+func TestMultiRealmRoutesAndRemembersSelection(t *testing.T) {
+	h := MultiRealm("frost", true, map[string]http.Handler{
+		"frost": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("frost")) }),
+		"ember": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ember")) }),
+	})
+	selected := httptest.NewRecorder()
+	h.ServeHTTP(selected, httptest.NewRequest(http.MethodGet, "/api/realm?realm=ember", nil))
+	if selected.Code != http.StatusOK || selected.Body.String() != "ember" || len(selected.Result().Cookies()) != 1 || !selected.Result().Cookies()[0].Secure {
+		t.Fatalf("realm selection failed: %d %q %#v", selected.Code, selected.Body.String(), selected.Result().Cookies())
+	}
+	rememberedRequest := httptest.NewRequest(http.MethodGet, "/api/realm", nil)
+	rememberedRequest.AddCookie(selected.Result().Cookies()[0])
+	remembered := httptest.NewRecorder()
+	h.ServeHTTP(remembered, rememberedRequest)
+	if remembered.Body.String() != "ember" {
+		t.Fatalf("remembered realm = %q; want ember", remembered.Body.String())
+	}
+	invalid := httptest.NewRecorder()
+	h.ServeHTTP(invalid, httptest.NewRequest(http.MethodGet, "/?realm=unknown", nil))
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid explicit realm = %d; want 400", invalid.Code)
 	}
 }
 
@@ -140,11 +171,11 @@ func TestMockPortalManagementAndSelfService(t *testing.T) {
 	if w := do(http.MethodPost, "/api/characters/99/service", `{"action":"restore"}`); w.Code != http.StatusOK {
 		t.Fatalf("restore returned %d: %s", w.Code, w.Body.String())
 	}
-	settings := `{"portalName":"Frosthold","realmName":"Frosthold","brandMark":"F","tagline":"Test realm","realmAddress":"logon.frosthold.test","downloadUrl":"","communityUrl":"","termsUrl":"","privacyUrl":"","themePrimary":"#d3ae68","themeSecondary":"#f3d89c","themeAccent":"#3fd0be","themeBackground":"#07110f","maintenanceEnabled":true,"maintenanceMessage":"Restart in progress","registration":true,"armory":true,"rankings":true,"guilds":true,"realm":true,"shop":true,"support":true,"admin":true,"gmConsole":false}`
+	settings := `{"portalName":"Frosthold","realmName":"Frosthold","brandMark":"F","tagline":"Test realm","realmAddress":"logon.frosthold.test","experienceRate":"3×","downloadUrl":"","communityUrl":"","termsUrl":"","privacyUrl":"","themePrimary":"#d3ae68","themeSecondary":"#f3d89c","themeAccent":"#3fd0be","themeBackground":"#07110f","maintenanceEnabled":true,"maintenanceMessage":"Restart in progress","registration":true,"armory":true,"rankings":true,"guilds":true,"realm":true,"shop":true,"support":true,"admin":true,"gmConsole":false}`
 	if w := do(http.MethodPut, "/api/admin/settings", settings); w.Code != http.StatusOK {
 		t.Fatalf("settings update returned %d: %s", w.Code, w.Body.String())
 	}
-	if w := do(http.MethodGet, "/api/public-config", ""); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"portalName":"Frosthold"`) || !strings.Contains(w.Body.String(), `"active":true`) {
+	if w := do(http.MethodGet, "/api/public-config", ""); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"portalName":"Frosthold"`) || !strings.Contains(w.Body.String(), `"experienceRate":"3×"`) || !strings.Contains(w.Body.String(), `"active":true`) {
 		t.Fatalf("runtime settings not public: %d %s", w.Code, w.Body.String())
 	}
 	if w := do(http.MethodPost, "/api/admin/news", `{"title":"Patch notes","summary":"A new season begins.","kind":"announcement","active":true}`); w.Code != http.StatusCreated {
@@ -163,7 +194,7 @@ func TestMockPortalManagementAndSelfService(t *testing.T) {
 }
 
 func TestPublicBrandingConfig(t *testing.T) {
-	s := &Server{c: config.Config{MockMode: true, PortalName: "Frosthold", RealmName: "Frosthold One", RealmAddress: "logon.frosthold.test", BrandMark: "FH", ExpansionName: "Wrath", ClientVersion: "3.3.5a"}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	s := &Server{c: config.Config{MockMode: true, PortalName: "Frosthold", RealmName: "Frosthold One", RealmAddress: "logon.frosthold.test", RealmKey: "frost", Realms: []config.RealmConfig{{Key: "frost", Name: "Frosthold One"}, {Key: "ember", Name: "Emberfall"}}, BrandMark: "FH", ExpansionName: "Wrath", ClientVersion: "3.3.5a"}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
 	r := httptest.NewRequest("GET", "/api/public-config", nil)
 	w := httptest.NewRecorder()
 	s.Handler().ServeHTTP(w, r)
@@ -174,8 +205,15 @@ func TestPublicBrandingConfig(t *testing.T) {
 	if body["portalName"] != "Frosthold" || body["realmAddress"] != "logon.frosthold.test" || body["brandMark"] != "FH" {
 		t.Fatalf("unexpected public branding config: %#v", body)
 	}
+	realms := body["realms"].([]any)
+	if body["realmKey"] != "frost" || len(realms) != 2 {
+		t.Fatalf("unexpected realm directory: %#v", body)
+	}
 	if _, exposed := body["realmControlToken"]; exposed {
 		t.Fatal("private realm control token was exposed")
+	}
+	if _, exposed := realms[0].(map[string]any)["charactersDsn"]; exposed {
+		t.Fatal("private multi-realm connection settings were exposed")
 	}
 }
 
@@ -210,6 +248,38 @@ func TestSecureResponsesIncludeHSTS(t *testing.T) {
 	s.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 	if got := w.Header().Get("Strict-Transport-Security"); got == "" {
 		t.Fatal("secure response did not include HSTS")
+	}
+	if got := w.Header().Get("Content-Security-Policy"); !strings.Contains(got, "https://code.jquery.com") {
+		t.Fatalf("content security policy does not allow the pinned jQuery CDN: %q", got)
+	}
+}
+
+func TestTechnicalStatusRequiresGM(t *testing.T) {
+	s := &Server{c: config.Config{MockMode: true, EnableAdminPanel: true}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	h := s.Handler()
+
+	public := httptest.NewRecorder()
+	h.ServeHTTP(public, httptest.NewRequest(http.MethodGet, "/api/status", nil))
+	if public.Code != http.StatusOK || strings.Contains(public.Body.String(), `"database"`) {
+		t.Fatalf("public status leaked technical state: %d %s", public.Code, public.Body.String())
+	}
+
+	denied := httptest.NewRecorder()
+	h.ServeHTTP(denied, httptest.NewRequest(http.MethodGet, "/api/admin/status", nil))
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("unauthenticated admin status = %d; want 403", denied.Code)
+	}
+
+	login := httptest.NewRecorder()
+	h.ServeHTTP(login, httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"username":"DEMO","password":"demo1234"}`)))
+	request := httptest.NewRequest(http.MethodGet, "/api/admin/status", nil)
+	for _, cookie := range login.Result().Cookies() {
+		request.AddCookie(cookie)
+	}
+	admin := httptest.NewRecorder()
+	h.ServeHTTP(admin, request)
+	if admin.Code != http.StatusOK || !strings.Contains(admin.Body.String(), `"database":true`) {
+		t.Fatalf("GM status unavailable: %d %s", admin.Code, admin.Body.String())
 	}
 }
 
@@ -271,6 +341,29 @@ func TestServiceCommandsAreAllowListed(t *testing.T) {
 	}
 	if _, err := serviceCommand("server shutdown", "Arthoria"); err == nil {
 		t.Fatal("arbitrary service command was accepted")
+	}
+}
+
+func TestSplitItemStacksUsesTemplateStackLimit(t *testing.T) {
+	got := splitItemStacks(40113, 45, 20)
+	want := []string{"40113:20", "40113:20", "40113:5"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v; want %v", got, want)
+	}
+
+	got = splitItemStacks(46152, 2, 1)
+	want = []string{"46152:1", "46152:1"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v; want %v", got, want)
+	}
+
+	attachments := make([]string, 25)
+	for i := range attachments {
+		attachments[i] = fmt.Sprintf("%d:1", i+1)
+	}
+	messages := chunkMailStacks(attachments)
+	if len(messages) != 3 || len(messages[0]) != 12 || len(messages[1]) != 12 || len(messages[2]) != 1 {
+		t.Fatalf("unexpected mail split: %v", messages)
 	}
 }
 

@@ -5,12 +5,21 @@ import "testing"
 func TestLoadCustomization(t *testing.T) {
 	t.Setenv("UI_TEXT_JSON", `{"nav.home":"Accueil"}`)
 	t.Setenv("NEWS_JSON", `[{"title":"Launch","summary":"Welcome","date":"2026-08-28","url":"https://example.com/news"}]`)
-	c := Config{ThemePrimary: "#112233", ThemeSecondary: "#223344", ThemeAccent: "#334455", ThemeBackground: "#445566", Locale: "fr-FR"}
+	t.Setenv("REALMS_JSON", `[{"key":"frost","name":"Frosthold","id":1},{"key":"ember","name":"Emberfall","id":2}]`)
+	c := Config{ThemePrimary: "#112233", ThemeSecondary: "#223344", ThemeAccent: "#334455", ThemeBackground: "#445566", Locale: "fr-FR", RealmKey: "frost", RealmID: 1, RealmName: "Frosthold", PublicURL: "https://portal.example.com", CharactersDB: "acore_characters", WorldDB: "acore_world"}
 	if err := loadCustomization(&c); err != nil {
 		t.Fatalf("valid customization rejected: %v", err)
 	}
-	if c.UIText["nav.home"] != "Accueil" || len(c.News) != 1 || c.News[0].Title != "Launch" {
-		t.Fatalf("customization was not decoded: %#v %#v", c.UIText, c.News)
+	if c.UIText["nav.home"] != "Accueil" || len(c.News) != 1 || c.News[0].Title != "Launch" || len(c.Realms) != 2 || c.Realms[1].Key != "ember" {
+		t.Fatalf("customization was not decoded: %#v %#v %#v", c.UIText, c.News, c.Realms)
+	}
+}
+
+func TestLoadCustomizationRejectsRealmDirectoryWithoutCurrentRealm(t *testing.T) {
+	t.Setenv("REALMS_JSON", `[{"key":"ember","name":"Emberfall","id":2}]`)
+	c := Config{ThemePrimary: "#112233", ThemeSecondary: "#223344", ThemeAccent: "#334455", ThemeBackground: "#445566", Locale: "en", RealmKey: "frost", RealmID: 1, CharactersDB: "acore_characters", WorldDB: "acore_world"}
+	if err := loadCustomization(&c); err == nil {
+		t.Fatal("realm directory without active REALM_KEY was accepted")
 	}
 }
 

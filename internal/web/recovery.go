@@ -20,6 +20,19 @@ import (
 
 func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := s.runtimeSettings(r)
+	type publicRealm struct {
+		Key            string `json:"key"`
+		Name           string `json:"name"`
+		Address        string `json:"address"`
+		ExperienceRate string `json:"experienceRate"`
+	}
+	realms := make([]publicRealm, 0, len(s.c.Realms))
+	for _, realm := range s.c.Realms {
+		if realm.Key == s.c.RealmKey {
+			realm.Name, realm.Address, realm.ExperienceRate = cfg.RealmName, cfg.RealmAddress, cfg.ExperienceRate
+		}
+		realms = append(realms, publicRealm{realm.Key, realm.Name, realm.Address, realm.ExperienceRate})
+	}
 	news := s.publicNews(r)
 	if len(news) == 0 {
 		for i, item := range s.c.News {
@@ -30,9 +43,10 @@ func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
 	maintenance := cfg.MaintenanceEnabled && (cfg.MaintenanceStarts == nil || !now.Before(*cfg.MaintenanceStarts)) && (cfg.MaintenanceEnds == nil || now.Before(*cfg.MaintenanceEnds))
 	jsonOut(w, 200, map[string]any{
 		"portalName": cfg.PortalName, "realmName": cfg.RealmName, "brandMark": cfg.BrandMark,
+		"realmKey": s.c.RealmKey, "realms": realms,
 		"tagline": cfg.Tagline, "expansionName": s.c.ExpansionName,
 		"clientVersion": s.c.ClientVersion, "clientBuild": s.c.ClientBuild,
-		"experienceRate": s.c.ExperienceRate, "uptimeLabel": s.c.UptimeLabel,
+		"experienceRate": cfg.ExperienceRate, "uptimeLabel": s.c.UptimeLabel,
 		"footerText": s.c.FooterText, "realmAddress": cfg.RealmAddress,
 		"downloadUrl": cfg.DownloadURL, "communityUrl": cfg.CommunityURL,
 		"logoUrl": s.c.LogoURL, "heroImageUrl": s.c.HeroImageURL, "faviconUrl": s.c.FaviconURL,

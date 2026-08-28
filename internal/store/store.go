@@ -110,12 +110,13 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 PRIMARY KEY (product_id,item_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_orders (
 		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, account_id INT UNSIGNED NOT NULL, character_guid INT UNSIGNED NOT NULL,
+		 realm_key VARCHAR(64) NOT NULL DEFAULT 'default',
 		 product_id INT UNSIGNED NOT NULL, item_id INT UNSIGNED NOT NULL, quantity INT UNSIGNED NOT NULL, total INT UNSIGNED NOT NULL,
 		 status ENUM('pending','delivering','delivered','review','failed','refunded') NOT NULL DEFAULT 'pending', error_message VARCHAR(500) NOT NULL DEFAULT '',
 		 attempts INT UNSIGNED NOT NULL DEFAULT 0, service_level TINYINT UNSIGNED NOT NULL DEFAULT 0, gold_amount INT UNSIGNED NOT NULL DEFAULT 0,
 		 service_action VARCHAR(30) NOT NULL DEFAULT '',
 		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, delivery_started_at TIMESTAMP NULL, delivered_at TIMESTAMP NULL,
-		 INDEX idx_portal_orders_account (account_id, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		 INDEX idx_portal_orders_account (account_id, created_at), INDEX idx_portal_orders_realm_status (realm_key,status,id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_order_items (
 		 order_id BIGINT UNSIGNED NOT NULL, item_id INT UNSIGNED NOT NULL, quantity INT UNSIGNED NOT NULL DEFAULT 1,
 		 PRIMARY KEY (order_id,item_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
@@ -129,16 +130,19 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 UNIQUE KEY idx_portal_checkout (checkout_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_moderation_log (
 		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, actor_account_id INT UNSIGNED NOT NULL, target_account_id INT UNSIGNED NOT NULL DEFAULT 0,
+		 realm_key VARCHAR(64) NOT NULL DEFAULT 'default',
 		 target VARCHAR(64) NOT NULL, action VARCHAR(30) NOT NULL, duration VARCHAR(30) NOT NULL DEFAULT '', reason VARCHAR(255) NOT NULL DEFAULT '',
 		 status ENUM('executed','review') NOT NULL, error_message VARCHAR(500) NOT NULL DEFAULT '', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		 INDEX idx_portal_moderation_target (target_account_id,created_at), INDEX idx_portal_moderation_actor (actor_account_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_command_log (
 		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, actor_account_id INT UNSIGNED NOT NULL,
+		 realm_key VARCHAR(64) NOT NULL DEFAULT 'default',
 		 command VARCHAR(255) NOT NULL, response TEXT NOT NULL, success TINYINT(1) NOT NULL DEFAULT 0,
 		 ip_address VARCHAR(45) NOT NULL DEFAULT '', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		 INDEX idx_portal_command_actor (actor_account_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_support_tickets (
 		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, account_id INT UNSIGNED NOT NULL, character_guid INT UNSIGNED NOT NULL DEFAULT 0,
+		 realm_key VARCHAR(64) NOT NULL DEFAULT 'default',
 		 subject VARCHAR(100) NOT NULL, message TEXT NOT NULL, status ENUM('open','answered','closed') NOT NULL DEFAULT 'open',
 		 gm_account_id INT UNSIGNED NOT NULL DEFAULT 0, response TEXT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -170,6 +174,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 INDEX idx_portal_coupon_account(coupon_id,account_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_character_services (
 		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, account_id INT UNSIGNED NOT NULL, character_guid INT UNSIGNED NOT NULL,
+		 realm_key VARCHAR(64) NOT NULL DEFAULT 'default',
 		 action VARCHAR(30) NOT NULL, character_name VARCHAR(32) NOT NULL DEFAULT '', success TINYINT(1) NOT NULL DEFAULT 0,
 		 response VARCHAR(500) NOT NULL DEFAULT '', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		 INDEX idx_portal_character_service(account_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
@@ -210,6 +215,11 @@ func (s *Store) Migrate(ctx context.Context) error {
 		{"portal_orders", "subtotal", "INT UNSIGNED NOT NULL DEFAULT 0"},
 		{"portal_orders", "discount", "INT UNSIGNED NOT NULL DEFAULT 0"},
 		{"portal_orders", "coupon_code", "VARCHAR(40) NOT NULL DEFAULT ''"},
+		{"portal_orders", "realm_key", "VARCHAR(64) NOT NULL DEFAULT 'default'"},
+		{"portal_moderation_log", "realm_key", "VARCHAR(64) NOT NULL DEFAULT 'default'"},
+		{"portal_command_log", "realm_key", "VARCHAR(64) NOT NULL DEFAULT 'default'"},
+		{"portal_support_tickets", "realm_key", "VARCHAR(64) NOT NULL DEFAULT 'default'"},
+		{"portal_character_services", "realm_key", "VARCHAR(64) NOT NULL DEFAULT 'default'"},
 		{"portal_sessions", "last_seen_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"},
 		{"portal_sessions", "ip_address", "VARCHAR(45) NOT NULL DEFAULT ''"},
 		{"portal_sessions", "user_agent", "VARCHAR(255) NOT NULL DEFAULT ''"},
@@ -218,6 +228,16 @@ func (s *Store) Migrate(ctx context.Context) error {
 		if err := s.ensureColumn(ctx, column.table, column.column, column.definition); err != nil {
 			return fmt.Errorf("portal column migration %s.%s: %w", column.table, column.column, err)
 		}
+	}
+	if s.C.RealmKey == s.C.DefaultRealmKey && s.C.RealmKey != "default" {
+		for _, table := range []string{"portal_orders", "portal_moderation_log", "portal_command_log", "portal_support_tickets", "portal_character_services"} {
+			if _, err := s.Auth.ExecContext(ctx, fmt.Sprintf("UPDATE `%s` SET realm_key=? WHERE realm_key='default'", table), s.C.RealmKey); err != nil {
+				return fmt.Errorf("portal legacy realm migration %s: %w", table, err)
+			}
+		}
+	}
+	if err := s.ensureIndex(ctx, "portal_orders", "idx_portal_orders_realm_status", "realm_key,status,id"); err != nil {
+		return fmt.Errorf("portal order realm index migration: %w", err)
 	}
 	if _, err := s.Auth.ExecContext(ctx, `ALTER TABLE portal_orders MODIFY COLUMN status ENUM('pending','delivering','delivered','review','failed','refunded') NOT NULL DEFAULT 'pending'`); err != nil {
 		return fmt.Errorf("portal order status migration: %w", err)
@@ -233,6 +253,22 @@ func (s *Store) Migrate(ctx context.Context) error {
 	}
 	_, _ = s.Auth.ExecContext(ctx, `DELETE FROM portal_sessions WHERE expires_at < NOW()`)
 	return nil
+}
+
+func (s *Store) ensureIndex(ctx context.Context, table, index, columns string) error {
+	var exists int
+	if err := s.Auth.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=? AND table_name=? AND index_name=?`, s.C.AuthDB, table, index).Scan(&exists); err != nil {
+		return err
+	}
+	if exists > 0 {
+		return nil
+	}
+	_, err := s.Auth.ExecContext(ctx, fmt.Sprintf("CREATE INDEX `%s` ON `%s` (%s)", index, table, columns))
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1061 {
+		return nil
+	}
+	return err
 }
 
 // ensureColumn avoids ADD COLUMN IF NOT EXISTS, which is unavailable on older

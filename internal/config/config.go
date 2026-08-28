@@ -15,6 +15,8 @@ type Config struct {
 	Addr, AuthDSN, CharactersDSN, WorldDSN string
 	AuthDB, CharactersDB, WorldDB          string
 	PublicURL, RealmName, RealmAddress     string
+	RealmKey                               string
+	DefaultRealmKey                        string
 	PortalName, BrandMark, PortalTagline   string
 	ExpansionName, ClientVersion           string
 	ClientBuild, ExperienceRate            string
@@ -26,6 +28,7 @@ type Config struct {
 	Locale, TermsURL, PrivacyURL           string
 	UIText                                 map[string]string
 	News                                   []NewsItem
+	Realms                                 []RealmConfig
 	SOAPURL, SOAPUser, SOAPPassword        string
 	CookieSecure                           bool
 	TrustProxy                             bool
@@ -64,6 +67,35 @@ type NewsItem struct {
 	URL     string `json:"url"`
 }
 
+// RealmConfig describes one AzerothCore realm served by this portal process.
+// Connection fields are never included in the public configuration response.
+type RealmConfig struct {
+	Key            string `json:"key"`
+	Name           string `json:"name"`
+	Address        string `json:"address"`
+	ExperienceRate string `json:"experienceRate"`
+	CharactersDSN  string `json:"charactersDsn"`
+	WorldDSN       string `json:"worldDsn"`
+	CharactersDB   string `json:"charactersDb"`
+	WorldDB        string `json:"worldDb"`
+	SOAPURL        string `json:"soapUrl"`
+	SOAPUser       string `json:"soapUser"`
+	SOAPPassword   string `json:"soapPassword"`
+	StartWebhook   string `json:"startWebhook"`
+	ControlToken   string `json:"controlToken"`
+	ID             int    `json:"id"`
+}
+
+func (c Config) ForRealm(realm RealmConfig) Config {
+	c.RealmKey, c.RealmName, c.RealmAddress, c.RealmID = realm.Key, realm.Name, realm.Address, realm.ID
+	c.ExperienceRate = realm.ExperienceRate
+	c.CharactersDSN, c.WorldDSN = realm.CharactersDSN, realm.WorldDSN
+	c.CharactersDB, c.WorldDB = realm.CharactersDB, realm.WorldDB
+	c.SOAPURL, c.SOAPUser, c.SOAPPassword = realm.SOAPURL, realm.SOAPUser, realm.SOAPPassword
+	c.RealmStartWebhook, c.RealmControlToken = realm.StartWebhook, realm.ControlToken
+	return c
+}
+
 var identifier = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
 
 func Load() (Config, error) {
@@ -71,7 +103,7 @@ func Load() (Config, error) {
 		Addr:    env("PORTAL_ADDR", ":8080"),
 		AuthDSN: os.Getenv("AUTH_DSN"), CharactersDSN: os.Getenv("CHARACTERS_DSN"), WorldDSN: os.Getenv("WORLD_DSN"),
 		AuthDB: env("AUTH_DB", "acore_auth"), CharactersDB: env("CHARACTERS_DB", "acore_characters"), WorldDB: env("WORLD_DB", "acore_world"),
-		PublicURL: env("PUBLIC_URL", "http://localhost:8080"), RealmName: env("REALM_NAME", "Azeroth"), RealmAddress: env("REALM_ADDRESS", "logon.example.com"),
+		PublicURL: env("PUBLIC_URL", "http://localhost:8080"), RealmName: env("REALM_NAME", "Azeroth"), RealmAddress: env("REALM_ADDRESS", "logon.example.com"), RealmKey: env("REALM_KEY", "default"),
 		PortalName: env("PORTAL_NAME", env("REALM_NAME", "Azeroth")), BrandMark: env("BRAND_MARK", "A"),
 		PortalTagline: env("PORTAL_TAGLINE", "A timeless realm, shaped by its community. Forge alliances, conquer raids, and write your story."),
 		ExpansionName: env("EXPANSION_NAME", "Wrath of the Lich King"), ClientVersion: env("CLIENT_VERSION", "3.3.5a"), ClientBuild: env("CLIENT_BUILD", "12340"),
@@ -125,6 +157,7 @@ func Load() (Config, error) {
 	if err := loadCustomization(&c); err != nil {
 		return c, err
 	}
+	c.DefaultRealmKey = c.RealmKey
 	if c.EnableSetup && (len(c.SetupToken) < 16 || len(c.SetupToken) > 256) {
 		return c, fmt.Errorf("SETUP_TOKEN must contain 16–256 characters when setup is enabled")
 	}

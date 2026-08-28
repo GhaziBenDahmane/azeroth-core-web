@@ -50,7 +50,7 @@ All request-derived values are passed as MySQL parameters. The only values inter
 
 ## Residual risks and deployment requirements
 
-1. Wowhead's JavaScript and asset CDN is a third-party runtime dependency. A compromise or incompatible API change affects the armory model viewer. CSP restricts it to Wowhead's asset host, but self-hosted reviewed assets are safer.
+1. Wowhead's JavaScript and asset CDN and the pinned jQuery CDN dependency are third-party runtime dependencies. A compromise or incompatible API change affects the armory model viewer. CSP restricts scripts to the required hosts, and jQuery is protected by subresource integrity, but self-hosted reviewed assets are safer.
 2. SOAP itself has no idempotency key. Ambiguous failures enter manual review; staff should inspect worldserver/mail logs before retrying.
 3. TOTP secrets are stored in the portal database. Protect database backups and access as production credentials.
 4. Terminate TLS at a trusted proxy, enable secure cookies, firewall SOAP/MySQL, rotate the admin token, and use the least-privilege grants documented in the README.

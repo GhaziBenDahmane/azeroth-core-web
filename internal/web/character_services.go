@@ -119,7 +119,7 @@ func (s *Server) characterService(w http.ResponseWriter, r *http.Request) {
 	if len(response) > 500 {
 		response = response[:500]
 	}
-	_, _ = s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_character_services(account_id,character_guid,action,character_name,success,response) VALUES(?,?,?,?,?,?)", a.ID, guid, in.Action, name, success, response)
+	_, _ = s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_character_services(account_id,character_guid,realm_key,action,character_name,success,response) VALUES(?,?,?,?,?,?,?)", a.ID, guid, s.c.RealmKey, in.Action, name, success, response)
 	if cmdErr != nil {
 		problem(w, 502, "AzerothCore rejected the character service")
 		return

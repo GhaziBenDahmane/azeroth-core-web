@@ -25,6 +25,8 @@ S6 and S7 use their matching Gladiator off-pieces, jewelry, and weapons. Every P
 
 Gems and enchantments are intentionally delivered as items. AzerothCore's standard `send items` command cannot safely create an already-enchanted, pre-socketed item instance. The player equips the armor and applies the supplied gems and scrolls in game. Physical dual-wield packages receive two weapon enchant scrolls.
 
-Bundles larger than one mailbox message are split into groups of twelve attachments. The entire order remains in `review` after an ambiguous SOAP failure so staff can inspect already-sent mail before retrying.
+Level 80 packages also set every weapon and defense skill already learned by the character to 400. The character must remain offline during delivery. The portal does not grant weapon proficiencies that the class has not learned or cannot use.
+
+Bundles larger than one mailbox message are split by the real `item_template.stackable` limits and sent in groups of at most twelve attachment stacks. The entire order remains in `review` after an ambiguous SOAP failure so staff can inspect already-sent mail before retrying.
 
 If any required set piece or supply cannot be resolved in the installed world database, that package is not created. Startup logs report the number of complete packages loaded. This fail-closed behavior prevents mislabeled or partially populated products.

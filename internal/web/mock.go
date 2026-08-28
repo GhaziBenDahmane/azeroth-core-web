@@ -52,7 +52,7 @@ var mockProducts = buildMockProducts()
 
 func buildMockProducts() []product {
 	products := []product{
-		{ID: 1, ItemID: 49284, Quantity: 1, Price: 120, Name: "Swift Spectral Tiger", Description: "A rare spectral mount delivered directly through in-game mail.", Category: "Mounts"},
+		{ID: 1, ItemID: 49284, Quantity: 1, Price: 120, Name: "Reins of the Swift Spectral Tiger", Description: "The WotLK mount item, delivered directly through in-game mail.", Category: "Mounts"},
 		{ID: 2, ItemID: 49623, Quantity: 1, Price: 85, Name: "Shadowmourne", Description: "A legendary two-handed axe for the realm's mightiest champions.", Category: "Weapons"},
 		{ID: 3, ItemID: 51809, Quantity: 1, Price: 45, Name: "Portable Hole", Description: "A spacious 24-slot bag for long expeditions across Northrend.", Category: "Utility"},
 		{ID: 4, ItemID: 23713, Quantity: 1, Price: 60, Name: "Hippogryph Hatchling", Description: "A loyal companion from the forests of Feralas.", Category: "Companions"},
@@ -116,7 +116,7 @@ func (s *Server) mockHandler() http.Handler {
 	m.HandleFunc("GET /api/status", func(w http.ResponseWriter, r *http.Request) {
 		cfg := s.runtimeSettings(r)
 		active, message := s.maintenanceActive(r)
-		jsonOut(w, 200, map[string]any{"online": true, "realm": cfg.RealmName, "address": cfg.RealmAddress, "shopDelivery": true, "portal": true, "database": true, "soapConfigured": true, "maintenance": active, "maintenanceMessage": message, "checkedAt": time.Now(), "demo": true})
+		jsonOut(w, 200, map[string]any{"online": true, "realm": cfg.RealmName, "address": cfg.RealmAddress, "maintenance": active, "maintenanceMessage": message, "checkedAt": time.Now(), "demo": true})
 	})
 	m.HandleFunc("POST /api/auth/register", s.feature(s.c.EnableRegistration, "Registration", s.mockRegister))
 	m.HandleFunc("POST /api/auth/login", s.mockLogin)
@@ -162,6 +162,7 @@ func (s *Server) mockHandler() http.Handler {
 	m.HandleFunc("POST /api/tickets", s.feature(s.c.EnableSupport, "Support", s.mockCreateTicket))
 	m.HandleFunc("POST /api/admin/credits", s.feature(s.c.EnableAdminPanel, "Administration", s.rate(30, time.Minute, s.mockCredits)))
 	m.HandleFunc("GET /api/admin/orders", s.feature(s.c.EnableAdminPanel, "Administration", s.mockAdminOrders))
+	m.HandleFunc("GET /api/admin/status", s.feature(s.c.EnableAdminPanel, "Administration", s.mockAdminStatus))
 	m.HandleFunc("GET /api/admin/ledger", s.feature(s.c.EnableAdminPanel, "Administration", func(w http.ResponseWriter, _ *http.Request) {
 		jsonOut(w, 200, map[string]any{"entries": []map[string]any{{"id": 1, "Actor": "DEMO", "Target": "DEMO", "Amount": 500, "Reason": "Demo starting balance", "Created": time.Now().Add(-48 * time.Hour)}}})
 	}))
@@ -445,6 +446,16 @@ func (s *Server) mockOrders(w http.ResponseWriter, r *http.Request) {
 	orders := append([]map[string]any(nil), s.mock.orders...)
 	s.mock.mu.Unlock()
 	jsonOut(w, 200, map[string]any{"orders": orders})
+}
+
+func (s *Server) mockAdminStatus(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireGM(r); !ok {
+		problem(w, http.StatusForbidden, "GM access required")
+		return
+	}
+	cfg := s.runtimeSettings(r)
+	active, message := s.maintenanceActive(r)
+	jsonOut(w, http.StatusOK, map[string]any{"online": true, "realm": cfg.RealmName, "address": cfg.RealmAddress, "shopDelivery": true, "portal": true, "database": true, "soapConfigured": true, "maintenance": active, "maintenanceMessage": message, "checkedAt": time.Now(), "demo": true})
 }
 
 func (s *Server) mockTickets(w http.ResponseWriter, r *http.Request) {

@@ -19,7 +19,7 @@ func (s *Server) adminOrders(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusForbidden, "GM access required")
 		return
 	}
-	rows, err := s.s.Auth.QueryContext(r.Context(), `SELECT o.id,a.username,o.character_guid,p.name,o.total,o.status,o.attempts,o.error_message,o.created_at FROM portal_orders o JOIN portal_products p ON p.id=o.product_id JOIN `+"`"+s.c.AuthDB+"`"+`.account a ON a.id=o.account_id ORDER BY o.id DESC LIMIT 100`)
+	rows, err := s.s.Auth.QueryContext(r.Context(), `SELECT o.id,a.username,o.character_guid,p.name,o.total,o.status,o.attempts,o.error_message,o.created_at FROM portal_orders o JOIN portal_products p ON p.id=o.product_id JOIN `+"`"+s.c.AuthDB+"`"+`.account a ON a.id=o.account_id WHERE o.realm_key=? ORDER BY o.id DESC LIMIT 100`, s.c.RealmKey)
 	if err != nil {
 		problem(w, 500, "Could not load orders")
 		return
@@ -283,7 +283,7 @@ func (s *Server) adminModeration(w http.ResponseWriter, r *http.Request) {
 		problem(w, 503, "Realm administration is not configured")
 		return
 	}
-	logResult, err := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_moderation_log(actor_account_id,target_account_id,target,action,duration,reason,status) VALUES(?,?,?,?,?,?,'review')", actor.ID, targetAccountID, in.Target, in.Action, in.Duration, in.Reason)
+	logResult, err := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_moderation_log(actor_account_id,target_account_id,realm_key,target,action,duration,reason,status) VALUES(?,?,?,?,?,?,?,'review')", actor.ID, targetAccountID, s.c.RealmKey, in.Target, in.Action, in.Duration, in.Reason)
 	if err != nil {
 		problem(w, 500, "Could not create moderation audit entry")
 		return
@@ -313,7 +313,7 @@ func (s *Server) adminModerationLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := s.s.Auth.QueryContext(r.Context(), fmt.Sprintf(`SELECT m.id,a.username,m.target,m.action,m.duration,m.reason,m.status,m.error_message,m.created_at
-		FROM portal_moderation_log m JOIN %s.account a ON a.id=m.actor_account_id ORDER BY m.id DESC LIMIT 100`, s.c.AuthDB))
+		FROM portal_moderation_log m JOIN %s.account a ON a.id=m.actor_account_id WHERE m.realm_key=? ORDER BY m.id DESC LIMIT 100`, s.c.AuthDB), s.c.RealmKey)
 	if err != nil {
 		problem(w, 500, "Could not load moderation history")
 		return

@@ -17,6 +17,7 @@ type siteSettings struct {
 	BrandMark          string     `json:"brandMark"`
 	Tagline            string     `json:"tagline"`
 	RealmAddress       string     `json:"realmAddress"`
+	ExperienceRate     string     `json:"experienceRate"`
 	DownloadURL        string     `json:"downloadUrl"`
 	CommunityURL       string     `json:"communityUrl"`
 	TermsURL           string     `json:"termsUrl"`
@@ -67,9 +68,11 @@ var couponCodePattern = regexp.MustCompile(`^[A-Z0-9][A-Z0-9_-]{2,39}$`)
 
 func boolPtr(v bool) *bool { return &v }
 
+func (s *Server) siteSettingsKey() string { return "site_config:" + s.c.RealmKey }
+
 func (s *Server) defaultSiteSettings() siteSettings {
 	return siteSettings{PortalName: s.c.PortalName, RealmName: s.c.RealmName, BrandMark: s.c.BrandMark, Tagline: s.c.PortalTagline,
-		RealmAddress: s.c.RealmAddress, DownloadURL: s.c.DownloadURL, CommunityURL: s.c.CommunityURL, TermsURL: s.c.TermsURL, PrivacyURL: s.c.PrivacyURL,
+		RealmAddress: s.c.RealmAddress, ExperienceRate: s.c.ExperienceRate, DownloadURL: s.c.DownloadURL, CommunityURL: s.c.CommunityURL, TermsURL: s.c.TermsURL, PrivacyURL: s.c.PrivacyURL,
 		ThemePrimary: s.c.ThemePrimary, ThemeSecondary: s.c.ThemeSecondary, ThemeAccent: s.c.ThemeAccent, ThemeBackground: s.c.ThemeBackground,
 		Registration: boolPtr(s.c.EnableRegistration), Armory: boolPtr(s.c.EnableArmory), Rankings: boolPtr(s.c.EnableRankings), Guilds: boolPtr(s.c.EnableGuilds),
 		Realm: boolPtr(s.c.EnableRealmStatus), Shop: boolPtr(s.c.EnableShop), Support: boolPtr(s.c.EnableSupport), Admin: boolPtr(s.c.EnableAdminPanel), GMConsole: boolPtr(s.c.EnableGMConsole)}
@@ -86,9 +89,16 @@ func (s *Server) runtimeSettings(ctx *http.Request) siteSettings {
 		return base
 	}
 	var raw string
-	if s.s.Auth.QueryRowContext(ctx.Context(), "SELECT setting_value FROM portal_settings WHERE setting_key='site_config'").Scan(&raw) == nil {
+	if s.s.Auth.QueryRowContext(ctx.Context(), "SELECT setting_value FROM portal_settings WHERE setting_key=?", s.siteSettingsKey()).Scan(&raw) != nil && s.c.RealmKey == "default" {
+		_ = s.s.Auth.QueryRowContext(ctx.Context(), "SELECT setting_value FROM portal_settings WHERE setting_key='site_config'").Scan(&raw)
+	}
+	if raw != "" {
 		var stored siteSettings
 		if json.Unmarshal([]byte(raw), &stored) == nil && stored.PortalName != "" {
+			// Preserve compatibility with site_config JSON saved before this setting existed.
+			if strings.TrimSpace(stored.ExperienceRate) == "" {
+				stored.ExperienceRate = base.ExperienceRate
+			}
 			return stored
 		}
 	}
@@ -179,23 +189,26 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		s.mock.mu.Unlock()
 	} else {
 		raw, _ := json.Marshal(in)
-		if _, err := s.s.Auth.ExecContext(r.Context(), `INSERT INTO portal_settings(setting_key,setting_value) VALUES('site_config',?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)`, string(raw)); err != nil {
+		if _, err := s.s.Auth.ExecContext(r.Context(), `INSERT INTO portal_settings(setting_key,setting_value) VALUES(?,?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)`, s.siteSettingsKey(), string(raw)); err != nil {
 			problem(w, 500, "Could not save settings")
 			return
 		}
-		_, _ = s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_admin_audit(actor_account_id,action,target,details) VALUES(?,'settings.update','site_config',?)", a.ID, "Runtime portal configuration updated")
+		_, _ = s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_admin_audit(actor_account_id,action,target,details) VALUES(?,'settings.update',?,?)", a.ID, s.siteSettingsKey(), "Runtime portal configuration updated")
 	}
 	jsonOut(w, 200, map[string]bool{"ok": true})
 }
 
 func validateSiteSettings(in siteSettings) error {
-	for _, v := range []string{in.PortalName, in.RealmName, in.Tagline, in.RealmAddress, in.MaintenanceMessage} {
+	for _, v := range []string{in.PortalName, in.RealmName, in.Tagline, in.RealmAddress, in.ExperienceRate, in.MaintenanceMessage} {
 		if len(v) > 500 {
 			return fmt.Errorf("configuration text is too long")
 		}
 	}
 	if strings.TrimSpace(in.PortalName) == "" || strings.TrimSpace(in.RealmName) == "" || strings.TrimSpace(in.RealmAddress) == "" {
 		return fmt.Errorf("portal name, realm name, and realm address are required")
+	}
+	if strings.TrimSpace(in.ExperienceRate) == "" || len(in.ExperienceRate) > 30 {
+		return fmt.Errorf("experience rate is required and must be at most 30 characters")
 	}
 	if len(in.BrandMark) < 1 || len(in.BrandMark) > 3 {
 		return fmt.Errorf("brand mark must contain 1–3 characters")

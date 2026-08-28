@@ -28,7 +28,7 @@ func (s *Server) tickets(w http.ResponseWriter, r *http.Request) {
 		problem(w, 401, "Sign in required")
 		return
 	}
-	rows, err := s.s.Auth.QueryContext(r.Context(), "SELECT id,character_guid,subject,message,status,response,created_at,updated_at FROM portal_support_tickets WHERE account_id=? ORDER BY id DESC LIMIT 50", a.ID)
+	rows, err := s.s.Auth.QueryContext(r.Context(), "SELECT id,character_guid,subject,message,status,response,created_at,updated_at FROM portal_support_tickets WHERE account_id=? AND realm_key=? ORDER BY id DESC LIMIT 50", a.ID, s.c.RealmKey)
 	if err != nil {
 		problem(w, 500, "Could not load tickets")
 		return
@@ -70,7 +70,7 @@ func (s *Server) createTicket(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	res, err := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_support_tickets(account_id,character_guid,subject,message,response) VALUES(?,?,?,?,?)", a.ID, in.CharacterGUID, in.Subject, in.Message, "")
+	res, err := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_support_tickets(account_id,character_guid,realm_key,subject,message,response) VALUES(?,?,?,?,?,?)", a.ID, in.CharacterGUID, s.c.RealmKey, in.Subject, in.Message, "")
 	if err != nil {
 		problem(w, 500, "Could not create ticket")
 		return
@@ -84,7 +84,7 @@ func (s *Server) adminTickets(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "GM access required")
 		return
 	}
-	rows, err := s.s.Auth.QueryContext(r.Context(), fmt.Sprintf(`SELECT t.id,t.account_id,a.username,t.character_guid,t.subject,t.message,t.status,t.response,COALESCE(g.username,''),t.created_at,t.updated_at FROM portal_support_tickets t JOIN %s.account a ON a.id=t.account_id LEFT JOIN %s.account g ON g.id=t.gm_account_id ORDER BY FIELD(t.status,'open','answered','closed'),t.id DESC LIMIT 100`, s.c.AuthDB, s.c.AuthDB))
+	rows, err := s.s.Auth.QueryContext(r.Context(), fmt.Sprintf(`SELECT t.id,t.account_id,a.username,t.character_guid,t.subject,t.message,t.status,t.response,COALESCE(g.username,''),t.created_at,t.updated_at FROM portal_support_tickets t JOIN %s.account a ON a.id=t.account_id LEFT JOIN %s.account g ON g.id=t.gm_account_id WHERE t.realm_key=? ORDER BY FIELD(t.status,'open','answered','closed'),t.id DESC LIMIT 100`, s.c.AuthDB, s.c.AuthDB), s.c.RealmKey)
 	if err != nil {
 		problem(w, 500, "Could not load tickets")
 		return
@@ -125,7 +125,7 @@ func (s *Server) adminTicketUpdate(w http.ResponseWriter, r *http.Request) {
 		problem(w, 422, "An answer is required and must not exceed 4000 characters")
 		return
 	}
-	res, err := s.s.Auth.ExecContext(r.Context(), "UPDATE portal_support_tickets SET status=?,response=?,gm_account_id=? WHERE id=?", in.Status, in.Response, a.ID, id)
+	res, err := s.s.Auth.ExecContext(r.Context(), "UPDATE portal_support_tickets SET status=?,response=?,gm_account_id=? WHERE id=? AND realm_key=?", in.Status, in.Response, a.ID, id, s.c.RealmKey)
 	if err != nil {
 		problem(w, 500, "Could not update ticket")
 		return

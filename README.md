@@ -27,7 +27,7 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - Categorized shop with full product CRUD, WotLK item autocomplete, equipment/bag preview, scheduling, purchase limits, and limited-use coupons
 - Durable queued fulfillment through AzerothCore SOAP, with review/refund controls
 - Realm status, faction population, guild directory, and guild rosters
-- Database-backed news/announcement editor, live website configuration, scheduled maintenance, and a public status page
+- Database-backed news/announcement editor, live website configuration, scheduled maintenance, and GM-only service monitoring
 - Health, readiness, and Prometheus metrics endpoints
 - Responsive, dependency-light Astro UI
 - One multi-stage Docker image; no Node runtime in production
@@ -112,7 +112,7 @@ docker run --rm -p 8080:8080 -e MOCK_MODE=true azeroth-portal:latest
 
 Sign in with `DEMO` / `demo1234`. Demo mode includes characters, armory equipment, 500 credits, products, and simulated mail delivery. Its state is intentionally held in memory and resets when the process stops.
 
-Equipment names, levels, armor, and stats come from AzerothCore. The center paper-doll loads Wowhead's WebGL model viewer with the character's race/gender model and equipped display IDs. Since the world database stores client display IDs rather than icon filenames, the browser also resolves missing live-server icons through Wowhead's tooltip endpoint and caches the result locally. Demo icons are bundled as known icon names. Raid dates come only from `character_achievement`; AzerothCore's current-lockout encounter mask is intentionally not presented as permanent progression history.
+Equipment names, levels, armor, and stats come from AzerothCore. The center paper-doll loads pinned jQuery 3.7.1 before Wowhead's WebGL model viewer, then supplies the character's race/gender model and equipped display IDs. Since the world database stores client display IDs rather than icon filenames, the browser also resolves missing live-server icons through Wowhead's tooltip endpoint and caches the result locally. Demo icons are bundled as known icon names. Raid dates come only from `character_achievement`; AzerothCore's current-lockout encounter mask is intentionally not presented as permanent progression history.
 
 The container is the portal only. AzerothCore's existing auth, characters, world databases and worldserver stay external.
 
@@ -209,7 +209,7 @@ curl -X POST http://localhost:8080/api/admin/products \
 
 Use item IDs approved for your exact AzerothCore world database. Gems and enchant scrolls are ordinary bundle items and arrive in the same mail; the portal deliberately does not write enchantment data directly into character inventory tables.
 
-The default specialization-aware S6, S7, and T8 catalog is populated automatically from the installed AzerothCore `item_template` table. It includes each five-piece armor set, all matching off-pieces, jewelry, trinkets, class-appropriate weapons and relics, a phase-appropriate gem kit, a full enchant kit, and level 80. See [CATALOG.md](CATALOG.md) for the exact behavior and safety rationale.
+The default specialization-aware S6, S7, and T8 catalog is populated automatically from the installed AzerothCore `item_template` table. It includes each five-piece armor set, all matching off-pieces, jewelry, trinkets, class-appropriate weapons and relics, a phase-appropriate gem kit, a full enchant kit, level 80, and maximum rank 400 for the character's learned weapon and defense skills. See [CATALOG.md](CATALOG.md) for the exact behavior and safety rationale.
 
 Credits can be granted through the audited GM console. To sell fixed credit packs, configure the five `STRIPE_*` variables and point a Stripe webhook at `/api/billing/webhook` for `checkout.session.completed` events.
 
@@ -223,7 +223,7 @@ Purchases commit the debit and an immutable item snapshot before entering the de
 
 Operational probes are available at `/healthz`, `/readyz`, and `/metrics`.
 
-The public `/status` page reports portal, database, realm, and shop-delivery state. GMs can edit branding and links, disable feature modules, schedule maintenance, publish announcements, manage products, and create coupons from the account dashboard. The catalog editor searches the installed WotLK `item_template`, displays equipment in a slot preview, and supports arbitrary item and bag quantities alongside gold, services, schedules, limits, and credit pricing. Environment feature flags remain hard security gates; saved settings in `portal_settings` take effect immediately and can be reset by deleting the `site_config` row.
+The player-facing `/realm` page reports realm population and availability. Technical portal, database, realm, and delivery health is restricted to the Monitoring section of `/admin`. GMs can edit branding and links, disable feature modules, schedule maintenance, publish announcements, manage products, and create coupons from the dedicated admin panel. The catalog editor searches the installed WotLK `item_template`, displays equipment in a slot preview, and supports arbitrary item and bag quantities alongside gold, services, schedules, limits, and credit pricing. Environment feature flags remain hard security gates; saved settings in `portal_settings` take effect immediately and can be reset by deleting the `site_config` row.
 
 Character services verify account ownership and offline state before issuing a fixed, allow-listed AzerothCore command. The browser never supplies a raw command. Every attempted real service is recorded in `portal_character_services`.
 
@@ -253,6 +253,8 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `COOKIE_SECURE` | Require HTTPS for session cookies; mandatory with an HTTPS `PUBLIC_URL` | `false` |
 | `TRUST_PROXY` | Trust proxy-provided client IP headers for sessions and rate limiting | `false` |
 | `REALM_NAME`, `REALM_ADDRESS` | UI realm identity and realmlist address | `Azeroth`, example host |
+| `REALM_KEY` | Stable key identifying this realm in the frontend realm switcher | `default` |
+| `REALMS_JSON` | Optional in-process realm definitions with per-realm ID, character/world DSNs and SOAP connection; omitted fields inherit the single-realm variables | current realm only |
 | `PORTAL_NAME`, `BRAND_MARK` | Site-wide display name and short sigil (up to 3 characters recommended) | realm name, `A` |
 | `PORTAL_TAGLINE`, `FOOTER_TEXT` | Home-page introduction and footer copy | community-oriented defaults |
 | `EXPANSION_NAME`, `CLIENT_VERSION`, `CLIENT_BUILD` | Client information shown in connection instructions | WotLK, `3.3.5a`, `12340` |
@@ -286,7 +288,9 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 
 Set `PUBLIC_URL=https://your-domain`, `COOKIE_SECURE=true`, terminate TLS at your proxy, and keep the portal and SOAP ports behind a firewall in production. Set `TRUST_PROXY=true` only when the portal cannot be reached directly and your proxy overwrites (rather than appends to) incoming client-IP headers.
 
-The GM browser console is disabled by default. When enabled, commands are executed using the configured SOAP account, so its RBAC permissions are the real upper bound. Every attempt is stored in `portal_command_log`; password-bearing account commands are redacted in that log. Prefer the prefix allow-list and enable `GM_CONSOLE_ALLOW_ALL=true` only for trusted level-3 operators with 2FA.
+For multiple realms, set `REALMS_JSON` and run the same single portal container. The auth database, accounts, sessions, credits, and catalog are shared; each realm entry selects its own character/world database, realm ID, address, XP rate, SOAP endpoint, and optional start webhook. The selected realm is validated by the backend and remembered in a secure same-site cookie. Every page and API call is routed to that realm, while recovery/setup tokens are discarded when switching realms.
+
+GM tools live in the dedicated `/admin` panel and are only exposed to authenticated GM accounts. Its catalog view provides search, status filtering, sortable columns, and the full product/package editor. The browser command console is disabled by default. When enabled, commands are executed using the configured SOAP account, so its RBAC permissions are the real upper bound. Every attempt is stored in `portal_command_log`; password-bearing account commands are redacted in that log. Prefer the prefix allow-list and enable `GM_CONSOLE_ALLOW_ALL=true` only for trusted level-3 operators with 2FA.
 
 `UI_TEXT_JSON` currently supports the shared keys `nav.home`, `nav.armory`, `nav.rankings`, `nav.guilds`, `nav.realm`, `nav.shop`, `action.signIn`, `action.register`, `action.account`, `footer.community`, `footer.terms`, `footer.privacy`, `home.heroLine1`, `home.heroLine2`, `home.createAccount`, `home.howToConnect`, `news.eyebrow`, `news.title`, and `news.readMore`. Values are inserted as text, never HTML.
 

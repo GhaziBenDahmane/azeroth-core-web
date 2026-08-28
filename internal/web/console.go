@@ -102,7 +102,7 @@ func (s *Server) adminConsoleExecute(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusForbidden, "Command is not included in GM_CONSOLE_ALLOWED_PREFIXES")
 		return
 	}
-	result, err := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_command_log(actor_account_id,command,response,success,ip_address) VALUES(?,?,'Pending',0,?)", actor.ID, auditConsoleCommand(command), s.clientIP(r))
+	result, err := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_command_log(actor_account_id,realm_key,command,response,success,ip_address) VALUES(?,?,?,'Pending',0,?)", actor.ID, s.c.RealmKey, auditConsoleCommand(command), s.clientIP(r))
 	if err != nil {
 		problem(w, http.StatusInternalServerError, "Could not create command audit entry")
 		return
@@ -129,7 +129,7 @@ func (s *Server) adminConsoleHistory(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusForbidden, "GM console access required")
 		return
 	}
-	rows, err := s.s.Auth.QueryContext(r.Context(), "SELECT l.id,a.username,l.command,l.response,l.success,l.ip_address,l.created_at FROM portal_command_log l JOIN `"+s.c.AuthDB+"`.account a ON a.id=l.actor_account_id ORDER BY l.id DESC LIMIT 50")
+	rows, err := s.s.Auth.QueryContext(r.Context(), "SELECT l.id,a.username,l.command,l.response,l.success,l.ip_address,l.created_at FROM portal_command_log l JOIN `"+s.c.AuthDB+"`.account a ON a.id=l.actor_account_id WHERE l.realm_key=? ORDER BY l.id DESC LIMIT 50", s.c.RealmKey)
 	if err != nil {
 		problem(w, http.StatusInternalServerError, "Could not load command history")
 		return
