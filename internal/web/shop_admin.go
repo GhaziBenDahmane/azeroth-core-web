@@ -24,7 +24,7 @@ func validateManagedProduct(p product) error {
 	if strings.TrimSpace(p.Name) == "" || len(p.Name) > 100 || len(p.Description) > 500 || p.Price == 0 {
 		return fmt.Errorf("name, price, and valid field lengths are required")
 	}
-	if p.Price > 10_000_000 || p.Quantity > 1000 || strings.TrimSpace(p.Category) == "" || len(p.Category) > 40 || len(p.Tier) > 30 || p.PerAccountLimit > 100_000 || p.ServiceLevel > 80 {
+	if p.Price > 10_000_000 || (p.SalePrice >= p.Price && p.SalePrice != 0) || p.Quantity > 1000 || strings.TrimSpace(p.Category) == "" || len(p.Category) > 40 || len(p.Tier) > 30 || p.PerAccountLimit > 100_000 || p.StockLimit > 1_000_000 || p.ServiceLevel > 80 {
 		return fmt.Errorf("product price, quantity, category, or purchase limit is out of range")
 	}
 	if p.ClassID == 10 || p.ClassID > 11 {
@@ -100,7 +100,7 @@ func (s *Server) validateProductItems(ctx context.Context, p product) error {
 }
 
 func (s *Server) adminItemSearch(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireGM(r); !ok {
+	if _, ok := s.requireStaffPermission(r, "commerce"); !ok {
 		problem(w, 403, "GM access required")
 		return
 	}
@@ -133,7 +133,7 @@ func (s *Server) adminItemSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminProductDetail(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireGM(r); !ok {
+	if _, ok := s.requireStaffPermission(r, "commerce"); !ok {
 		problem(w, 403, "GM access required")
 		return
 	}
@@ -160,7 +160,7 @@ func (s *Server) adminProductDetail(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) loadManagedProduct(ctx context.Context, id uint32) (product, error) {
 	var p product
-	err := s.s.Auth.QueryRowContext(ctx, "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit FROM portal_products WHERE id=?", id).Scan(&p.ID, &p.Name, &p.Description, &p.ItemID, &p.Quantity, &p.Price, &p.Category, &p.ImageURL, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold, &p.ServiceAction, &p.Active, &p.StartsAt, &p.EndsAt, &p.PerAccountLimit)
+	err := s.s.Auth.QueryRowContext(ctx, "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit,featured,sale_price,stock_limit,sold_count,category_order FROM portal_products WHERE id=? AND realm_key=?", id, s.c.RealmKey).Scan(&p.ID, &p.Name, &p.Description, &p.ItemID, &p.Quantity, &p.Price, &p.Category, &p.ImageURL, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold, &p.ServiceAction, &p.Active, &p.StartsAt, &p.EndsAt, &p.PerAccountLimit, &p.Featured, &p.SalePrice, &p.StockLimit, &p.SoldCount, &p.CategoryOrder)
 	if err != nil {
 		return p, err
 	}
@@ -217,7 +217,7 @@ func (s *Server) enrichBundleItems(ctx context.Context, items []bundleItem) erro
 }
 
 func (s *Server) adminProductUpdate(w http.ResponseWriter, r *http.Request) {
-	a, ok := s.requireGM(r)
+	a, ok := s.requireStaffPermission(r, "commerce")
 	if !ok {
 		problem(w, 403, "GM access required")
 		return
@@ -250,11 +250,11 @@ func (s *Server) adminProductUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	var exists int
-	if e = tx.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM portal_products WHERE id=? FOR UPDATE", id).Scan(&exists); e != nil || exists == 0 {
+	if e = tx.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM portal_products WHERE id=? AND realm_key=? FOR UPDATE", id, s.c.RealmKey).Scan(&exists); e != nil || exists == 0 {
 		problem(w, 404, "Product not found")
 		return
 	}
-	_, e = tx.ExecContext(r.Context(), `UPDATE portal_products SET name=?,description=?,item_id=?,quantity=?,price=?,category=?,image_url=?,class_id=?,tier_label=?,service_level=?,gold_amount=?,service_action=?,active=?,starts_at=?,ends_at=?,per_account_limit=? WHERE id=?`, p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL, p.ClassID, p.Tier, p.ServiceLevel, p.Gold, p.ServiceAction, p.Active, p.StartsAt, p.EndsAt, p.PerAccountLimit, id)
+	_, e = tx.ExecContext(r.Context(), `UPDATE portal_products SET name=?,description=?,item_id=?,quantity=?,price=?,category=?,image_url=?,class_id=?,tier_label=?,service_level=?,gold_amount=?,service_action=?,active=?,starts_at=?,ends_at=?,per_account_limit=?,featured=?,sale_price=?,stock_limit=?,category_order=? WHERE id=? AND realm_key=?`, p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL, p.ClassID, p.Tier, p.ServiceLevel, p.Gold, p.ServiceAction, p.Active, p.StartsAt, p.EndsAt, p.PerAccountLimit, p.Featured, p.SalePrice, p.StockLimit, p.CategoryOrder, id, s.c.RealmKey)
 	if e != nil {
 		problem(w, 500, "Could not update product")
 		return
@@ -281,7 +281,7 @@ func (s *Server) adminProductUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminProductDelete(w http.ResponseWriter, r *http.Request) {
-	a, ok := s.requireGM(r)
+	a, ok := s.requireStaffPermission(r, "commerce")
 	if !ok {
 		problem(w, 403, "GM access required")
 		return
@@ -295,7 +295,7 @@ func (s *Server) adminProductDelete(w http.ResponseWriter, r *http.Request) {
 		s.mockAdminProductDelete(w, r)
 		return
 	}
-	res, e := s.s.Auth.ExecContext(r.Context(), "UPDATE portal_products SET active=0 WHERE id=?", id)
+	res, e := s.s.Auth.ExecContext(r.Context(), "UPDATE portal_products SET active=0 WHERE id=? AND realm_key=?", id, s.c.RealmKey)
 	if e != nil {
 		problem(w, 500, "Could not archive product")
 		return
@@ -340,7 +340,7 @@ func (s *Server) applyCoupon(r *http.Request, tx *sql.Tx, accountID uint32, raw 
 }
 
 func (s *Server) adminCoupons(w http.ResponseWriter, r *http.Request) {
-	a, ok := s.requireGM(r)
+	a, ok := s.requireStaffPermission(r, "commerce")
 	if !ok {
 		problem(w, 403, "GM access required")
 		return
@@ -405,7 +405,7 @@ func (s *Server) adminCoupons(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminCouponDelete(w http.ResponseWriter, r *http.Request) {
-	a, ok := s.requireGM(r)
+	a, ok := s.requireStaffPermission(r, "commerce")
 	if !ok {
 		problem(w, 403, "GM access required")
 		return
@@ -451,10 +451,10 @@ func (s *Server) mockAdminProductUpdate(w http.ResponseWriter, r *http.Request) 
 	}
 	s.mock.mu.Lock()
 	defer s.mock.mu.Unlock()
-	for i := range mockProducts {
-		if uint64(mockProducts[i].ID) == id {
+	for i := range s.mock.products {
+		if uint64(s.mock.products[i].ID) == id {
 			p.ID = uint32(id)
-			mockProducts[i] = p
+			s.mock.products[i] = p
 			jsonOut(w, 200, map[string]bool{"ok": true})
 			return
 		}
@@ -465,9 +465,9 @@ func (s *Server) mockAdminProductDelete(w http.ResponseWriter, r *http.Request) 
 	id, _ := strconv.ParseUint(r.PathValue("id"), 10, 32)
 	s.mock.mu.Lock()
 	defer s.mock.mu.Unlock()
-	for i := range mockProducts {
-		if uint64(mockProducts[i].ID) == id {
-			mockProducts[i].Active = false
+	for i := range s.mock.products {
+		if uint64(s.mock.products[i].ID) == id {
+			s.mock.products[i].Active = false
 			jsonOut(w, 200, map[string]bool{"ok": true})
 			return
 		}
@@ -517,7 +517,7 @@ func (s *Server) mockAdminProductDetail(w http.ResponseWriter, r *http.Request) 
 	id, _ := strconv.ParseUint(r.PathValue("id"), 10, 32)
 	s.mock.mu.Lock()
 	defer s.mock.mu.Unlock()
-	for _, original := range mockProducts {
+	for _, original := range s.mock.products {
 		if uint64(original.ID) != id {
 			continue
 		}

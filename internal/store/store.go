@@ -104,6 +104,8 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 category VARCHAR(40) NOT NULL DEFAULT 'Items', image_url VARCHAR(500) NOT NULL DEFAULT '', active TINYINT(1) NOT NULL DEFAULT 1,
 		 class_id TINYINT UNSIGNED NOT NULL DEFAULT 0, tier_label VARCHAR(30) NOT NULL DEFAULT '', service_level TINYINT UNSIGNED NOT NULL DEFAULT 0,
 		 gold_amount INT UNSIGNED NOT NULL DEFAULT 0, service_action VARCHAR(30) NOT NULL DEFAULT '',
+		 realm_key VARCHAR(64) NOT NULL DEFAULT 'default', featured TINYINT(1) NOT NULL DEFAULT 0,
+		 sale_price INT UNSIGNED NOT NULL DEFAULT 0, stock_limit INT UNSIGNED NOT NULL DEFAULT 0, sold_count INT UNSIGNED NOT NULL DEFAULT 0, category_order INT NOT NULL DEFAULT 0,
 		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_portal_products_active (active), UNIQUE KEY idx_portal_products_seed_key (seed_key)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_product_items (
 		 product_id INT UNSIGNED NOT NULL, item_id INT UNSIGNED NOT NULL, quantity INT UNSIGNED NOT NULL DEFAULT 1,
@@ -160,7 +162,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		`CREATE TABLE IF NOT EXISTS portal_news (
 		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(120) NOT NULL, summary VARCHAR(1000) NOT NULL DEFAULT '', url VARCHAR(500) NOT NULL DEFAULT '',
 		 kind ENUM('news','announcement','maintenance') NOT NULL DEFAULT 'news', publish_at DATETIME NULL, expires_at DATETIME NULL,
-		 active TINYINT(1) NOT NULL DEFAULT 1, created_by INT UNSIGNED NOT NULL DEFAULT 0,
+		 active TINYINT(1) NOT NULL DEFAULT 1, created_by INT UNSIGNED NOT NULL DEFAULT 0, realm_key VARCHAR(64) NOT NULL DEFAULT 'default',
 		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 		 INDEX idx_portal_news_publish (active,publish_at,expires_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS portal_coupons (
@@ -182,6 +184,22 @@ func (s *Store) Migrate(ctx context.Context) error {
 		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, actor_account_id INT UNSIGNED NOT NULL, action VARCHAR(50) NOT NULL,
 		 target VARCHAR(120) NOT NULL DEFAULT '', details VARCHAR(500) NOT NULL DEFAULT '', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		 INDEX idx_portal_admin_audit(actor_account_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS portal_daily_rewards (
+		 account_id INT UNSIGNED NOT NULL, realm_key VARCHAR(64) NOT NULL, claim_date DATE NOT NULL, credits INT UNSIGNED NOT NULL,
+		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(account_id,realm_key,claim_date)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS portal_vote_rewards (
+		 event_id VARCHAR(128) PRIMARY KEY, account_id INT UNSIGNED NOT NULL, realm_key VARCHAR(64) NOT NULL,
+		 credits INT UNSIGNED NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		 INDEX idx_portal_vote_account (account_id,realm_key,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS portal_referrals (
+		 account_id INT UNSIGNED PRIMARY KEY, code VARCHAR(40) NOT NULL, referred_by INT UNSIGNED NOT NULL DEFAULT 0,
+		 uses INT UNSIGNED NOT NULL DEFAULT 0, credits_earned INT UNSIGNED NOT NULL DEFAULT 0,
+		 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY idx_portal_referral_code(code)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS portal_raid_kills (
+		 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, realm_key VARCHAR(64) NOT NULL, guild_id INT UNSIGNED NOT NULL DEFAULT 0,
+		 guild_name VARCHAR(80) NOT NULL, raid VARCHAR(80) NOT NULL, boss VARCHAR(80) NOT NULL, difficulty VARCHAR(30) NOT NULL,
+		 duration_seconds INT UNSIGNED NOT NULL DEFAULT 0, killed_at DATETIME NOT NULL,
+		 INDEX idx_portal_raid_rank (realm_key,raid,difficulty,duration_seconds), INDEX idx_portal_raid_recent (realm_key,killed_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, q := range statements {
 		if _, err := s.Auth.ExecContext(ctx, q); err != nil {
@@ -207,6 +225,12 @@ func (s *Store) Migrate(ctx context.Context) error {
 		{"portal_products", "starts_at", "DATETIME NULL"},
 		{"portal_products", "ends_at", "DATETIME NULL"},
 		{"portal_products", "per_account_limit", "INT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_products", "realm_key", "VARCHAR(64) NOT NULL DEFAULT 'default'"},
+		{"portal_products", "featured", "TINYINT(1) NOT NULL DEFAULT 0"},
+		{"portal_products", "sale_price", "INT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_products", "stock_limit", "INT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_products", "sold_count", "INT UNSIGNED NOT NULL DEFAULT 0"},
+		{"portal_products", "category_order", "INT NOT NULL DEFAULT 0"},
 		{"portal_orders", "attempts", "INT UNSIGNED NOT NULL DEFAULT 0"},
 		{"portal_orders", "service_level", "TINYINT UNSIGNED NOT NULL DEFAULT 0"},
 		{"portal_orders", "gold_amount", "INT UNSIGNED NOT NULL DEFAULT 0"},
@@ -220,6 +244,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		{"portal_command_log", "realm_key", "VARCHAR(64) NOT NULL DEFAULT 'default'"},
 		{"portal_support_tickets", "realm_key", "VARCHAR(64) NOT NULL DEFAULT 'default'"},
 		{"portal_character_services", "realm_key", "VARCHAR(64) NOT NULL DEFAULT 'default'"},
+		{"portal_news", "realm_key", "VARCHAR(64) NOT NULL DEFAULT 'default'"},
 		{"portal_sessions", "last_seen_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"},
 		{"portal_sessions", "ip_address", "VARCHAR(45) NOT NULL DEFAULT ''"},
 		{"portal_sessions", "user_agent", "VARCHAR(255) NOT NULL DEFAULT ''"},
@@ -230,14 +255,23 @@ func (s *Store) Migrate(ctx context.Context) error {
 		}
 	}
 	if s.C.RealmKey == s.C.DefaultRealmKey && s.C.RealmKey != "default" {
-		for _, table := range []string{"portal_orders", "portal_moderation_log", "portal_command_log", "portal_support_tickets", "portal_character_services"} {
+		for _, table := range []string{"portal_products", "portal_news", "portal_orders", "portal_moderation_log", "portal_command_log", "portal_support_tickets", "portal_character_services"} {
 			if _, err := s.Auth.ExecContext(ctx, fmt.Sprintf("UPDATE `%s` SET realm_key=? WHERE realm_key='default'", table), s.C.RealmKey); err != nil {
 				return fmt.Errorf("portal legacy realm migration %s: %w", table, err)
 			}
 		}
 	}
+	if _, err := s.Auth.ExecContext(ctx, "UPDATE portal_products SET seed_key=CONCAT(?,':',seed_key) WHERE realm_key=? AND seed_key IS NOT NULL AND seed_key NOT LIKE '%:%'", s.C.RealmKey, s.C.RealmKey); err != nil {
+		return fmt.Errorf("portal product seed migration: %w", err)
+	}
 	if err := s.ensureIndex(ctx, "portal_orders", "idx_portal_orders_realm_status", "realm_key,status,id"); err != nil {
 		return fmt.Errorf("portal order realm index migration: %w", err)
+	}
+	if err := s.ensureIndex(ctx, "portal_products", "idx_portal_products_realm", "realm_key,active,category_order"); err != nil {
+		return fmt.Errorf("portal product realm index migration: %w", err)
+	}
+	if err := s.ensureIndex(ctx, "portal_news", "idx_portal_news_realm", "realm_key,active,publish_at"); err != nil {
+		return fmt.Errorf("portal news realm index migration: %w", err)
 	}
 	if _, err := s.Auth.ExecContext(ctx, `ALTER TABLE portal_orders MODIFY COLUMN status ENUM('pending','delivering','delivered','review','failed','refunded') NOT NULL DEFAULT 'pending'`); err != nil {
 		return fmt.Errorf("portal order status migration: %w", err)
@@ -298,10 +332,11 @@ func (s *Store) SeedDefaultServices(ctx context.Context) error {
 		{"service-faction-change", "Faction Change", "Choose a compatible race from the opposite faction on your next login.", "faction_change", 50},
 	}
 	for _, service := range services {
-		_, err := s.Auth.ExecContext(ctx, `INSERT INTO portal_products(seed_key,name,description,item_id,quantity,price,category,tier_label,service_action,active)
-			VALUES(?,?,?,0,0,?,'Services','Character',?,1)
+		seedKey := s.C.RealmKey + ":" + service.key
+		_, err := s.Auth.ExecContext(ctx, `INSERT INTO portal_products(seed_key,name,description,item_id,quantity,price,category,tier_label,service_action,active,realm_key)
+			VALUES(?,?,?,0,0,?,'Services','Character',?,1,?)
 			ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),price=VALUES(price),category=VALUES(category),tier_label=VALUES(tier_label),service_action=VALUES(service_action),active=1`,
-			service.key, service.name, service.description, service.price, service.action)
+			seedKey, service.name, service.description, service.price, service.action, s.C.RealmKey)
 		if err != nil {
 			return fmt.Errorf("seed %s: %w", service.key, err)
 		}

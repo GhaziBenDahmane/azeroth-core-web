@@ -1,280 +1,3092 @@
 const qs = (s, root = document) => root.querySelector(s);
 const qsa = (s, root = document) => [...root.querySelectorAll(s)];
 const page = document.body.dataset.page;
-const classes = {1:'Warrior',2:'Paladin',3:'Hunter',4:'Rogue',5:'Priest',6:'Death Knight',7:'Shaman',8:'Mage',9:'Warlock',11:'Druid'};
-const classSetPreviewItems = {1:46151,2:46156,3:46143,4:46125,5:46172,6:46115,7:46212,8:46129,9:46140,11:46161};
-const races = {1:'Human',2:'Orc',3:'Dwarf',4:'Night Elf',5:'Undead',6:'Tauren',7:'Gnome',8:'Troll',10:'Blood Elf',11:'Draenei'};
-const slots = {0:'Head',1:'Neck',2:'Shoulders',3:'Shirt',4:'Chest',5:'Waist',6:'Legs',7:'Feet',8:'Wrists',9:'Hands',10:'Ring',11:'Ring',12:'Trinket',13:'Trinket',14:'Back',15:'Main hand',16:'Off hand',17:'Ranged',18:'Tabard'};
-const qualityNames = {0:'Poor',1:'Common',2:'Uncommon',3:'Rare',4:'Epic',5:'Legendary'};
-const statNames = {1:'Health',3:'Agility',4:'Strength',5:'Intellect',6:'Spirit',7:'Stamina',12:'Defense Rating',13:'Dodge Rating',14:'Parry Rating',15:'Block Rating',16:'Melee Hit',17:'Ranged Hit',18:'Spell Hit',19:'Melee Critical Strike',20:'Ranged Critical Strike',21:'Spell Critical Strike',28:'Melee Haste',29:'Ranged Haste',30:'Spell Haste',31:'Hit Rating',32:'Critical Strike Rating',35:'Resilience Rating',36:'Haste Rating',37:'Expertise Rating',38:'Attack Power',45:'Spell Power',47:'Spell Penetration',48:'Block Value'};
-const iconBase = 'https://wow.zamimg.com/images/wow/icons/large/';
-const localItemIcon = '/images/item-placeholder.svg';
-const characterDisplays = {1:[49,50],2:[51,52],3:[53,54],4:[55,56],5:[57,58],6:[59,60],7:[1563,1564],8:[1478,1479],10:[15476,15475],11:[16125,16126]};
-const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-const requestedRealm = new URLSearchParams(location.search).get('realm')||'';
+const classes = {
+	1: "Warrior",
+	2: "Paladin",
+	3: "Hunter",
+	4: "Rogue",
+	5: "Priest",
+	6: "Death Knight",
+	7: "Shaman",
+	8: "Mage",
+	9: "Warlock",
+	11: "Druid",
+};
+const classSetPreviewItems = {
+	1: 46151,
+	2: 46156,
+	3: 46143,
+	4: 46125,
+	5: 46172,
+	6: 46115,
+	7: 46212,
+	8: 46129,
+	9: 46140,
+	11: 46161,
+};
+const races = {
+	1: "Human",
+	2: "Orc",
+	3: "Dwarf",
+	4: "Night Elf",
+	5: "Undead",
+	6: "Tauren",
+	7: "Gnome",
+	8: "Troll",
+	10: "Blood Elf",
+	11: "Draenei",
+};
+const slots = {
+	0: "Head",
+	1: "Neck",
+	2: "Shoulders",
+	3: "Shirt",
+	4: "Chest",
+	5: "Waist",
+	6: "Legs",
+	7: "Feet",
+	8: "Wrists",
+	9: "Hands",
+	10: "Ring",
+	11: "Ring",
+	12: "Trinket",
+	13: "Trinket",
+	14: "Back",
+	15: "Main hand",
+	16: "Off hand",
+	17: "Ranged",
+	18: "Tabard",
+};
+const qualityNames = {
+	0: "Poor",
+	1: "Common",
+	2: "Uncommon",
+	3: "Rare",
+	4: "Epic",
+	5: "Legendary",
+};
+const statNames = {
+	1: "Health",
+	3: "Agility",
+	4: "Strength",
+	5: "Intellect",
+	6: "Spirit",
+	7: "Stamina",
+	12: "Defense Rating",
+	13: "Dodge Rating",
+	14: "Parry Rating",
+	15: "Block Rating",
+	16: "Melee Hit",
+	17: "Ranged Hit",
+	18: "Spell Hit",
+	19: "Melee Critical Strike",
+	20: "Ranged Critical Strike",
+	21: "Spell Critical Strike",
+	28: "Melee Haste",
+	29: "Ranged Haste",
+	30: "Spell Haste",
+	31: "Hit Rating",
+	32: "Critical Strike Rating",
+	35: "Resilience Rating",
+	36: "Haste Rating",
+	37: "Expertise Rating",
+	38: "Attack Power",
+	45: "Spell Power",
+	47: "Spell Penetration",
+	48: "Block Value",
+};
+const iconBase = "https://wow.zamimg.com/images/wow/icons/large/";
+const localItemIcon = "/images/item-placeholder.svg";
+const characterDisplays = {
+	1: [49, 50],
+	2: [51, 52],
+	3: [53, 54],
+	4: [55, 56],
+	5: [57, 58],
+	6: [59, 60],
+	7: [1563, 1564],
+	8: [1478, 1479],
+	10: [15476, 15475],
+	11: [16125, 16126],
+};
+const esc = (value) =>
+	String(value ?? "").replace(
+		/[&<>'"]/g,
+		(c) =>
+			({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[
+				c
+			],
+	);
+const requestedRealm = new URLSearchParams(location.search).get("realm") || "";
 
-function setTheme(theme){
-  document.documentElement.dataset.theme=theme;
-  localStorage.setItem('portal-theme',theme);
-  const toggle=qs('#theme-toggle'),light=theme==='light';
-  if(toggle){toggle.setAttribute('aria-label',light?'Use dark mode':'Use light mode');toggle.title=light?'Use dark mode':'Use light mode'}
-}
-setTheme(document.documentElement.dataset.theme||'dark');
-qs('#theme-toggle')?.addEventListener('click',()=>setTheme(document.documentElement.dataset.theme==='light'?'dark':'light'));
-const accountMenu=qs('.account-menu'),accountTrigger=qs('.account-menu-trigger');
-accountTrigger?.addEventListener('click',event=>{event.stopPropagation();const open=accountMenu.classList.toggle('open');accountTrigger.setAttribute('aria-expanded',String(open))});
-document.addEventListener('click',event=>{if(accountMenu&&!accountMenu.contains(event.target)){accountMenu.classList.remove('open');accountTrigger?.setAttribute('aria-expanded','false')}});
-document.addEventListener('keydown',event=>{if(event.key==='Escape'){accountMenu?.classList.remove('open');accountTrigger?.setAttribute('aria-expanded','false')}});
-qs('.account-signout')?.addEventListener('click',async()=>{try{await api('/api/auth/logout',{method:'POST',body:'{}'})}finally{location.href='/'}});
-
-async function api(path, options = {}) {
-  if(requestedRealm&&path.startsWith('/api/')){const url=new URL(path,location.origin);if(!url.searchParams.has('realm'))url.searchParams.set('realm',requestedRealm);path=url.pathname+url.search}
-  const response = await fetch(path, {headers:{'Content-Type':'application/json', ...(options.headers||{})}, ...options});
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw Object.assign(new Error(body.error || 'Something went wrong'), {status:response.status});
-  return body;
-}
-function publicLink(value){try{const url=new URL(value,location.origin);return ['http:','https:'].includes(url.protocol)?url.href:''}catch{return ''}}
-function applyPublicConfig(c){
-  const name=c.portalName||c.realmName||'Azeroth',mark=(c.brandMark||name.slice(0,1)||'A').slice(0,3);
-	const color=/^#[0-9a-f]{6}$/i,root=document.documentElement.style;
-	if(color.test(c.themePrimary))root.setProperty('--gold',c.themePrimary);
-	if(color.test(c.themeSecondary))root.setProperty('--gold2',c.themeSecondary);
-	if(color.test(c.themeAccent))root.setProperty('--teal',c.themeAccent);
-	if(color.test(c.themeBackground))root.setProperty('--bg',c.themeBackground);
-	document.documentElement.lang=c.locale||'en';
-  qsa('[data-brand-name]').forEach(x=>{const small=qs('small',x);if(small){x.firstChild.textContent=name.toUpperCase()}else{x.textContent=name.toUpperCase()}});
-  qsa('[data-brand-mark]').forEach(x=>x.textContent=mark.toUpperCase());
-  qsa('[data-realm-name]').forEach(x=>x.textContent=(c.realmName||name).toUpperCase()+'.');
-  qsa('[data-home-realm]').forEach(x=>x.textContent=c.realmName||name);
-  if(document.title.includes('Azeroth'))document.title=document.title.replace('Azeroth',name);
-  const description=qs('meta[name=description]');if(description&&c.tagline)description.content=c.tagline;
-  if(qs('#portal-tagline'))qs('#portal-tagline').textContent=c.tagline;
-  if(qs('#client-version'))qs('#client-version').textContent=c.clientVersion;
-  if(qs('#experience-rate'))qs('#experience-rate').textContent=c.experienceRate;
-  if(qs('#uptime-label'))qs('#uptime-label').textContent=c.uptimeLabel;
-  if(qs('#expansion-name'))qs('#expansion-name').textContent=c.expansionName;
-  if(qs('#client-description'))qs('#client-description').textContent=`${c.expansionName} ${c.clientVersion}`;
-  if(qs('#client-build'))qs('#client-build').textContent=c.clientBuild;
-  if(qs('#realm-address'))qs('#realm-address').textContent=c.realmAddress;
-  qsa('[data-footer-text]').forEach(x=>x.textContent=c.footerText);
-	qsa('[data-i18n]').forEach(x=>{const translated=c.translations?.[x.dataset.i18n];if(translated)x.textContent=translated});
-	const logo=publicLink(c.logoUrl);if(logo){const candidate=new Image();candidate.onload=()=>{qsa('[data-brand-logo]').forEach(x=>{x.src=logo;x.alt=name;x.classList.remove('hidden')});qsa('[data-brand-mark]').forEach(x=>x.classList.add('hidden'))};candidate.src=logo}
-	const hero=publicLink(c.heroImageUrl),heroArea=qs('.home-hero');if(hero&&heroArea){const candidate=new Image();candidate.onload=()=>{heroArea.style.setProperty('--hero-image',`url("${hero.replaceAll('"','%22')}")`);heroArea.classList.add('custom-hero');qs('#default-hero-credit')?.classList.add('hidden')};candidate.src=hero}
-	const favicon=publicLink(c.faviconUrl);if(favicon){let icon=qs('link[rel="icon"]');if(!icon){icon=document.createElement('link');icon.rel='icon';document.head.append(icon)}icon.href=favicon}
-  const download=publicLink(c.downloadUrl);if(download&&qs('#download-link')){qs('#download-link').href=download;qs('#download-link').classList.remove('hidden')}
-  const community=publicLink(c.communityUrl);qsa('.config-community').forEach(x=>{if(community){x.href=community;x.classList.remove('hidden')}});
-	for(const [selector,url] of [['.config-terms',publicLink(c.termsUrl)],['.config-privacy',publicLink(c.privacyUrl)]])qsa(`${selector}`).forEach(x=>{if(url){x.href=url;x.classList.remove('hidden')}});
-	const featureRoutes={registration:'/register',armory:'/armory',rankings:'/rankings',guilds:'/guilds',realm:'/realm',shop:'/shop'};
-	for(const [feature,path] of Object.entries(featureRoutes))if(c.features?.[feature]===false)qsa(`a[href="${path}"]`).forEach(x=>x.classList.add('hidden'));
-	if(c.features?.shop===false){qsa('[data-feature-shop]').forEach(x=>x.classList.add('hidden'));const grid=qs('.account-grid');if(grid)grid.style.gridTemplateColumns='1fr'}
-	if(c.features?.support===false)qsa('[data-feature-support]').forEach(x=>x.classList.add('hidden'));
-	const pageFeature={register:'registration',armory:'armory',rankings:'rankings',guilds:'guilds',realm:'realm',shop:'shop'}[page];
-	if(pageFeature&&c.features?.[pageFeature]===false){qs('main').innerHTML=`<section class="page-hero wrap"><p class="eyebrow">MODULE DISABLED</p><h1>${esc(name)}</h1><p>This section is not enabled for this realm.</p></section>`}
-	if(c.maintenance?.active){const banner=qs('#maintenance-banner');banner.textContent=c.maintenance.message||'The realm is currently undergoing scheduled maintenance.';banner.classList.remove('hidden')}
-	if(c.news?.length&&qs('#news-grid')){const section=qs('#news-section'),grid=qs('#news-grid');section.classList.remove('hidden');for(const item of c.news){const article=document.createElement('article');article.className='news-card';const date=document.createElement('time');date.textContent=item.publishAt?new Date(item.publishAt).toLocaleString():(item.date||'');const title=document.createElement('h3');title.textContent=item.title;const summary=document.createElement('p');summary.textContent=item.summary||'';article.append(date,title,summary);const link=publicLink(item.url);if(link){const more=document.createElement('a');more.href=link;more.rel='noreferrer';more.textContent=c.translations?.['news.readMore']||'Read more →';article.append(more)}grid.append(article)}}
-	const realmPicker=qs('.realm-switcher'),realmSelect=qs('#realm-switcher');
-	if(realmPicker&&realmSelect&&Array.isArray(c.realms)&&c.realms.length>1){
-	  realmSelect.innerHTML='';
-	  c.realms.forEach(realm=>{const option=document.createElement('option');option.value=realm.key;option.textContent=realm.name;option.selected=realm.key===c.realmKey;realmSelect.append(option)});
-	  realmSelect.onchange=()=>{const target=new URL(location.href);target.searchParams.set('realm',realmSelect.value);if(['/reset-password','/verify-email','/setup'].includes(location.pathname)){target.pathname='/';target.search='?realm='+encodeURIComponent(realmSelect.value)}target.hash='';location.href=target.href};
-	  realmPicker.classList.remove('hidden');
+function setTheme(theme) {
+	document.documentElement.dataset.theme = theme;
+	localStorage.setItem("portal-theme", theme);
+	const toggle = qs("#theme-toggle"),
+		light = theme === "light";
+	if (toggle) {
+		toggle.setAttribute(
+			"aria-label",
+			light ? "Use dark mode" : "Use light mode",
+		);
+		toggle.title = light ? "Use dark mode" : "Use light mode";
 	}
 }
-const publicConfigPromise=api('/api/public-config');
-publicConfigPromise.then(applyPublicConfig).catch(()=>{});
-const setupStatePromise=api('/api/setup/status');
-if(page!=='setup')setupStatePromise.then(s=>{if(s.required)location.replace('/setup')}).catch(()=>{});
-function toast(message){const el=qs('#toast');el.textContent=message;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2600)}
-function setMessage(form,message,success=false){const el=qs('.form-message',form);el.textContent=message;el.classList.toggle('success',success)}
-function submitJSON(form,path,onSuccess){form?.addEventListener('submit',async e=>{e.preventDefault();const button=qs('button[type=submit]',form);button.disabled=true;setMessage(form,'');try{const data=Object.fromEntries(new FormData(form));const result=await api(path,{method:'POST',body:JSON.stringify(data)});await onSuccess(result)}catch(err){setMessage(form,err.message)}finally{button.disabled=false}})}
-function initial(name){return (name||'?').slice(0,1).toUpperCase()}
-function resolveItemIcon(img,itemId){
-  if(!itemId)return;
-  const key='item-icon-'+itemId,cached=localStorage.getItem(key);
-  if(cached){img.src=iconBase+cached+'.jpg';return}
-  fetch(`https://nether.wowhead.com/tooltip/item/${itemId}?dataEnv=8&locale=0`).then(r=>r.ok?r.json():Promise.reject()).then(data=>{if(data.icon){localStorage.setItem(key,data.icon);img.src=iconBase+data.icon+'.jpg'}}).catch(()=>{});
-}
-function useLocalItemFallback(img){img.onerror=()=>{img.onerror=null;img.src=localItemIcon}}
-function characterCard(c){const a=document.createElement('article');a.className='character-card';a.dataset.name=c.name;a.innerHTML=`<div class="avatar">${initial(c.name)}</div><div><h3></h3><p>${races[c.race]||'Unknown'} · Level ${c.level} ${classes[c.class]||'Hero'}</p><p>${c.guild?'‹'+esc(c.guild)+'›':'Unaffiliated'}</p></div>${c.online?'<i class="online" title="Online"></i>':''}`;qs('h3',a).textContent=c.name;return a}
+setTheme(document.documentElement.dataset.theme || "dark");
+qs("#theme-toggle")?.addEventListener("click", () =>
+	setTheme(
+		document.documentElement.dataset.theme === "light" ? "dark" : "light",
+	),
+);
+const accountMenu = qs(".account-menu"),
+	accountTrigger = qs(".account-menu-trigger");
+accountTrigger?.addEventListener("click", (event) => {
+	event.stopPropagation();
+	const open = accountMenu.classList.toggle("open");
+	accountTrigger.setAttribute("aria-expanded", String(open));
+});
+document.addEventListener("click", (event) => {
+	if (accountMenu && !accountMenu.contains(event.target)) {
+		accountMenu.classList.remove("open");
+		accountTrigger?.setAttribute("aria-expanded", "false");
+	}
+});
+document.addEventListener("keydown", (event) => {
+	if (event.key === "Escape") {
+		accountMenu?.classList.remove("open");
+		accountTrigger?.setAttribute("aria-expanded", "false");
+	}
+});
+qs(".account-signout")?.addEventListener("click", async () => {
+	try {
+		await api("/api/auth/logout", { method: "POST", body: "{}" });
+	} finally {
+		location.href = "/";
+	}
+});
 
-async function hydrateNav(){try{const [me,cfg]=await Promise.all([api('/api/me'),publicConfigPromise]);qsa('.signed-out').forEach(x=>x.classList.add('hidden'));qsa('.signed-in').forEach(x=>x.classList.remove('hidden'));if(me.account?.gmLevel&&cfg.features?.admin!==false)qsa('.admin-link').forEach(x=>x.classList.remove('hidden'))}catch{}}
+async function api(path, options = {}) {
+	if (requestedRealm && path.startsWith("/api/")) {
+		const url = new URL(path, location.origin);
+		if (!url.searchParams.has("realm"))
+			url.searchParams.set("realm", requestedRealm);
+		path = url.pathname + url.search;
+	}
+	const response = await fetch(path, {
+		headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+		...options,
+	});
+	const body = await response.json().catch(() => ({}));
+	if (!response.ok)
+		throw Object.assign(new Error(body.error || "Something went wrong"), {
+			status: response.status,
+		});
+	return body;
+}
+function publicLink(value) {
+	try {
+		const url = new URL(value, location.origin);
+		return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+	} catch {
+		return "";
+	}
+}
+function applyPublicConfig(c) {
+	const name = c.portalName || c.realmName || "Azeroth",
+		mark = (c.brandMark || name.slice(0, 1) || "A").slice(0, 3);
+	const color = /^#[0-9a-f]{6}$/i,
+		root = document.documentElement.style;
+	if (color.test(c.themePrimary)) root.setProperty("--gold", c.themePrimary);
+	if (color.test(c.themeSecondary))
+		root.setProperty("--gold2", c.themeSecondary);
+	if (color.test(c.themeAccent)) root.setProperty("--teal", c.themeAccent);
+	if (color.test(c.themeBackground))
+		root.setProperty("--bg", c.themeBackground);
+	document.documentElement.lang = c.locale || "en";
+	qsa("[data-brand-name]").forEach((x) => {
+		const small = qs("small", x);
+		if (small) {
+			x.firstChild.textContent = name.toUpperCase();
+		} else {
+			x.textContent = name.toUpperCase();
+		}
+	});
+	qsa("[data-brand-mark]").forEach((x) => (x.textContent = mark.toUpperCase()));
+	qsa("[data-realm-name]").forEach(
+		(x) => (x.textContent = (c.realmName || name).toUpperCase() + "."),
+	);
+	qsa("[data-home-realm]").forEach(
+		(x) => (x.textContent = c.realmName || name),
+	);
+	if (document.title.includes("Azeroth"))
+		document.title = document.title.replace("Azeroth", name);
+	const description = qs("meta[name=description]");
+	if (description && c.tagline) description.content = c.tagline;
+	if (qs("#portal-tagline")) qs("#portal-tagline").textContent = c.tagline;
+	if (qs("#home-headline") && c.homeHeadline)
+		qs("#home-headline").textContent = c.homeHeadline;
+	if (qs("#home-eyebrow") && c.homeEyebrow)
+		qs("#home-eyebrow").textContent = c.homeEyebrow;
+	if (qs("#home-primary-cta") && c.homePrimaryCta)
+		qs("#home-primary-cta").textContent = c.homePrimaryCta;
+	if (qs("#home-connect-title") && c.homeConnectTitle)
+		qs("#home-connect-title").textContent = c.homeConnectTitle;
+	if (qs("#home-guide-text") && c.homeGuideText)
+		qs("#home-guide-text").textContent = c.homeGuideText;
+	for (const [card, content, value] of [
+		["#home-rules-card", "#home-rules", c.homeRules],
+		["#home-discord-card", "#home-discord-status", c.discordStatus],
+		["#home-changelog-card", "#home-changelog", c.homeChangelog],
+	])
+		if (value && qs(card)) {
+			qs(content).textContent = value;
+			qs(card).classList.remove("hidden");
+			qs("#home-community")?.classList.remove("hidden");
+		}
+	if (qs("#client-version"))
+		qs("#client-version").textContent = c.clientVersion;
+	if (qs("#experience-rate"))
+		qs("#experience-rate").textContent = c.experienceRate;
+	if (qs("#uptime-label")) qs("#uptime-label").textContent = c.uptimeLabel;
+	if (qs("#expansion-name"))
+		qs("#expansion-name").textContent = c.expansionName;
+	if (qs("#client-description"))
+		qs("#client-description").textContent =
+			`${c.expansionName} ${c.clientVersion}`;
+	if (qs("#client-build")) qs("#client-build").textContent = c.clientBuild;
+	if (qs("#realm-address")) qs("#realm-address").textContent = c.realmAddress;
+	qsa("[data-footer-text]").forEach((x) => (x.textContent = c.footerText));
+	qsa("[data-i18n]").forEach((x) => {
+		const translated = c.translations?.[x.dataset.i18n];
+		if (translated) x.textContent = translated;
+	});
+	const logo = publicLink(c.logoUrl);
+	if (logo) {
+		const candidate = new Image();
+		candidate.onload = () => {
+			qsa("[data-brand-logo]").forEach((x) => {
+				x.src = logo;
+				x.alt = name;
+				x.classList.remove("hidden");
+			});
+			qsa("[data-brand-mark]").forEach((x) => x.classList.add("hidden"));
+		};
+		candidate.src = logo;
+	}
+	const hero = publicLink(c.heroImageUrl),
+		heroArea = qs(".home-hero");
+	if (hero && heroArea) {
+		const candidate = new Image();
+		candidate.onload = () => {
+			heroArea.style.setProperty(
+				"--hero-image",
+				`url("${hero.replaceAll('"', "%22")}")`,
+			);
+			heroArea.classList.add("custom-hero");
+			qs("#default-hero-credit")?.classList.add("hidden");
+		};
+		candidate.src = hero;
+	}
+	const favicon = publicLink(c.faviconUrl);
+	if (favicon) {
+		let icon = qs('link[rel="icon"]');
+		if (!icon) {
+			icon = document.createElement("link");
+			icon.rel = "icon";
+			document.head.append(icon);
+		}
+		icon.href = favicon;
+	}
+	const download = publicLink(c.downloadUrl);
+	if (download && qs("#download-link")) {
+		qs("#download-link").href = download;
+		qs("#download-link").classList.remove("hidden");
+	}
+	const community = publicLink(c.communityUrl);
+	qsa(".config-community").forEach((x) => {
+		if (community) {
+			x.href = community;
+			x.classList.remove("hidden");
+		}
+	});
+	for (const [selector, url] of [
+		[".config-terms", publicLink(c.termsUrl)],
+		[".config-privacy", publicLink(c.privacyUrl)],
+	])
+		qsa(`${selector}`).forEach((x) => {
+			if (url) {
+				x.href = url;
+				x.classList.remove("hidden");
+			}
+		});
+	const featureRoutes = {
+		registration: "/register",
+		armory: "/armory",
+		rankings: "/rankings",
+		guilds: "/guilds",
+		realm: "/realm",
+		shop: "/shop",
+	};
+	for (const [feature, path] of Object.entries(featureRoutes))
+		if (c.features?.[feature] === false)
+			qsa(`a[href="${path}"]`).forEach((x) => x.classList.add("hidden"));
+	if (c.features?.shop === false) {
+		qsa("[data-feature-shop]").forEach((x) => x.classList.add("hidden"));
+		const grid = qs(".account-grid");
+		if (grid) grid.style.gridTemplateColumns = "1fr";
+	}
+	if (c.features?.support === false)
+		qsa("[data-feature-support]").forEach((x) => x.classList.add("hidden"));
+	const pageFeature = {
+		register: "registration",
+		armory: "armory",
+		rankings: "rankings",
+		guilds: "guilds",
+		realm: "realm",
+		shop: "shop",
+	}[page];
+	if (pageFeature && c.features?.[pageFeature] === false) {
+		qs("main").innerHTML =
+			`<section class="page-hero wrap"><p class="eyebrow">MODULE DISABLED</p><h1>${esc(name)}</h1><p>This section is not enabled for this realm.</p></section>`;
+	}
+	if (c.maintenance?.active) {
+		const banner = qs("#maintenance-banner");
+		banner.textContent =
+			c.maintenance.message ||
+			"The realm is currently undergoing scheduled maintenance.";
+		banner.classList.remove("hidden");
+	}
+	if (c.news?.length && qs("#news-grid")) {
+		const section = qs("#news-section"),
+			grid = qs("#news-grid");
+		section.classList.remove("hidden");
+		for (const item of [...c.news].sort(
+			(a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)),
+		)) {
+			const article = document.createElement("article");
+			article.className = "news-card";
+			if (item.featured) {
+				const badge = document.createElement("span");
+				badge.className = "featured-badge";
+				badge.textContent = "FEATURED";
+				article.append(badge);
+			}
+			const date = document.createElement("time");
+			date.textContent = item.publishAt
+				? new Date(item.publishAt).toLocaleString()
+				: item.date || "";
+			const title = document.createElement("h3");
+			title.textContent = item.title;
+			const summary = document.createElement("p");
+			summary.textContent = item.summary || "";
+			article.append(date, title, summary);
+			const link = publicLink(item.url);
+			if (link) {
+				const more = document.createElement("a");
+				more.href = link;
+				more.rel = "noreferrer";
+				more.textContent = c.translations?.["news.readMore"] || "Read more →";
+				article.append(more);
+			}
+			grid.append(article);
+		}
+	}
+	const realmPicker = qs(".realm-switcher"),
+		realmSelect = qs("#realm-switcher");
+	if (
+		realmPicker &&
+		realmSelect &&
+		Array.isArray(c.realms) &&
+		c.realms.length > 1
+	) {
+		realmSelect.innerHTML = "";
+		c.realms.forEach((realm) => {
+			const option = document.createElement("option");
+			option.value = realm.key;
+			option.textContent = realm.name;
+			option.selected = realm.key === c.realmKey;
+			realmSelect.append(option);
+		});
+		realmSelect.onchange = () => {
+			const target = new URL(location.href);
+			target.searchParams.set("realm", realmSelect.value);
+			if (
+				["/reset-password", "/verify-email", "/setup"].includes(
+					location.pathname,
+				)
+			) {
+				target.pathname = "/";
+				target.search = "?realm=" + encodeURIComponent(realmSelect.value);
+			}
+			target.hash = "";
+			location.href = target.href;
+		};
+		realmPicker.classList.remove("hidden");
+	}
+}
+const publicConfigPromise = api("/api/public-config");
+publicConfigPromise.then(applyPublicConfig).catch(() => {});
+const setupStatePromise = api("/api/setup/status");
+if (page !== "setup")
+	setupStatePromise
+		.then((s) => {
+			if (s.required) location.replace("/setup");
+		})
+		.catch(() => {});
+function toast(message) {
+	const el = qs("#toast");
+	el.textContent = message;
+	el.classList.add("show");
+	setTimeout(() => el.classList.remove("show"), 2600);
+}
+function setMessage(form, message, success = false) {
+	const el = qs(".form-message", form);
+	el.textContent = message;
+	el.classList.toggle("success", success);
+}
+function submitJSON(form, path, onSuccess) {
+	form?.addEventListener("submit", async (e) => {
+		e.preventDefault();
+		const button = qs("button[type=submit]", form);
+		button.disabled = true;
+		setMessage(form, "");
+		try {
+			const data = Object.fromEntries(new FormData(form));
+			const result = await api(path, {
+				method: "POST",
+				body: JSON.stringify(data),
+			});
+			await onSuccess(result);
+		} catch (err) {
+			setMessage(form, err.message);
+		} finally {
+			button.disabled = false;
+		}
+	});
+}
+function initial(name) {
+	return (name || "?").slice(0, 1).toUpperCase();
+}
+function resolveItemIcon(img, itemId) {
+	if (!itemId) return;
+	const key = "item-icon-" + itemId,
+		cached = localStorage.getItem(key);
+	if (cached) {
+		img.src = iconBase + cached + ".jpg";
+		return;
+	}
+	fetch(`https://nether.wowhead.com/tooltip/item/${itemId}?dataEnv=8&locale=0`)
+		.then((r) => (r.ok ? r.json() : Promise.reject()))
+		.then((data) => {
+			if (data.icon) {
+				localStorage.setItem(key, data.icon);
+				img.src = iconBase + data.icon + ".jpg";
+			}
+		})
+		.catch(() => {});
+}
+function useLocalItemFallback(img) {
+	img.onerror = () => {
+		img.onerror = null;
+		img.src = localItemIcon;
+	};
+}
+function characterCard(c) {
+	const a = document.createElement("article");
+	a.className = "character-card";
+	a.dataset.name = c.name;
+	a.innerHTML = `<div class="avatar">${initial(c.name)}</div><div><h3></h3><p>${races[c.race] || "Unknown"} · Level ${c.level} ${classes[c.class] || "Hero"}</p><p>${c.guild ? "‹" + esc(c.guild) + "›" : "Unaffiliated"}</p></div>${c.online ? '<i class="online" title="Online"></i>' : ""}`;
+	qs("h3", a).textContent = c.name;
+	return a;
+}
+
+async function hydrateNav() {
+	try {
+		const [me, cfg] = await Promise.all([api("/api/me"), publicConfigPromise]);
+		qsa(".signed-out").forEach((x) => x.classList.add("hidden"));
+		qsa(".signed-in").forEach((x) => x.classList.remove("hidden"));
+		if (me.permissions?.length && cfg.features?.admin !== false)
+			qsa(".admin-link").forEach((x) => x.classList.remove("hidden"));
+	} catch {}
+}
 hydrateNav();
 
-if(page==='home'){
-  publicConfigPromise.then(async cfg=>{
-    const realms=Array.isArray(cfg.realms)&&cfg.realms.length?cfg.realms:[{key:cfg.realmKey||'',name:cfg.realmName,address:cfg.realmAddress,experienceRate:cfg.experienceRate}];
-    const results=await Promise.all(realms.map(async realm=>{
-      const realmParam=realm.key?'?realm='+encodeURIComponent(realm.key):'';
-      const [health,overview]=await Promise.allSettled([api('/api/status'+realmParam,{credentials:'omit'}),api('/api/realm'+realmParam,{credentials:'omit'})]);
-      return {realm,health:health.status==='fulfilled'?health.value:null,overview:overview.status==='fulfilled'?overview.value:null};
-    }));
-    const grid=qs('#home-realm-grid');grid.innerHTML='';
-    let onlineRealms=0,onlinePlayers=0;
-    results.forEach(({realm,health,overview})=>{
-      const online=Boolean(health?.online),players=Number(overview?.online||0),alliance=Number(overview?.allianceOnline||0),horde=Number(overview?.hordeOnline||0);
-      if(online)onlineRealms++;
-      onlinePlayers+=players;
-      const card=document.createElement('article');card.className='home-realm-card '+(online?'is-online':'is-offline');
-      const href=new URL('/realm',location.origin);if(realm.key)href.searchParams.set('realm',realm.key);
-      card.innerHTML=`<header><div><span class="realm-live-dot"></span><span>${online?'Online':'Offline'}</span></div>${health?.maintenance?'<b class="realm-maintenance">Maintenance</b>':''}</header><h3>${esc(realm.name||health?.realm||'Realm')}</h3><p>${esc(realm.address||health?.address||'Address unavailable')}</p><dl><div><dt>${players.toLocaleString()}</dt><dd>Players online</dd></div><div><dt>${esc(realm.experienceRate||cfg.experienceRate||'1×')}</dt><dd>Experience rate</dd></div></dl>${overview?`<div class="realm-factions"><span>Alliance ${alliance.toLocaleString()}</span><span>Horde ${horde.toLocaleString()}</span></div>`:''}<a href="${href.pathname+href.search}">View realm details <span>→</span></a>`;
-      grid.append(card);
-    });
-    qs('#realm-status').textContent=`${onlineRealms} of ${results.length} realm${results.length===1?'':'s'} online · ${onlinePlayers.toLocaleString()} players`;
-    const selected=results.find(x=>x.realm.key===cfg.realmKey)||results[0],address=selected?.realm.address||selected?.health?.address||cfg.realmAddress;
-    if(address){qs('#realm-address').textContent=address;qs('.code-copy').dataset.copy=`set realmlist ${address}`}
-  }).catch(()=>{qs('#realm-status').textContent='Realm information unavailable';qs('#home-realm-grid').innerHTML='<p class="empty">Realm status is temporarily unavailable.</p>'});
-  qs('.code-copy')?.addEventListener('click',e=>{navigator.clipboard.writeText(e.currentTarget.dataset.copy);toast('Realmlist copied')});
+if (page === "home") {
+	publicConfigPromise
+		.then(async (cfg) => {
+			const realms =
+				Array.isArray(cfg.realms) && cfg.realms.length
+					? cfg.realms
+					: [
+							{
+								key: cfg.realmKey || "",
+								name: cfg.realmName,
+								address: cfg.realmAddress,
+								experienceRate: cfg.experienceRate,
+							},
+						];
+			const results = await Promise.all(
+				realms.map(async (realm) => {
+					const realmParam = realm.key
+						? "?realm=" + encodeURIComponent(realm.key)
+						: "";
+					const [health, overview, realmConfig] = await Promise.allSettled([
+						api("/api/status" + realmParam, { credentials: "omit" }),
+						api("/api/realm" + realmParam, { credentials: "omit" }),
+						api("/api/public-config" + realmParam, { credentials: "omit" }),
+					]);
+					return {
+						realm,
+						health: health.status === "fulfilled" ? health.value : null,
+						overview: overview.status === "fulfilled" ? overview.value : null,
+						config:
+							realmConfig.status === "fulfilled" ? realmConfig.value : null,
+					};
+				}),
+			);
+			const grid = qs("#home-realm-grid");
+			grid.innerHTML = "";
+			let onlineRealms = 0,
+				onlinePlayers = 0;
+			results.forEach(({ realm, health, overview, config }) => {
+				const online = Boolean(health?.online),
+					players = Number(overview?.online || 0),
+					alliance = Number(overview?.allianceOnline || 0),
+					horde = Number(overview?.hordeOnline || 0);
+				if (online) onlineRealms++;
+				onlinePlayers += players;
+				const card = document.createElement("article");
+				card.className =
+					"home-realm-card " + (online ? "is-online" : "is-offline");
+				const href = new URL("/realm", location.origin);
+				if (realm.key) href.searchParams.set("realm", realm.key);
+				card.innerHTML = `<header><div><span class="realm-live-dot"></span><span>${online ? "Online" : "Offline"}</span></div>${health?.maintenance ? '<b class="realm-maintenance">Maintenance</b>' : ""}</header><h3>${esc(realm.name || health?.realm || "Realm")}</h3><p>${esc(config?.realmProfile?.type || "PvE")} · ${esc(config?.realmProfile?.season || config?.realmProfile?.timezone || "")}</p><dl><div><dt>${players.toLocaleString()}</dt><dd>Players online</dd></div><div><dt>${esc(config?.realmProfile?.rates?.questXp || realm.experienceRate || cfg.experienceRate || "1×")}</dt><dd>Quest XP</dd></div></dl>${overview ? `<div class="realm-factions"><span>Alliance ${alliance.toLocaleString()}</span><span>Horde ${horde.toLocaleString()}</span></div>` : ""}<a href="${href.pathname + href.search}">View realm details <span>→</span></a>`;
+				grid.append(card);
+			});
+			qs("#realm-status").textContent =
+				`${onlineRealms} of ${results.length} realm${results.length === 1 ? "" : "s"} online · ${onlinePlayers.toLocaleString()} players`;
+			const selected =
+					results.find((x) => x.realm.key === cfg.realmKey) || results[0],
+				address =
+					selected?.realm.address ||
+					selected?.health?.address ||
+					cfg.realmAddress;
+			if (address) {
+				qs("#realm-address").textContent = address;
+				qs(".code-copy").dataset.copy = `set realmlist ${address}`;
+			}
+		})
+		.catch(() => {
+			qs("#realm-status").textContent = "Realm information unavailable";
+			qs("#home-realm-grid").innerHTML =
+				'<p class="empty">Realm status is temporarily unavailable.</p>';
+		});
+	qs(".code-copy")?.addEventListener("click", (e) => {
+		navigator.clipboard.writeText(e.currentTarget.dataset.copy);
+		toast("Realmlist copied");
+	});
 }
-if(page==='register'){
-  submitJSON(qs('#register-form'),'/api/auth/register',result=>{setMessage(qs('#register-form'),result.message,true);if(!result.verificationRequired)setTimeout(()=>location.href='/login',900)});
-  publicConfigPromise.then(c=>{if(!c.turnstileSiteKey)return;const script=document.createElement('script');script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';script.async=true;script.onload=()=>window.turnstile.render('#turnstile',{sitekey:c.turnstileSiteKey,callback:token=>qs('[name=turnstileToken]').value=token});document.head.append(script)}).catch(()=>{});
+if (page === "register") {
+	const form = qs("#register-form"),
+		turnstile = qs("#turnstile", form),
+		referral = document.createElement("label");
+	referral.innerHTML =
+		'Referral code <small>(optional)</small><input name="referralCode" maxlength="40" placeholder="FRIEND-ABC123">';
+	form.insertBefore(referral, turnstile);
+	submitJSON(qs("#register-form"), "/api/auth/register", (result) => {
+		setMessage(qs("#register-form"), result.message, true);
+		if (!result.verificationRequired)
+			setTimeout(() => (location.href = "/login"), 900);
+	});
+	publicConfigPromise
+		.then((c) => {
+			if (!c.turnstileSiteKey) return;
+			const script = document.createElement("script");
+			script.src =
+				"https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+			script.async = true;
+			script.onload = () =>
+				window.turnstile.render("#turnstile", {
+					sitekey: c.turnstileSiteKey,
+					callback: (token) => (qs("[name=turnstileToken]").value = token),
+				});
+			document.head.append(script);
+		})
+		.catch(() => {});
 }
-if(page==='setup'){
-  const form=qs('#setup-form');
-  const showSetupState=(titleText,messageText,withLogin=false)=>{form.innerHTML='';const title=document.createElement('h2');title.textContent=titleText;const message=document.createElement('p');message.className='muted';message.textContent=messageText;form.append(title,message);if(withLogin){const link=document.createElement('a');link.className='button full';link.href='/login';link.textContent='Sign in →';form.append(link)}};
-  setupStatePromise.then(state=>{if(!state.enabled)showSetupState('Setup disabled','Configure ENABLE_SETUP=true and a SETUP_TOKEN to use the web setup wizard.');else if(state.complete)showSetupState('Setup complete','The initial realm administrator has already been created.',true)}).catch(e=>setMessage(form,e.message));
-  form.onsubmit=async e=>{e.preventDefault();const values=Object.fromEntries(new FormData(form));if(values.password!==values.confirmPassword){setMessage(form,'Passwords do not match');return}delete values.confirmPassword;const button=qs('button[type=submit]',form);button.disabled=true;try{const result=await api('/api/setup',{method:'POST',body:JSON.stringify(values)});form.reset();form.innerHTML='';const title=document.createElement('h2');title.textContent='Setup complete';const message=document.createElement('p');message.className='success';message.textContent=`${result.username} is now a level ${result.gmLevel} GM.`;const link=document.createElement('a');link.className='button full';link.href='/login';link.textContent='Sign in →';form.append(title,message,link)}catch(err){setMessage(form,err.message)}finally{button.disabled=false}};
-}
-if(page==='login') submitJSON(qs('#login-form'),'/api/auth/login',()=>{location.href='/account'});
-if(page==='forgot-password') submitJSON(qs('#forgot-form'),'/api/auth/password/request',result=>setMessage(qs('#forgot-form'),result.message,true));
-if(page==='reset-password'){const form=qs('#reset-form');form.onsubmit=async e=>{e.preventDefault();const token=new URLSearchParams(location.search).get('token')||'';try{await api('/api/auth/password/reset',{method:'POST',body:JSON.stringify({token,password:new FormData(form).get('password')})});setMessage(form,'Password reset. Taking you to sign in…',true);setTimeout(()=>location.href='/login',900)}catch(err){setMessage(form,err.message)}}}
-if(page==='verify-email'){
-  const status=qs('#verification-status'),resend=qs('#verification-resend'),token=new URLSearchParams(location.search).get('token')||'';
-  const verify=async()=>{if(!token){status.textContent='This verification link is missing its token.';resend.classList.remove('hidden');return}try{const result=await api('/api/auth/email/verify',{method:'POST',body:JSON.stringify({token})});status.textContent=result.message;status.classList.add('success');qs('#verification-login').classList.remove('hidden')}catch(err){status.textContent=err.message;resend.classList.remove('hidden')}};
-  resend.onsubmit=async e=>{e.preventDefault();const button=qs('button',resend);button.disabled=true;try{const result=await api('/api/auth/email/resend',{method:'POST',body:JSON.stringify({email:new FormData(resend).get('email')})});setMessage(resend,result.message,true)}catch(err){setMessage(resend,err.message)}finally{button.disabled=false}};
-  verify();
-}
-
-if(page==='armory'){
-  const form=qs('#armory-search'),grid=qs('#armory-results'),detail=qs('#character-detail'),tooltip=qs('#item-tooltip');
-  const fallbackIcon=localItemIcon;
-  const formatDate=value=>value?new Intl.DateTimeFormat(undefined,{day:'numeric',month:'short',year:'numeric'}).format(new Date(value*1000)):'Not recorded';
-  function itemIcon(item){return item.icon?iconBase+item.icon+'.jpg':fallbackIcon}
-  let jqueryLoader,wowheadLoader;
-  function loadJQuery(){if(window.jQuery)return Promise.resolve(window.jQuery);if(jqueryLoader)return jqueryLoader;jqueryLoader=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://code.jquery.com/jquery-3.7.1.min.js';script.integrity='sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=';script.crossOrigin='anonymous';script.async=true;script.onload=()=>window.jQuery?resolve(window.jQuery):reject(new Error('jQuery API unavailable'));script.onerror=()=>reject(new Error('jQuery CDN unavailable'));document.head.append(script)});return jqueryLoader}
-  function loadWowhead(){if(window.ZamModelViewer)return Promise.resolve(window.ZamModelViewer);if(wowheadLoader)return wowheadLoader;wowheadLoader=loadJQuery().then(()=>new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://wow.zamimg.com/modelviewer/live/viewer/viewer.min.js';script.async=true;script.onload=()=>window.ZamModelViewer?resolve(window.ZamModelViewer):reject(new Error('Viewer API unavailable'));script.onerror=()=>reject(new Error('Wowhead CDN unavailable'));document.head.append(script)}));return wowheadLoader}
-  async function mountWowheadModel(container,c,equipment){const stage=qs('.wowhead-model',container),status=qs('.model-provider',container);try{const Viewer=await loadWowhead();const display=(characterDisplays[c.race]||characterDisplays[1])[c.gender===1?1:0];const model={id:display,type:8,items:equipment.filter(i=>i.displayId).map(i=>[Number(i.slot)+1,Number(i.displayId)])};const options={type:1,contentPath:'https://wow.zamimg.com/modelviewer/live/',container:stage,aspect:.72,hd:true,models:[model]};let viewer;try{viewer=new Viewer(options)}catch{viewer=new Viewer({...options,models:model})}await Promise.resolve(viewer);stage.classList.add('ready');status.textContent='Interactive 3D · Wowhead model viewer'}catch(error){status.textContent='Wowhead model viewer failed to initialize';stage.innerHTML='<p class="model-error">Unable to load the 3D model.</p>'}}
-  async function resolveIcon(img,item){if(item.icon)return;try{const cached=localStorage.getItem('item-icon-'+item.entry);if(cached){img.src=iconBase+cached+'.jpg';return}const data=await fetch(`https://nether.wowhead.com/tooltip/item/${item.entry}?dataEnv=8&locale=0`).then(r=>r.json());if(data.icon){localStorage.setItem('item-icon-'+item.entry,data.icon);img.src=iconBase+data.icon+'.jpg'}}catch{}}
-  function showTooltip(item,event){const stats=(item.stats||[]).map(x=>typeof x==='string'?x:`+${x.value} ${statNames[x.type]||'Stat '+x.type}`);tooltip.innerHTML=`<strong class="q${item.quality||0}">${esc(item.name)}</strong><span>${qualityNames[item.quality]||'Item'} · Item Level ${item.itemLevel||'—'}</span>${item.requiredLevel?`<span>Requires Level ${item.requiredLevel}</span>`:''}${item.armor?`<span>${item.armor} Armor</span>`:''}${stats.map(x=>`<span class="item-stat">${esc(x)}</span>`).join('')}<small>Item ${item.entry}</small>`;tooltip.classList.add('visible');moveTooltip(event)}
-  function moveTooltip(event){const pad=18,w=tooltip.offsetWidth||260,h=tooltip.offsetHeight||180;tooltip.style.left=Math.min(event.clientX+16,innerWidth-w-pad)+'px';tooltip.style.top=Math.min(event.clientY+16,innerHeight-h-pad)+'px'}
-  function gearSlot(slot,item){const el=document.createElement('div');el.className=`gear-slot gear-slot-${slot} q-border-${item?.quality||0}`;el.innerHTML=`<div class="gear-icon">${item?'<img alt=""/>':'<span>+</span>'}</div><div class="gear-label"><small>${slots[slot]}</small><strong>${item?esc(item.name):'Empty slot'}</strong>${item?`<i>Item level ${item.itemLevel||'—'}</i>`:''}</div>`;if(item){const img=qs('img',el);img.src=itemIcon(item);useLocalItemFallback(img);resolveIcon(img,item);el.onmouseenter=e=>showTooltip(item,e);el.onmousemove=moveTooltip;el.onmouseleave=()=>tooltip.classList.remove('visible')}return el}
-  function renderPaperdoll(c,equipment){const bySlot=new Map(equipment.map(i=>[Number(i.slot),i]));const doll=document.createElement('div');doll.className='paperdoll';const left=document.createElement('div');left.className='gear-column left';[0,1,2,14,4,3,8,9].forEach(slot=>left.append(gearSlot(slot,bySlot.get(slot))));const center=document.createElement('div');center.className=`character-model class-${c.class}`;center.innerHTML=`<div class="model-glow"></div><div class="wowhead-model"><div class="model-loading"><i></i><span>Loading character model</span></div></div><span class="model-provider">Connecting to Wowhead 3D…</span><div class="model-caption"><p>${races[c.race]||''}</p><strong>${classes[c.class]||'Hero'}</strong><small>Level ${c.level}</small></div>`;mountWowheadModel(center,c,equipment);const right=document.createElement('div');right.className='gear-column right';[5,6,7,10,11,12,13,18].forEach(slot=>right.append(gearSlot(slot,bySlot.get(slot))));const weapons=document.createElement('div');weapons.className='weapon-row';[15,16,17].forEach(slot=>weapons.append(gearSlot(slot,bySlot.get(slot))));doll.append(left,center,right,weapons);return doll}
-  function renderProgression(data,target){target.innerHTML='';const summary=document.createElement('div');summary.className='progress-summary';const done=data.progression.filter(x=>x.characterDate).length;summary.innerHTML=`<div><p class="eyebrow">RECORDED PROGRESSION</p><h3>${esc(data.character)}${data.guild?` · &lt;${esc(data.guild)}&gt;`:''}</h3></div><strong>${done}<small> / ${data.progression.length} sections</small></strong>`;target.append(summary);const groups={};data.progression.forEach(p=>(groups[p.raid]??=[]).push(p));Object.entries(groups).forEach(([raid,entries])=>{const section=document.createElement('section');section.className='raid-card';const completed=entries.filter(x=>x.characterDate).length;section.innerHTML=`<header><div><h3>${esc(raid)}</h3><p>${completed} of ${entries.length} recorded sections</p></div><span>${Math.round(completed/entries.length*100)}%</span></header><div class="raid-progress"><i style="width:${completed/entries.length*100}%"></i></div><div class="raid-encounters"></div>`;const list=qs('.raid-encounters',section);entries.forEach(e=>{const row=document.createElement('article');row.className=e.characterDate?'down':'pending';row.innerHTML=`<span class="kill-mark">${e.characterDate?'✓':'○'}</span><div><strong>${esc(e.section)}</strong><small>${esc(e.difficulty)} · ${e.bosses.map(esc).join(', ')}</small></div><time>${formatDate(e.characterDate)}</time>${data.guild?`<em>Guild first: ${formatDate(e.guildDate)}</em>`:''}`;list.append(row)});target.append(section)})}
-  async function search(term=''){detail.innerHTML='';grid.innerHTML='';try{const {characters}=await api('/api/armory?q='+encodeURIComponent(term));if(!characters.length){grid.innerHTML='<p class="empty">No heroes found. Try another name.</p>';return}characters.forEach(c=>{const card=characterCard(c);card.addEventListener('click',()=>show(c.name));grid.append(card)})}catch(e){grid.innerHTML=`<p class="empty">${esc(e.message)}</p>`}}
-  async function show(name){grid.innerHTML='';detail.innerHTML='<div class="skeleton"></div>';try{const [{character:c,equipment,profile,arenaTeams},progress]=await Promise.all([api('/api/armory/'+encodeURIComponent(name)),api('/api/progression/'+encodeURIComponent(name))]);const wrap=document.createElement('article');wrap.className='character-profile';wrap.innerHTML=`<button class="ghost-button" id="back-armory">← Back to heroes</button><div class="profile-head"><div class="avatar">${initial(c.name)}</div><div><h2></h2><p>Level ${c.level} ${races[c.race]||''} ${classes[c.class]||''}</p><a class="guild-name" href="/guilds">${c.guild?'‹'+esc(c.guild)+'›':'Unaffiliated'}</a></div><div class="profile-vitals"><span class="${c.online?'is-online':''}">${c.online?'Online now':'Offline'}</span><strong>${Math.floor(c.totalTime/3600).toLocaleString()}h <small>played</small></strong></div></div><nav class="profile-tabs"><button class="active" data-profile="gear">Equipment</button><button data-profile="achievements">Achievements & raids</button><button data-profile="pvp">Arena</button></nav><div id="gear-panel"></div><div id="achievements-panel" class="hidden"></div><div id="pvp-panel" class="hidden"></div>`;qs('h2',wrap).textContent=c.name;const gear=qs('#gear-panel',wrap),summary=document.createElement('div'),professions=profile?.professions||[];summary.className='profile-overview';summary.innerHTML=`<div class="profile-stat"><span>Achievements</span><b>${profile?.achievements||0}</b></div><div class="profile-stat"><span>Exalted reputations</span><b>${profile?.exaltedReputations||0}</b></div><div class="profile-stat"><span>Talent specializations</span><b>${profile?.talentSpecs||0}</b></div><div class="profile-stat"><span>Active glyphs</span><b>${profile?.glyphs||0}</b></div><section><h3>Professions</h3>${professions.length?professions.map(p=>`<p><b>${esc(p.name)}</b><span>${p.value} / ${p.maximum}</span></p>`).join(''):'<p class="muted">No primary professions recorded.</p>'}</section>`;gear.append(summary,renderPaperdoll(c,equipment));renderProgression(progress,qs('#achievements-panel',wrap));const pvp=qs('#pvp-panel',wrap),teams=arenaTeams||[];pvp.innerHTML=teams.length?'<div class="personal-arena"></div>':'<p class="empty">This character is not on an active arena team.</p>';teams.forEach(t=>{const row=document.createElement('article');row.className='personal-team';row.innerHTML=`<strong>#${t.rank}</strong><div><h3>${esc(t.name)}</h3><p>${t.bracket}v${t.bracket} · Team rating ${t.rating}</p></div><span><b>${t.personalRating}</b><small> personal rating</small><em>${t.personalWins}W / ${t.personalGames-t.personalWins}L</em></span>`;qs('.personal-arena',pvp).append(row)});qsa('[data-profile]',wrap).forEach(b=>b.onclick=()=>{qsa('[data-profile]',wrap).forEach(x=>x.classList.toggle('active',x===b));['gear','achievements','pvp'].forEach(id=>qs('#'+id+'-panel',wrap).classList.toggle('hidden',b.dataset.profile!==id))});detail.innerHTML='';detail.append(wrap);qs('#back-armory').onclick=()=>search(form.q.value)}catch(e){detail.innerHTML=`<p class="empty">${esc(e.message)}</p>`}}
-  form.addEventListener('submit',e=>{e.preventDefault();search(form.q.value)});const initialQuery=new URLSearchParams(location.search).get('q')||'';form.q.value=initialQuery;if(initialQuery)show(initialQuery);else search('');
-}
-
-if(page==='rankings'){
-  async function loadRankings(bracket){const box=qs('#arena-ranking');box.innerHTML='<div class="skeleton"></div>';try{const {teams}=await api('/api/arena?bracket='+bracket);box.innerHTML='<div class="rank-row rank-head"><span>Rank</span><span>Team</span><span>Rating</span><span>Record</span></div>';teams.forEach(t=>{const row=document.createElement('article');row.className='rank-row';const members=t.members.map(m=>`<a href="/armory?q=${encodeURIComponent(m.name)}"><b>${esc(m.name)}</b><small>${classes[m.class]||'Hero'} · ${m.personalRating}</small></a>`).join('');row.innerHTML=`<strong class="rank-number">${t.rank}</strong><div><h3>${esc(t.name)}</h3><div class="team-members">${members}</div></div><strong class="team-rating">${t.rating}</strong><span>${t.seasonWins}W <i>/ ${t.seasonGames-t.seasonWins}L</i></span>`;box.append(row)})}catch(e){box.innerHTML=`<p class="empty">${esc(e.message)}</p>`}}
-	qsa('[data-bracket]').forEach(b=>b.onclick=()=>{qsa('[data-bracket]').forEach(x=>x.classList.toggle('active',x===b));loadRankings(Number(b.dataset.bracket))});loadRankings(2);
-	async function loadCharacterRankings(metric){const box=qs('#character-ranking'),guilds=metric==='guild-members';box.innerHTML='<div class="skeleton"></div>';try{const data=await api('/api/rankings?metric='+encodeURIComponent(metric));box.innerHTML=`<div class="rank-row rank-head"><span>Rank</span><span>${guilds?'Guild':'Character'}</span><span>${guilds?'Type':'Level'}</span><span>${guilds?'Members':'Score'}</span></div>`;data.rows.forEach(x=>{const value=metric==='played-time'?Math.floor(x.value/3600).toLocaleString()+'h':Number(x.value).toLocaleString();const row=document.createElement('article');row.className='rank-row';row.innerHTML=`<strong class="rank-number">${x.rank}</strong><div><a href="${guilds?'/guilds':'/armory?q='+encodeURIComponent(x.name)}"><h3>${esc(x.name)}</h3></a><small>${guilds?'Guild':(classes[x.class]||'Hero')+(x.online?' · Online':'')}</small></div><strong>${guilds?'—':x.level}</strong><span>${value}</span>`;box.append(row)})}catch(e){box.innerHTML=`<p class="empty">${esc(e.message)}</p>`}};
-	qsa('[data-metric]').forEach(b=>b.onclick=()=>{qsa('[data-metric]').forEach(x=>x.classList.toggle('active',x===b));loadCharacterRankings(b.dataset.metric)});loadCharacterRankings('honorable-kills')
-}
-
-if(page==='shop'){
-  const grid=qs('#product-grid'),filters=qs('#shop-filters'),dialog=qs('#purchase-dialog');let products=[],selected=null,characters=[],activeCategory='All',activeClass=0;
-  function renderProductArt(art,p){
-    const leadItem=p.itemId||p.items?.[0]?.itemId||classSetPreviewItems[p.classId];
-    if(p.gold>0&&!leadItem){const img=document.createElement('img');img.className='product-icon gold-icon';img.src=iconBase+'inv_misc_coin_01.jpg';img.alt='';useLocalItemFallback(img);art.classList.add('gold-art');art.append(img);return}
-    if(leadItem){const img=document.createElement('img');img.className='product-icon';img.src=localItemIcon;img.alt='';useLocalItemFallback(img);resolveItemIcon(img,leadItem);art.append(img);if(p.classId){art.classList.add('class-art-'+p.classId);const label=document.createElement('span');label.className='product-art-label';label.textContent=classes[p.classId]||p.className||'Set';art.append(label)}return}
-    art.textContent=p.classId?(classes[p.classId]||p.className||'Class'):(p.category||'Package');
-    art.classList.add(p.classId?'class-art-'+p.classId:'service-art');
-  }
-  function render(){grid.innerHTML='';const shown=products.filter(p=>(activeCategory==='All'||p.category===activeCategory)&&(!activeClass||!p.classId||p.classId===activeClass));if(!shown.length){grid.innerHTML='<p class="empty">No packages match these filters.</p>';return}shown.forEach(p=>{const card=document.createElement('article');card.className='product-card'+(p.tier?' package-card':'');card.innerHTML=`<div class="product-art"></div><div class="product-body"><div class="product-tags"><span class="category"></span>${p.tier?'<span class="tier"></span>':''}</div><h3></h3><p></p><ul class="package-includes"></ul><div class="product-foot"><strong class="price">${p.price} credits</strong><button class="buy">Purchase</button></div></div>`;const art=qs('.product-art',card),className=p.className||classes[p.classId];renderProductArt(art,p);qs('.category',card).textContent=p.gold>0?'Gold':(className||p.category);if(qs('.tier',card))qs('.tier',card).textContent=p.tier;qs('h3',card).textContent=p.name;qs('.product-body>p',card).textContent=p.description||`${p.quantity} × item ${p.itemId}`;const includes=qs('.package-includes',card);(p.includes||[]).forEach(x=>{const li=document.createElement('li');li.textContent=x;includes.append(li)});qs('.buy',card).onclick=()=>openPurchase(p);grid.append(card)})}
-  function categoryButtons(){const cats=['All',...new Set(products.map(p=>p.category))];filters.innerHTML='';const buttons=document.createElement('div');buttons.className='filter-buttons';cats.forEach((c,i)=>{const b=document.createElement('button');b.className='filter'+(i===0?' active':'');b.textContent=c;b.onclick=()=>{activeCategory=c;qsa('.filter',buttons).forEach(x=>x.classList.toggle('active',x===b));render()};buttons.append(b)});const select=document.createElement('select');select.className='class-filter';select.innerHTML='<option value="0">All classes</option>'+Object.entries(classes).map(([id,name])=>`<option value="${id}">${name}</option>`).join('');select.onchange=()=>{activeClass=Number(select.value);render()};filters.append(buttons,select)}
-  async function openPurchase(p){selected=p;try{const [me,chars]=await Promise.all([api('/api/me'),api('/api/characters')]);characters=chars.characters.filter(c=>!c.online&&(!p.classId||c.class===p.classId));if(!characters.length){toast(p.classId?`You need an offline ${p.className||classes[p.classId]} for this package`:'You need an offline character for delivery');return}qs('#purchase-title').textContent=p.name;qs('#purchase-price').textContent=p.price+' credits';qs('#purchase-character').innerHTML='';characters.forEach(c=>{const o=document.createElement('option');o.value=c.guid;o.textContent=`${c.name} — level ${c.level} ${classes[c.class]||''}`;qs('#purchase-character').append(o)});dialog.showModal()}catch(e){if(e.status===401)location.href='/login?next=/shop';else toast(e.message)}}
-	qs('.dialog-close').onclick=()=>dialog.close();qs('#purchase-confirm').onclick=async()=>{const btn=qs('#purchase-confirm');btn.disabled=true;setMessage(dialog,'');try{const result=await api('/api/shop/purchase',{method:'POST',body:JSON.stringify({productId:selected.id,characterGuid:Number(qs('#purchase-character').value),coupon:qs('#purchase-coupon').value})});dialog.close();toast(result.message)}catch(e){setMessage(dialog,e.message)}finally{btn.disabled=false}};
-  api('/api/shop').then(data=>{products=data.products;qs('#shop-meta').textContent=data.deliveryEnabled?'Automatic in-game delivery is online.':'Catalog preview · delivery is currently offline.';categoryButtons();render()}).catch(e=>grid.innerHTML=`<p class="empty">${e.message}</p>`);
-  qsa('[data-credit-package]').forEach(button=>button.onclick=async()=>{button.disabled=true;try{const result=await api('/api/billing/checkout',{method:'POST',body:JSON.stringify({package:button.dataset.creditPackage})});location.href=result.url}catch(e){if(e.status===401)location.href='/login?next=/shop';else toast(e.message)}finally{button.disabled=false}});
-}
-
-if(page==='account'||page==='admin'){
-	  if(page==='account')Promise.all([api('/api/me'),api('/api/characters'),api('/api/orders'),publicConfigPromise]).then(([me,chars,orders,cfg])=>{qs('#account-name').textContent=me.account.username;qs('#account-balance').textContent=me.balance;qs('#character-count').textContent=`${chars.characters.length} character${chars.characters.length===1?'':'s'}`;const box=qs('#account-characters');box.innerHTML='';if(!chars.characters.length)box.innerHTML='<p class="muted">No characters on this realm yet.</p>';chars.characters.forEach(c=>{const el=document.createElement('div');el.className='account-character';el.innerHTML=`<div class="avatar">${initial(c.name)}</div><div><h3></h3><p>Level ${c.level} ${classes[c.class]||'Hero'} · ${c.online?'Online':'Offline'}</p></div><span class="row-actions"></span>`;qs('h3',el).textContent=c.name;const actions=qs('.row-actions',el);if(cfg.features?.armory!==false){const inspect=document.createElement('a');inspect.href='/armory?q='+encodeURIComponent(c.name);inspect.textContent='Inspect';actions.append(inspect)};if(!c.online){for(const action of ['rename','customize','unstuck']){const b=document.createElement('button');b.className='ghost-button';b.textContent=action;b.onclick=()=>runCharacterService(c.guid,action);actions.append(b)}}box.append(el)});loadDeletedCharacters();const list=qs('#orders');list.innerHTML='';if(!orders.orders.length)list.innerHTML='<p class="muted">No orders yet.</p>';orders.orders.forEach(o=>{const el=document.createElement('div');el.className='order';el.innerHTML=`<span>Order #${o.id||o.ID} · item ${o.ItemID||o.itemId}</span><b class="status-${esc(o.Status||o.status)}">${esc(o.Status||o.status)}</b>`;list.append(el)})}).catch(e=>{if(e.status===401)location.href='/login';else toast(e.message)});
-	async function runCharacterService(guid,action){if(!confirm(`${action} this character? The change is applied by AzerothCore.`))return;try{await api(`/api/characters/${guid}/service`,{method:'POST',body:JSON.stringify({action})});toast(`Character ${action} requested`);loadDeletedCharacters()}catch(e){toast(e.message)}}
-	async function loadDeletedCharacters(){try{const {characters}=await api('/api/characters/deleted'),box=qs('#deleted-characters');box.innerHTML='';if(!characters.length){box.innerHTML='<p class="muted">No restorable characters.</p>';return}characters.forEach(c=>{const row=document.createElement('div');row.className='admin-row';row.innerHTML=`<span><b>${esc(c.name)}</b><small>Deleted ${new Date(c.deletedAt*1000).toLocaleString()}</small></span>`;const b=document.createElement('button');b.className='ghost-button';b.textContent='Restore';b.onclick=()=>runCharacterService(c.guid,'restore');row.append(b);box.append(row)})}catch(e){qs('#deleted-characters').innerHTML=`<p class="muted">${esc(e.message)}</p>`}}
-	  async function loadAccounts(q=''){try{const data=await api('/api/admin/accounts?q='+encodeURIComponent(q));const box=qs('#admin-accounts');box.innerHTML='';if(!data.accounts.length){box.innerHTML='<p class="muted">No matching accounts.</p>';return}data.accounts.forEach(a=>{const row=document.createElement('div');row.className='admin-account';const chars=(a.characters||[]).map(c=>`${esc(c.name)} · ${c.level} ${classes[c.class]||'Hero'}${c.online?' · online':''}`).join('<br>')||'No characters';row.innerHTML=`<div><b>${esc(a.username)}</b><small>${esc(a.email)} · ${a.banned?'<i class="danger">BANNED</i>':'Active'}</small><small>${chars}</small>${a.banReason?`<small>Reason: ${esc(a.banReason)}</small>`:''}</div><span class="row-actions"></span>`;const action=a.banned?'unban':'ban';const button=document.createElement('button');button.className='ghost-button';button.textContent=action;button.onclick=()=>{const form=qs('#gm-moderation-form');qs('[name=target]',form).value=a.username;qs('[name=action]',form).value=action;qs('[name=reason]',form).focus()};qs('.row-actions',row).append(button);(a.characters||[]).forEach(c=>{if(c.online){const kick=document.createElement('button');kick.className='ghost-button';kick.textContent='kick '+c.name;kick.onclick=()=>{const form=qs('#gm-moderation-form');qs('[name=target]',form).value=c.name;qs('[name=action]',form).value='kick';qs('[name=reason]',form).focus()};qs('.row-actions',row).append(kick)}});box.append(row)})}catch(e){toast(e.message)}}
-	  async function loadAdmin(){try{const [orders,ledger,moderation]=await Promise.all([api('/api/admin/orders'),api('/api/admin/ledger'),api('/api/admin/moderation')]);const box=qs('#admin-orders');box.innerHTML='';orders.orders.forEach(o=>{const row=document.createElement('div');row.className='admin-row';const id=o.id||o.ID,status=o.status||o.Status;row.innerHTML=`<span><b>#${id} · ${esc(o.product||'Shop order')}</b><small>${esc(o.username||'DEMO')} · ${esc(status)}</small></span><span class="row-actions"></span>`;if(['review','failed'].includes(status)){['retry','refund'].forEach(action=>{const b=document.createElement('button');b.className='ghost-button';b.textContent=action;b.onclick=async()=>{await api(`/api/admin/orders/${id}/${action}`,{method:'POST',body:'{}'});toast(`Order ${action} accepted`);loadAdmin()};qs('.row-actions',row).append(b)})}box.append(row)});const log=qs('#credit-ledger');log.innerHTML='';ledger.entries.forEach(x=>{const row=document.createElement('div');row.className='admin-row';row.innerHTML=`<span><b>${esc(x.Target||x.target)}</b><small>${esc(x.Reason||x.reason)}</small></span><strong>+${x.Amount||x.amount}</strong>`;log.append(row)});const mod=qs('#moderation-log');mod.innerHTML='';if(!moderation.entries.length)mod.innerHTML='<p class="muted">No moderation actions yet.</p>';moderation.entries.forEach(x=>{const row=document.createElement('div');row.className='admin-row';row.innerHTML=`<span><b>${esc(x.Action||x.action)} · ${esc(x.Target||x.target)}</b><small>by ${esc(x.Actor||x.actor)} · ${esc(x.Reason||x.reason)}</small></span><strong class="status-${esc(x.Status||x.status)}">${esc(x.Status||x.status)}</strong>`;mod.append(row)});await Promise.all([loadAccounts(),loadAdminTickets()])}catch(e){toast(e.message)}}
-	  async function loadAdminMonitoring(){const box=qs('#admin-service-status'),announcements=qs('#admin-scheduled-announcements');try{const [status,cfg]=await Promise.all([api('/api/admin/status'),publicConfigPromise]);box.innerHTML='';for(const [label,value] of [['Portal',status.portal],['Database',status.database],['Realm',status.online],['Shop delivery',status.shopDelivery]]){const card=document.createElement('article');card.className='status-card';card.innerHTML=`<span>${label}</span><strong class="${value?'is-online':'is-offline'}">${value?'Operational':'Unavailable'}</strong>`;box.append(card)}if(status.maintenance){const card=document.createElement('article');card.className='status-card maintenance';card.innerHTML=`<span>Maintenance</span><strong>${esc(status.maintenanceMessage||'Scheduled maintenance in progress')}</strong>`;box.append(card)}announcements.innerHTML='';(cfg.news||[]).filter(n=>n.kind==='announcement'||n.kind==='maintenance').forEach(n=>{const card=document.createElement('article');card.className='news-card';card.innerHTML=`<time>${n.publishAt?new Date(n.publishAt).toLocaleString():''}</time><h3>${esc(n.title)}</h3><p>${esc(n.summary||'')}</p>`;announcements.append(card)});if(!announcements.children.length)announcements.innerHTML='<p class="muted">No scheduled notices.</p>'}catch(e){box.innerHTML=`<p class="empty">${esc(e.message)}</p>`}}
-	  const iso=value=>value?new Date(value).toISOString():null;
-	  const inventorySlots={1:'Head',2:'Neck',3:'Shoulders',4:'Shirt',5:'Chest',6:'Waist',7:'Legs',8:'Feet',9:'Wrists',10:'Hands',11:'Ring',12:'Trinket',13:'One-hand weapon',14:'Shield',15:'Ranged',16:'Back',17:'Two-hand weapon',18:'Bag',19:'Tabard',20:'Chest',21:'Main hand',22:'Off hand',23:'Held off-hand',25:'Thrown',26:'Ranged',28:'Relic'};
-	  let catalogItems=[],catalogSearchTimer,adminProducts=[],catalogSort={key:'id',direction:1};
-	  function catalogItemIcon(img,item){useLocalItemFallback(img);resolveItemIcon(img,item.itemId)}
-	  function renderCatalogItems(){const list=qs('#catalog-items'),preview=qs('#catalog-equipment'),kind=qs('#catalog-product-kind');list.innerHTML='';preview.innerHTML='';kind.textContent=catalogItems.length===0?'Service or gold product · no items':catalogItems.length===1?'Single-item product · icon comes from this item ID':`Set / bundle · ${catalogItems.length} different items`;const equipped=catalogItems.filter(i=>inventorySlots[i.inventoryType]&&i.inventoryType!==18),bags=catalogItems.filter(i=>i.inventoryType===18);if(!equipped.length)preview.innerHTML='<p class="muted">Add equipment to preview its slots.</p>';equipped.forEach(item=>{const card=document.createElement('article');card.className=`catalog-slot q-border-${item.quality||0}`;card.innerHTML=`<img alt=""/><span><small>${inventorySlots[item.inventoryType]}</small><b>${esc(item.name||'Item '+item.itemId)}</b><em>iLvl ${item.itemLevel||'—'}</em></span>`;const img=qs('img',card);img.src=localItemIcon;catalogItemIcon(img,item);preview.append(card)});catalogItems.forEach((item,index)=>{const row=document.createElement('div');row.className='catalog-bundle-row';row.innerHTML=`<img alt=""/><span><b>${esc(item.name||'Item '+item.itemId)}</b><small>#${item.itemId} · ${item.inventoryType===18?'Bag · ':''}iLvl ${item.itemLevel||'—'}</small></span><label>Qty<input type="number" min="1" max="1000" value="${item.quantity||1}"/></label><button type="button" class="ghost-button">Remove</button>`;const img=qs('img',row);img.src=localItemIcon;catalogItemIcon(img,item);qs('input',row).onchange=e=>item.quantity=Math.max(1,Math.min(1000,Number(e.target.value)||1));qs('button',row).onclick=()=>{catalogItems.splice(index,1);renderCatalogItems()};list.append(row)});if(bags.length){const note=document.createElement('p');note.className='catalog-bag-count';note.textContent=`${bags.reduce((n,b)=>n+(b.quantity||1),0)} bag(s) included`;list.prepend(note)}}
-	  function renderCatalogTable(){const box=qs('#admin-products');if(!box)return;const term=(qs('#catalog-table-search')?.value||'').trim().toLowerCase(),status=qs('#catalog-table-status')?.value||'all';const rows=adminProducts.filter(p=>(status==='all'||(status==='active')===Boolean(p.active))&&(!term||[p.id,p.name,p.category,p.tier,classes[p.classId]].some(v=>String(v||'').toLowerCase().includes(term)))).sort((a,b)=>{let av=a[catalogSort.key],bv=b[catalogSort.key];if(typeof av==='string'||typeof bv==='string')return String(av||'').localeCompare(String(bv||''))*catalogSort.direction;return (Number(av)-Number(bv))*catalogSort.direction});box.innerHTML='';if(!rows.length){box.innerHTML='<tr><td colspan="7" class="table-empty">No matching products.</td></tr>';return}rows.forEach(p=>{const row=document.createElement('tr');const packageSummary=[p.serviceLevel?`Level ${p.serviceLevel}`:'',p.gold?`${Number(p.gold).toLocaleString()} gold`:'',p.serviceAction?String(p.serviceAction).replaceAll('_',' '):'',p.itemId?`Item #${p.itemId} × ${p.quantity}`:'Bundle'].filter(Boolean).join(' · ');row.innerHTML=`<td>#${p.id}</td><td><b>${esc(p.name)}</b><small>${esc(p.tier||'')}</small></td><td>${esc(p.category)}<small>${p.classId?classes[p.classId]:'Any class'}</small></td><td>${esc(packageSummary)}</td><td><strong>${Number(p.price).toLocaleString()}</strong> credits</td><td><span class="table-status ${p.active?'is-active':'is-archived'}">${p.active?'Active':'Archived'}</span></td><td><button type="button" class="ghost-button">Edit</button></td>`;qs('button',row).onclick=()=>navigateAdmin(`/admin/catalog/${p.id}/edit`);box.append(row)})}
-	  function fillCatalogForm(p={}){const f=qs('#catalog-editor');f.reset();catalogItems=(p.items||[]).map(i=>({...i,quantity:i.quantity||1}));for(const key of ['id','name','price','category','classId','tier','serviceLevel','gold','serviceAction','description','perAccountLimit'])if(f.elements[key])f.elements[key].value=p[key]??({category:'Items',classId:0,serviceLevel:0,gold:0,perAccountLimit:0}[key]??'');f.elements.active.checked=p.id?Boolean(p.active):true;f.elements.startsAt.value=p.startsAt?new Date(p.startsAt).toISOString().slice(0,16):'';f.elements.endsAt.value=p.endsAt?new Date(p.endsAt).toISOString().slice(0,16):'';qs('#catalog-editor-title').textContent=p.id?`Edit #${p.id} · ${p.name}`:'New product';qs('#catalog-archive').classList.toggle('hidden',!p.id||!p.active);qs('#catalog-item-results').innerHTML='';qs('#catalog-item-search').value='';renderCatalogItems();qs('#catalog-list').classList.add('hidden');f.classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'})}
-	  async function openCatalogEditor(id){try{const {product}=await api('/api/admin/products/'+id);fillCatalogForm(product)}catch(e){toast(e.message)}}
-	  function mountCatalogEditor(){const form=qs('#catalog-editor'),search=qs('#catalog-item-search'),results=qs('#catalog-item-results');qs('#catalog-new').onclick=e=>{e.preventDefault();navigateAdmin('/admin/catalog/new')};qs('#catalog-cancel').onclick=()=>navigateAdmin('/admin/catalog');search.oninput=()=>{clearTimeout(catalogSearchTimer);const term=search.value.trim();if(term.length<2){results.innerHTML='';return}catalogSearchTimer=setTimeout(async()=>{try{const data=await api('/api/admin/items?q='+encodeURIComponent(term));results.innerHTML='';data.items.forEach(item=>{const b=document.createElement('button');b.type='button';b.innerHTML=`<span class="q${item.quality||0}">${esc(item.name)}</span><small>#${item.itemId} · ${inventorySlots[item.inventoryType]||'Item'} · iLvl ${item.itemLevel}</small>`;b.onclick=()=>{const existing=catalogItems.find(x=>x.itemId===item.itemId);if(existing)existing.quantity++;else catalogItems.push({...item,quantity:1});renderCatalogItems();results.innerHTML='';search.value=''};results.append(b)});if(!data.items.length)results.innerHTML='<p class="muted">No matching items.</p>'}catch(e){results.innerHTML=`<p class="muted">${esc(e.message)}</p>`}},250)};form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(form),id=Number(fd.get('id')||0),payload=Object.fromEntries(fd);for(const key of ['price','classId','serviceLevel','gold','perAccountLimit'])payload[key]=Number(payload[key]||0);payload.active=fd.has('active');payload.startsAt=iso(payload.startsAt);payload.endsAt=iso(payload.endsAt);payload.imageUrl='';if(catalogItems.length===1){payload.itemId=catalogItems[0].itemId;payload.quantity=catalogItems[0].quantity;payload.items=[]}else{payload.itemId=0;payload.quantity=0;payload.items=catalogItems.map(i=>({itemId:i.itemId,quantity:i.quantity}))}delete payload.id;try{const result=await api(id?'/api/admin/products/'+id:'/api/admin/products',{method:id?'PUT':'POST',body:JSON.stringify(payload)});setMessage(form,id?'Product updated.':`Product #${result.id} created.`,true);await loadPortalAdmin();if(!id&&result.id)navigateAdmin(`/admin/catalog/${result.id}/edit`)}catch(err){setMessage(form,err.message)}};qs('#catalog-archive').onclick=async()=>{const id=Number(form.elements.id.value);if(id&&confirm('Archive this product? Existing orders remain intact.')){await api('/api/admin/products/'+id,{method:'DELETE'});await loadPortalAdmin();navigateAdmin('/admin/catalog')}}}
-	  async function loadPortalAdmin(){try{const [products,coupons,news,settings]=await Promise.all([api('/api/admin/products'),api('/api/admin/coupons'),api('/api/admin/news'),api('/api/admin/settings')]);adminProducts=products.products;renderCatalogTable();const couponBox=qs('#admin-coupons');couponBox.innerHTML='';coupons.coupons.forEach(c=>{const row=document.createElement('div');row.className='admin-row';row.innerHTML=`<span><b>${esc(c.code)}</b><small>${c.discountPercent||0}% + ${c.discountCredits||0} credits · ${c.active?'active':'disabled'}</small></span>`;const b=document.createElement('button');b.className='ghost-button';b.textContent='Disable';b.onclick=async()=>{await api('/api/admin/coupons/'+c.id,{method:'DELETE'});loadPortalAdmin()};row.append(b);couponBox.append(row)});const newsBox=qs('#admin-news');newsBox.innerHTML='';news.news.forEach(n=>{const row=document.createElement('div');row.className='admin-row';row.innerHTML=`<span><b>${esc(n.title)}</b><small>${esc(n.kind)} · ${n.active?'published':'archived'}</small></span><span class="row-actions"></span>`;const edit=document.createElement('button');edit.className='ghost-button';edit.textContent='Edit';edit.onclick=async()=>{const title=prompt('Title',n.title),summary=prompt('Summary',n.summary||'');if(title===null||summary===null)return;await api('/api/admin/news/'+n.id,{method:'PUT',body:JSON.stringify({...n,title,summary})});loadPortalAdmin()};const archive=document.createElement('button');archive.className='ghost-button';archive.textContent='Archive';archive.onclick=async()=>{await api('/api/admin/news/'+n.id,{method:'DELETE'});loadPortalAdmin()};qs('.row-actions',row).append(edit,archive);newsBox.append(row)});const form=qs('#gm-settings-form'),cfg=settings.settings;for(const [key,value] of Object.entries(cfg)){const input=form.elements[key];if(!input)continue;if(input.type==='checkbox')input.checked=Boolean(value);else if(input.type==='datetime-local')input.value=value?new Date(value).toISOString().slice(0,16):'';else input.value=value??''}}catch(e){toast(e.message)}}
-	  async function loadGMConsoleHistory(){const data=await api('/api/admin/console'),box=qs('#gm-command-history');box.innerHTML='';qs('#gm-command-policy').textContent=data.allowAll?'Unrestricted mode: every valid one-line command is permitted.':'Allowed command prefixes: '+data.allowedPrefixes.join(', ');if(!data.entries.length){box.innerHTML='<p class="muted">No commands have been run.</p>';return}data.entries.forEach(entry=>{const row=document.createElement('div');row.className='admin-row command-history';const info=document.createElement('span'),command=document.createElement('code'),meta=document.createElement('small'),result=document.createElement('strong');command.textContent='> '+entry.command;meta.textContent=`${entry.actor} · ${new Date(entry.created).toLocaleString()}\n${entry.response}`;result.textContent=entry.success?'OK':'FAILED';result.className=entry.success?'status-executed':'status-failed';info.append(command,meta);row.append(info,result);box.append(row)})}
-	  function mountGMConsole(){const panel=qs('#gm-command-console'),form=qs('#gm-command-form'),output=qs('#gm-command-output');qs('#gm-command-disabled',panel)?.classList.add('hidden');qs('#gm-command-enabled',panel)?.classList.remove('hidden');loadGMConsoleHistory().catch(e=>{output.textContent=e.message});form.onsubmit=async e=>{e.preventDefault();const button=qs('button[type=submit]',form),command=new FormData(form).get('command');button.disabled=true;setMessage(form,'');output.textContent='Executing…';try{const result=await api('/api/admin/console',{method:'POST',body:JSON.stringify({command})});output.textContent=result.output;form.reset();await loadGMConsoleHistory()}catch(err){output.textContent=err.message;setMessage(form,err.message)}finally{button.disabled=false}}}
-	  async function loadAdminTickets(){try{const {tickets}=await api('/api/admin/tickets');const box=qs('#admin-tickets');box.innerHTML='';if(!tickets.length)box.innerHTML='<p class="muted">No support tickets.</p>';tickets.forEach(t=>{const row=document.createElement('div');row.className='ticket-row';row.innerHTML=`<div><b>#${t.id} · ${esc(t.subject)}</b><small>${esc(t.username||'Player')} · ${esc(t.message)}</small>${t.response?`<small>Reply: ${esc(t.response)}</small>`:''}</div><span class="row-actions"></span>`;for(const action of ['answer','close']){const b=document.createElement('button');b.className='ghost-button';b.textContent=action;b.onclick=async()=>{const response=action==='answer'?prompt('Reply to this ticket',t.response||''):t.response||'Closed by staff';if(response===null)return;await api('/api/admin/tickets/'+t.id,{method:'POST',body:JSON.stringify({status:action==='answer'?'answered':'closed',response})});loadAdminTickets()};qs('.row-actions',row).append(b)}box.append(row)})}catch(e){toast(e.message)}}
-	  async function loadMyTickets(){try{const {tickets}=await api('/api/tickets');const box=qs('#my-tickets');box.innerHTML='';if(!tickets.length)box.innerHTML='<p class="muted">No support tickets.</p>';tickets.forEach(t=>{const row=document.createElement('div');row.className='ticket-row';row.innerHTML=`<div><b>#${t.id} · ${esc(t.subject)}</b><small>${esc(t.message)}</small>${t.response?`<small>GM reply: ${esc(t.response)}</small>`:''}</div><strong class="status-${esc(t.status)}">${esc(t.status)}</strong>`;box.append(row)})}catch(e){toast(e.message)}}
-  async function loadSessions(){try{const {sessions}=await api('/api/security/sessions');const box=qs('#security-sessions');box.innerHTML='';sessions.forEach(s=>{const row=document.createElement('div');row.className='session-row';row.innerHTML=`<span><b>${s.Current?'This session':esc(s.IP||'Unknown location')}</b><small>${esc(s.UserAgent||'Unknown browser')} · last seen ${new Date(s.LastSeen).toLocaleString()}</small></span>`;if(!s.Current){const b=document.createElement('button');b.className='ghost-button';b.textContent='Revoke';b.onclick=async()=>{await api('/api/security/sessions/'+encodeURIComponent(s.id),{method:'DELETE'});loadSessions()};row.append(b)}box.append(row)})}catch(e){qs('#security-sessions').innerHTML=`<p class="muted">${esc(e.message)}</p>`}}
-	  if(page==='account'){
-		loadSessions();publicConfigPromise.then(c=>{if(c.features?.support!==false){loadMyTickets();submitJSON(qs('#ticket-form'),'/api/tickets',()=>{setMessage(qs('#ticket-form'),'Ticket submitted.',true);qs('#ticket-form').reset();loadMyTickets()})}});submitJSON(qs('#password-form'),'/api/security/password',()=>{toast('Password changed. Please sign in again.');setTimeout(()=>location.href='/login',900)});qs('#totp-setup').onclick=async()=>{try{const data=await api('/api/security/totp/setup',{method:'POST',body:'{}'});qs('#totp-secret').textContent=data.secret;qs('#totp-enroll').classList.remove('hidden')}catch(e){toast(e.message)}};submitJSON(qs('#totp-form'),'/api/security/totp/enable',()=>{setMessage(qs('#totp-form'),'Authenticator enabled.',true);qs('#totp-setup').textContent='Reset authenticator'});qs('#logout').onclick=()=>api('/api/auth/logout',{method:'POST',body:'{}'}).finally(()=>location.href='/');
-	  }
-	  if(page==='admin'){
-		let adminRouteToken=0;
-		function parseAdminRoute(path=location.pathname){
-		  const clean=path.replace(/\/+$/,'')||'/admin';
-		  const editor=clean.match(/^\/admin\/catalog\/(\d+)\/edit$/);
-		  if(editor)return {view:'catalog',editor:Number(editor[1])};
-		  if(clean==='/admin/catalog/new')return {view:'catalog',editor:'new'};
-		  const routes={
-		    '/admin':{view:'overview'},'/admin/monitoring':{view:'monitoring'},'/admin/catalog':{view:'catalog'},
-		    '/admin/players/accounts':{view:'players',subview:'accounts'},'/admin/players/credits':{view:'players',subview:'credits'},'/admin/players/moderation':{view:'players',subview:'moderation'},
-		    '/admin/realm/operations':{view:'realm-admin',subview:'operations'},'/admin/realm/console':{view:'realm-admin',subview:'console'},
-		    '/admin/content':{view:'content'},'/admin/support':{view:'support-admin'},'/admin/settings':{view:'settings'},'/admin/audit':{view:'audit'}
-		  };
-		  return routes[clean]||{view:'overview',canonical:'/admin'};
+if (page === "setup") {
+	const form = qs("#setup-form");
+	const showSetupState = (titleText, messageText, withLogin = false) => {
+		form.innerHTML = "";
+		const title = document.createElement("h2");
+		title.textContent = titleText;
+		const message = document.createElement("p");
+		message.className = "muted";
+		message.textContent = messageText;
+		form.append(title, message);
+		if (withLogin) {
+			const link = document.createElement("a");
+			link.className = "button full";
+			link.href = "/login";
+			link.textContent = "Sign in →";
+			form.append(link);
 		}
-		async function applyAdminRoute(){
-		  const route=parseAdminRoute(),token=++adminRouteToken;
-		  qsa('[data-admin-route]').forEach(x=>x.classList.toggle('active',x.dataset.adminRoute===route.view));
-		  qsa('[data-admin-view]').forEach(x=>x.classList.toggle('active',x.dataset.adminView===route.view));
-		  qsa('[data-admin-subroute]').forEach(x=>x.classList.toggle('active',x.dataset.adminSubroute===route.subview&&x.closest('[data-admin-view]')?.dataset.adminView===route.view));
-		  qsa('[data-admin-subview]').forEach(x=>x.classList.toggle('active',x.dataset.adminSubview===route.subview&&x.closest('[data-admin-view]')?.dataset.adminView===route.view));
-		  const list=qs('#catalog-list'),editor=qs('#catalog-editor');
-		  if(route.view==='catalog'){
-		    const editing=route.editor!==undefined;
-		    list.classList.toggle('hidden',editing);editor.classList.toggle('hidden',!editing);
-		    if(route.editor==='new')fillCatalogForm();
-		    else if(Number.isInteger(route.editor)){await openCatalogEditor(route.editor);if(token!==adminRouteToken)return}
-		  }else{list.classList.remove('hidden');editor.classList.add('hidden')}
-		  if(route.canonical)history.replaceState(null,'',route.canonical);
-		  qs('.admin-workspace')?.classList.remove('route-changing');
+	};
+	setupStatePromise
+		.then((state) => {
+			if (!state.enabled)
+				showSetupState(
+					"Setup disabled",
+					"Configure ENABLE_SETUP=true and a SETUP_TOKEN to use the web setup wizard.",
+				);
+			else if (state.complete)
+				showSetupState(
+					"Setup complete",
+					"The initial realm administrator has already been created.",
+					true,
+				);
+		})
+		.catch((e) => setMessage(form, e.message));
+	form.onsubmit = async (e) => {
+		e.preventDefault();
+		const values = Object.fromEntries(new FormData(form));
+		if (values.password !== values.confirmPassword) {
+			setMessage(form, "Passwords do not match");
+			return;
 		}
-		function navigateAdmin(path,{replace=false}={}){
-		  if(path!==location.pathname)(replace?history.replaceState:history.pushState).call(history,null,'',path);
-		  qs('.admin-workspace')?.classList.add('route-changing');applyAdminRoute();
+		delete values.confirmPassword;
+		const button = qs("button[type=submit]", form);
+		button.disabled = true;
+		try {
+			const result = await api("/api/setup", {
+				method: "POST",
+				body: JSON.stringify(values),
+			});
+			form.reset();
+			form.innerHTML = "";
+			const title = document.createElement("h2");
+			title.textContent = "Setup complete";
+			const message = document.createElement("p");
+			message.className = "success";
+			message.textContent = `${result.username} is now a level ${result.gmLevel} GM.`;
+			const link = document.createElement("a");
+			link.className = "button full";
+			link.href = "/login";
+			link.textContent = "Sign in →";
+			form.append(title, message, link);
+		} catch (err) {
+			setMessage(form, err.message);
+		} finally {
+			button.disabled = false;
 		}
-		document.addEventListener('click',event=>{const link=event.target.closest('a[href^="/admin"]');if(!link||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();navigateAdmin(new URL(link.href).pathname)});
-		window.addEventListener('popstate',applyAdminRoute);
-		function syncModerationFields(){const form=qs('#gm-moderation-form'),ban=form.elements.action.value==='ban',field=qs('[data-moderation-field="duration"]',form),input=form.elements.duration;field.classList.toggle('hidden',!ban);input.required=ban}
-		function syncOperationFields(){
-		  const form=qs('#gm-operation-form'),action=form.elements.action.value;
-		  const config={
-		    start:['Start realm','Starts the realm through the configured start webhook.'],mute:['Mute character','Enter a character and a duration in minutes.'],unmute:['Unmute character','Remove an active character mute.'],
-		    ip_ban:['Ban IP','Duration examples: 30m, 7d, 1w, or -1.'],ip_unban:['Unban IP','Remove an IP address ban.'],gm_level:['Set GM level','Choose an account, security level, and realm scope.'],
-		    announce:['Send announcement','Broadcast this message to online players.'],motd:['Set message of the day','Replace the realm MOTD.'],restart:['Schedule restart','Delay must be 10–3600 seconds.'],shutdown:['Schedule shutdown','Delay must be 10–3600 seconds.'],cancel_shutdown:['Cancel shutdown or restart','Cancels the pending worldserver timer.']
-		  }[action];
-		  const visible={target:['mute','unmute','ip_ban','ip_unban','gm_level'].includes(action),duration:['mute','ip_ban','restart','shutdown'].includes(action),gm:action==='gm_level',reason:true};
-		  for(const [name,show] of Object.entries(visible)){const field=qs(`[data-operation-field="${name}"]`,form);field.classList.toggle('hidden',!show);qsa('input,select,textarea',field).forEach(input=>input.required=show&&(name==='target'||name==='duration'||name==='reason'))}
-		  const target=form.elements.target,duration=form.elements.duration,reason=form.elements.reason;
-		  target.placeholder=action==='ip_ban'||action==='ip_unban'?'IPv4 or IPv6 address':action==='gm_level'?'Account name':'Character name';
-		  duration.placeholder=action==='mute'?'Minutes (1–525600)':action==='ip_ban'?'30m, 7d, 1w, or -1':'Seconds (10–3600)';
-		  reason.placeholder=action==='announce'?'Announcement text':action==='motd'?'New realm message of the day':'Required audit reason';
-		  qs('#operation-title').textContent=config[0];qs('#operation-help').textContent=config[1];
+	};
+}
+if (page === "login")
+	submitJSON(qs("#login-form"), "/api/auth/login", () => {
+		location.href = "/account";
+	});
+if (page === "forgot-password")
+	submitJSON(qs("#forgot-form"), "/api/auth/password/request", (result) =>
+		setMessage(qs("#forgot-form"), result.message, true),
+	);
+if (page === "reset-password") {
+	const form = qs("#reset-form");
+	form.onsubmit = async (e) => {
+		e.preventDefault();
+		const token = new URLSearchParams(location.search).get("token") || "";
+		try {
+			await api("/api/auth/password/reset", {
+				method: "POST",
+				body: JSON.stringify({
+					token,
+					password: new FormData(form).get("password"),
+				}),
+			});
+			setMessage(form, "Password reset. Taking you to sign in…", true);
+			setTimeout(() => (location.href = "/login"), 900);
+		} catch (err) {
+			setMessage(form, err.message);
 		}
-		Promise.all([api('/api/me'),publicConfigPromise]).then(([me,cfg])=>{if(!me.account?.gmLevel||cfg.features?.admin===false)throw Object.assign(new Error('GM access required'),{status:403});qs('#admin-access').classList.remove('hidden');mountCatalogEditor();qs('#catalog-table-search').oninput=renderCatalogTable;qs('#catalog-table-status').onchange=renderCatalogTable;qsa('[data-catalog-sort]').forEach(button=>button.onclick=()=>{const key=button.dataset.catalogSort;if(catalogSort.key===key)catalogSort.direction*=-1;else catalogSort={key,direction:1};renderCatalogTable()});qsa('[data-admin-refresh]').forEach(button=>button.onclick=()=>Promise.all([loadAdmin(),loadPortalAdmin(),loadAdminMonitoring()]));qs('[data-monitoring-refresh]').onclick=loadAdminMonitoring;const gm=qs('#gm-credit-form');gm.onsubmit=async e=>{e.preventDefault();const button=qs('button[type=submit]',gm);button.disabled=true;setMessage(gm,'');const values=Object.fromEntries(new FormData(gm));values.amount=Number(values.amount);try{const result=await api('/api/admin/credits',{method:'POST',body:JSON.stringify(values)});setMessage(gm,`${result.amount} credits granted to ${result.username}. New balance: ${result.balance}.`,true);gm.reset();loadAdmin()}catch(err){setMessage(gm,err.message)}finally{button.disabled=false}};qs('#gm-coupon-form').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,v=Object.fromEntries(new FormData(f));for(const k of ['discountPercent','discountCredits','maxUses','perAccountLimit'])v[k]=Number(v[k]);v.startsAt=iso(v.startsAt);v.endsAt=iso(v.endsAt);try{await api('/api/admin/coupons',{method:'POST',body:JSON.stringify(v)});f.reset();setMessage(f,'Coupon created.',true);loadPortalAdmin()}catch(err){setMessage(f,err.message)}};qs('#gm-news-form').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,v=Object.fromEntries(new FormData(f));v.active=true;v.publishAt=iso(v.publishAt);v.expiresAt=iso(v.expiresAt);try{await api('/api/admin/news',{method:'POST',body:JSON.stringify(v)});f.reset();setMessage(f,'Published.',true);loadPortalAdmin()}catch(err){setMessage(f,err.message)}};qs('#gm-settings-form').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,fd=new FormData(f),v=Object.fromEntries(fd);for(const k of ['maintenanceEnabled','registration','armory','rankings','guilds','realm','shop','support','admin','gmConsole'])v[k]=fd.has(k);v.maintenanceStarts=iso(v.maintenanceStarts);v.maintenanceEnds=iso(v.maintenanceEnds);try{await api('/api/admin/settings',{method:'PUT',body:JSON.stringify(v)});setMessage(f,'Website settings saved.',true);toast('Configuration updated')}catch(err){setMessage(f,err.message)}};const search=qs('#gm-account-search');search.onsubmit=e=>{e.preventDefault();loadAccounts(new FormData(search).get('q'))};const moderate=async form=>{const button=qs('button[type=submit]',form);button.disabled=true;setMessage(form,'');try{const values=Object.fromEntries(new FormData(form));if('level'in values)values.level=Number(values.level);if('realmId'in values)values.realmId=Number(values.realmId);const result=await api('/api/admin/moderation',{method:'POST',body:JSON.stringify(values)});setMessage(form,`${result.action} applied to ${result.target}.`,true);await loadAdmin()}catch(err){setMessage(form,err.message)}finally{button.disabled=false}};const moderationForm=qs('#gm-moderation-form'),operationForm=qs('#gm-operation-form');moderationForm.onsubmit=e=>{e.preventDefault();moderate(e.currentTarget)};operationForm.onsubmit=e=>{e.preventDefault();moderate(e.currentTarget)};moderationForm.elements.action.onchange=syncModerationFields;operationForm.elements.action.onchange=syncOperationFields;syncModerationFields();syncOperationFields();applyAdminRoute();loadAdmin();loadPortalAdmin();loadAdminMonitoring();if(cfg.features?.gmConsole)mountGMConsole()}).catch(e=>{if(e.status===401){location.href='/login?next='+encodeURIComponent(location.pathname);return}qs('#admin-denied').classList.remove('hidden')});
-	  }
+	};
+}
+if (page === "verify-email") {
+	const status = qs("#verification-status"),
+		resend = qs("#verification-resend"),
+		token = new URLSearchParams(location.search).get("token") || "";
+	const verify = async () => {
+		if (!token) {
+			status.textContent = "This verification link is missing its token.";
+			resend.classList.remove("hidden");
+			return;
+		}
+		try {
+			const result = await api("/api/auth/email/verify", {
+				method: "POST",
+				body: JSON.stringify({ token }),
+			});
+			status.textContent = result.message;
+			status.classList.add("success");
+			qs("#verification-login").classList.remove("hidden");
+		} catch (err) {
+			status.textContent = err.message;
+			resend.classList.remove("hidden");
+		}
+	};
+	resend.onsubmit = async (e) => {
+		e.preventDefault();
+		const button = qs("button", resend);
+		button.disabled = true;
+		try {
+			const result = await api("/api/auth/email/resend", {
+				method: "POST",
+				body: JSON.stringify({ email: new FormData(resend).get("email") }),
+			});
+			setMessage(resend, result.message, true);
+		} catch (err) {
+			setMessage(resend, err.message);
+		} finally {
+			button.disabled = false;
+		}
+	};
+	verify();
 }
 
-if(page==='realm') Promise.all([api('/api/realm'),publicConfigPromise]).then(([r,c])=>{const hours=Math.floor(r.uptime/3600),total=Math.max(1,r.allianceOnline+r.hordeOnline),alliance=Math.round(r.allianceOnline/total*100);qs('#realm-overview').innerHTML=`<div class="realm-title"><i></i><div><p class="eyebrow">ONLINE NOW</p><h2>${esc(r.name)}</h2><code>set realmlist ${esc(r.address)}</code></div><strong>${Number(r.online).toLocaleString()}<small> players</small></strong></div><div class="realm-stats"><article><span>Total characters</span><b>${Number(r.characters).toLocaleString()}</b></article><article><span>Current uptime</span><b>${hours.toLocaleString()}h</b></article><article><span>Online record</span><b>${Number(r.recordOnline).toLocaleString()}</b></article><article><span>Experience rate</span><b>${esc(c.experienceRate||'1×')}</b></article></div><div class="faction-balance"><div><span>Alliance · ${r.allianceOnline}</span><span>Horde · ${r.hordeOnline}</span></div><i style="--alliance:${alliance}%"></i></div>`}).catch(e=>qs('#realm-overview').innerHTML=`<p class="empty">${esc(e.message)}</p>`);
+if (page === "armory") {
+	const form = qs("#armory-search"),
+		grid = qs("#armory-results"),
+		detail = qs("#character-detail"),
+		tooltip = qs("#item-tooltip");
+	const fallbackIcon = localItemIcon;
+	const formatDate = (value) =>
+		value
+			? new Intl.DateTimeFormat(undefined, {
+					day: "numeric",
+					month: "short",
+					year: "numeric",
+				}).format(new Date(value * 1000))
+			: "Not recorded";
+	function itemIcon(item) {
+		return item.icon ? iconBase + item.icon + ".jpg" : fallbackIcon;
+	}
+	let jqueryLoader, wowheadLoader;
+	function loadJQuery() {
+		if (window.jQuery) return Promise.resolve(window.jQuery);
+		if (jqueryLoader) return jqueryLoader;
+		jqueryLoader = new Promise((resolve, reject) => {
+			const script = document.createElement("script");
+			script.src = "https://code.jquery.com/jquery-3.7.1.min.js";
+			script.integrity = "sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=";
+			script.crossOrigin = "anonymous";
+			script.async = true;
+			script.onload = () =>
+				window.jQuery
+					? resolve(window.jQuery)
+					: reject(new Error("jQuery API unavailable"));
+			script.onerror = () => reject(new Error("jQuery CDN unavailable"));
+			document.head.append(script);
+		});
+		return jqueryLoader;
+	}
+	function loadWowhead() {
+		if (window.ZamModelViewer) return Promise.resolve(window.ZamModelViewer);
+		if (wowheadLoader) return wowheadLoader;
+		wowheadLoader = loadJQuery().then(
+			() =>
+				new Promise((resolve, reject) => {
+					const script = document.createElement("script");
+					script.src =
+						"https://wow.zamimg.com/modelviewer/live/viewer/viewer.min.js";
+					script.async = true;
+					script.onload = () =>
+						window.ZamModelViewer
+							? resolve(window.ZamModelViewer)
+							: reject(new Error("Viewer API unavailable"));
+					script.onerror = () => reject(new Error("Wowhead CDN unavailable"));
+					document.head.append(script);
+				}),
+		);
+		return wowheadLoader;
+	}
+	async function mountWowheadModel(container, c, equipment) {
+		const stage = qs(".wowhead-model", container),
+			status = qs(".model-provider", container);
+		try {
+			const Viewer = await loadWowhead();
+			const display = (characterDisplays[c.race] || characterDisplays[1])[
+				c.gender === 1 ? 1 : 0
+			];
+			const model = {
+				id: display,
+				type: 8,
+				items: equipment
+					.filter((i) => i.displayId)
+					.map((i) => [Number(i.slot) + 1, Number(i.displayId)]),
+			};
+			const options = {
+				type: 1,
+				contentPath: "https://wow.zamimg.com/modelviewer/live/",
+				container: stage,
+				aspect: 0.72,
+				hd: true,
+				models: [model],
+			};
+			let viewer;
+			try {
+				viewer = new Viewer(options);
+			} catch {
+				viewer = new Viewer({ ...options, models: model });
+			}
+			await Promise.resolve(viewer);
+			stage.classList.add("ready");
+			status.textContent = "Interactive 3D · Wowhead model viewer";
+		} catch (error) {
+			status.textContent = "Wowhead model viewer failed to initialize";
+			stage.innerHTML =
+				'<p class="model-error">Unable to load the 3D model.</p>';
+		}
+	}
+	async function resolveIcon(img, item) {
+		if (item.icon) return;
+		try {
+			const cached = localStorage.getItem("item-icon-" + item.entry);
+			if (cached) {
+				img.src = iconBase + cached + ".jpg";
+				return;
+			}
+			const data = await fetch(
+				`https://nether.wowhead.com/tooltip/item/${item.entry}?dataEnv=8&locale=0`,
+			).then((r) => r.json());
+			if (data.icon) {
+				localStorage.setItem("item-icon-" + item.entry, data.icon);
+				img.src = iconBase + data.icon + ".jpg";
+			}
+		} catch {}
+	}
+	function showTooltip(item, event) {
+		const stats = (item.stats || []).map((x) =>
+			typeof x === "string"
+				? x
+				: `+${x.value} ${statNames[x.type] || "Stat " + x.type}`,
+		);
+		tooltip.innerHTML = `<strong class="q${item.quality || 0}">${esc(item.name)}</strong><span>${qualityNames[item.quality] || "Item"} · Item Level ${item.itemLevel || "—"}</span>${item.requiredLevel ? `<span>Requires Level ${item.requiredLevel}</span>` : ""}${item.armor ? `<span>${item.armor} Armor</span>` : ""}${stats.map((x) => `<span class="item-stat">${esc(x)}</span>`).join("")}<small>Item ${item.entry}</small>`;
+		tooltip.classList.add("visible");
+		moveTooltip(event);
+	}
+	function moveTooltip(event) {
+		const pad = 18,
+			w = tooltip.offsetWidth || 260,
+			h = tooltip.offsetHeight || 180;
+		tooltip.style.left =
+			Math.min(event.clientX + 16, innerWidth - w - pad) + "px";
+		tooltip.style.top =
+			Math.min(event.clientY + 16, innerHeight - h - pad) + "px";
+	}
+	function gearSlot(slot, item) {
+		const el = document.createElement("div");
+		el.className = `gear-slot gear-slot-${slot} q-border-${item?.quality || 0}`;
+		el.innerHTML = `<div class="gear-icon">${item ? '<img alt=""/>' : "<span>+</span>"}</div><div class="gear-label"><small>${slots[slot]}</small><strong>${item ? esc(item.name) : "Empty slot"}</strong>${item ? `<i>Item level ${item.itemLevel || "—"}</i>` : ""}</div>`;
+		if (item) {
+			const img = qs("img", el);
+			img.src = itemIcon(item);
+			useLocalItemFallback(img);
+			resolveIcon(img, item);
+			el.onmouseenter = (e) => showTooltip(item, e);
+			el.onmousemove = moveTooltip;
+			el.onmouseleave = () => tooltip.classList.remove("visible");
+		}
+		return el;
+	}
+	function renderPaperdoll(c, equipment) {
+		const bySlot = new Map(equipment.map((i) => [Number(i.slot), i]));
+		const doll = document.createElement("div");
+		doll.className = "paperdoll";
+		const left = document.createElement("div");
+		left.className = "gear-column left";
+		[0, 1, 2, 14, 4, 3, 8, 9].forEach((slot) =>
+			left.append(gearSlot(slot, bySlot.get(slot))),
+		);
+		const center = document.createElement("div");
+		center.className = `character-model class-${c.class}`;
+		center.innerHTML = `<div class="model-glow"></div><div class="wowhead-model"><div class="model-loading"><i></i><span>Loading character model</span></div></div><span class="model-provider">Connecting to Wowhead 3D…</span><div class="model-caption"><p>${races[c.race] || ""}</p><strong>${classes[c.class] || "Hero"}</strong><small>Level ${c.level}</small></div>`;
+		mountWowheadModel(center, c, equipment);
+		const right = document.createElement("div");
+		right.className = "gear-column right";
+		[5, 6, 7, 10, 11, 12, 13, 18].forEach((slot) =>
+			right.append(gearSlot(slot, bySlot.get(slot))),
+		);
+		const weapons = document.createElement("div");
+		weapons.className = "weapon-row";
+		[15, 16, 17].forEach((slot) =>
+			weapons.append(gearSlot(slot, bySlot.get(slot))),
+		);
+		doll.append(left, center, right, weapons);
+		return doll;
+	}
+	function renderProgression(data, target) {
+		target.innerHTML = "";
+		const summary = document.createElement("div");
+		summary.className = "progress-summary";
+		const done = data.progression.filter((x) => x.characterDate).length;
+		summary.innerHTML = `<div><p class="eyebrow">RECORDED PROGRESSION</p><h3>${esc(data.character)}${data.guild ? ` · &lt;${esc(data.guild)}&gt;` : ""}</h3></div><strong>${done}<small> / ${data.progression.length} sections</small></strong>`;
+		target.append(summary);
+		const groups = {};
+		data.progression.forEach((p) => (groups[p.raid] ??= []).push(p));
+		Object.entries(groups).forEach(([raid, entries]) => {
+			const section = document.createElement("section");
+			section.className = "raid-card";
+			const completed = entries.filter((x) => x.characterDate).length;
+			section.innerHTML = `<header><div><h3>${esc(raid)}</h3><p>${completed} of ${entries.length} recorded sections</p></div><span>${Math.round((completed / entries.length) * 100)}%</span></header><div class="raid-progress"><i style="width:${(completed / entries.length) * 100}%"></i></div><div class="raid-encounters"></div>`;
+			const list = qs(".raid-encounters", section);
+			entries.forEach((e) => {
+				const row = document.createElement("article");
+				row.className = e.characterDate ? "down" : "pending";
+				row.innerHTML = `<span class="kill-mark">${e.characterDate ? "✓" : "○"}</span><div><strong>${esc(e.section)}</strong><small>${esc(e.difficulty)} · ${e.bosses.map(esc).join(", ")}</small></div><time>${formatDate(e.characterDate)}</time>${data.guild ? `<em>Guild first: ${formatDate(e.guildDate)}</em>` : ""}`;
+				list.append(row);
+			});
+			target.append(section);
+		});
+	}
+	async function search(term = "") {
+		detail.innerHTML = "";
+		grid.innerHTML = "";
+		try {
+			const { characters } = await api(
+				"/api/armory?q=" + encodeURIComponent(term),
+			);
+			if (!characters.length) {
+				grid.innerHTML =
+					'<p class="empty">No heroes found. Try another name.</p>';
+				return;
+			}
+			characters.forEach((c) => {
+				const card = characterCard(c);
+				card.addEventListener("click", () => show(c.name));
+				grid.append(card);
+			});
+		} catch (e) {
+			grid.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
+		}
+	}
+	async function show(name) {
+		grid.innerHTML = "";
+		detail.innerHTML = '<div class="skeleton"></div>';
+		try {
+			const [
+				{ character: c, equipment, profile, arenaTeams },
+				progress,
+				insights,
+			] = await Promise.all([
+				api("/api/armory/" + encodeURIComponent(name)),
+				api("/api/progression/" + encodeURIComponent(name)),
+				api("/api/armory/" + encodeURIComponent(name) + "/insights"),
+			]);
+			const wrap = document.createElement("article");
+			wrap.className = "character-profile";
+			wrap.innerHTML = `<button class="ghost-button" id="back-armory">← Back to heroes</button><div class="profile-head"><div class="avatar">${initial(c.name)}</div><div><h2></h2><p>Level ${c.level} ${races[c.race] || ""} ${classes[c.class] || ""}</p><a class="guild-name" href="/guilds">${c.guild ? "‹" + esc(c.guild) + "›" : "Unaffiliated"}</a></div><div class="profile-vitals"><span class="${c.online ? "is-online" : ""}">${c.online ? "Online now" : "Offline"}</span><strong>${Math.floor(c.totalTime / 3600).toLocaleString()}h <small>played</small></strong></div></div><nav class="profile-tabs"><button class="active" data-profile="gear">Equipment</button><button data-profile="talents">Talents & glyphs</button><button data-profile="achievements">Achievements & raids</button><button data-profile="pvp">PvP history</button><button data-profile="guild">Guild activity</button></nav><div id="gear-panel"></div><div id="talents-panel" class="hidden"></div><div id="achievements-panel" class="hidden"></div><div id="pvp-panel" class="hidden"></div><div id="guild-panel" class="hidden"></div>`;
+			qs("h2", wrap).textContent = c.name;
+			const gear = qs("#gear-panel", wrap),
+				summary = document.createElement("div"),
+				professions = profile?.professions || [];
+			summary.className = "profile-overview";
+			summary.innerHTML = `<div class="profile-stat"><span>Achievements</span><b>${profile?.achievements || 0}</b></div><div class="profile-stat"><span>Exalted reputations</span><b>${profile?.exaltedReputations || 0}</b></div><div class="profile-stat"><span>Talent specializations</span><b>${profile?.talentSpecs || 0}</b></div><div class="profile-stat"><span>Active glyphs</span><b>${profile?.glyphs || 0}</b></div><section><h3>Professions</h3>${professions.length ? professions.map((p) => `<p><b>${esc(p.name)}</b><span>${p.value} / ${p.maximum}</span></p>`).join("") : '<p class="muted">No primary professions recorded.</p>'}</section>`;
+			gear.append(summary, renderPaperdoll(c, equipment));
+			const talents = qs("#talents-panel", wrap);
+			talents.innerHTML = '<div class="insight-grid"></div>';
+			const talentGrid = qs(".insight-grid", talents);
+			(insights.talents || []).forEach((t) => {
+				const card = document.createElement("section");
+				card.className = "insight-card";
+				card.innerHTML = `<p class="eyebrow">${t.active ? "ACTIVE SPECIALIZATION" : "SECONDARY SPECIALIZATION"}</p><h3>${t.points} talent points</h3><div class="spell-chip-list">${(t.spells || []).map((id) => `<a href="https://www.wowhead.com/wotlk/spell=${id}" target="_blank" rel="noreferrer">Spell ${id}</a>`).join("")}</div>`;
+				talentGrid.append(card);
+			});
+			const glyphCard = document.createElement("section");
+			glyphCard.className = "insight-card";
+			glyphCard.innerHTML = `<p class="eyebrow">GLYPHS</p><h3>${(insights.glyphs || []).length} active glyphs</h3><div class="spell-chip-list">${(insights.glyphs || []).map((g) => `<a href="https://www.wowhead.com/wotlk/spell=${g.id}" target="_blank" rel="noreferrer">Glyph ${g.id} · slot ${g.slot + 1}</a>`).join("") || '<span class="muted">No glyphs recorded.</span>'}</div>`;
+			talentGrid.append(glyphCard);
+			renderProgression(progress, qs("#achievements-panel", wrap));
+			const achievements = document.createElement("section");
+			achievements.className = "achievement-browser";
+			achievements.innerHTML = `<div class="view-heading"><div><p class="eyebrow">ACHIEVEMENT BROWSER</p><h3>Recently earned</h3></div><input type="search" placeholder="Filter by achievement ID" aria-label="Filter achievements"></div><div class="achievement-list"></div>`;
+			const achievementList = qs(".achievement-list", achievements),
+				renderAchievements = (term) => {
+					achievementList.innerHTML = "";
+					(insights.achievements || [])
+						.filter((a) => String(a.id).includes(term))
+						.forEach((a) => {
+							const row = document.createElement("a");
+							row.href = `https://www.wowhead.com/wotlk/achievement=${a.id}`;
+							row.target = "_blank";
+							row.rel = "noreferrer";
+							row.className = "achievement-row";
+							row.innerHTML = `<strong>Achievement ${a.id}</strong><time>${formatDate(a.date)}</time>`;
+							achievementList.append(row);
+						});
+					if (!achievementList.children.length)
+						achievementList.innerHTML =
+							'<p class="muted">No matching achievements.</p>';
+				};
+			qs("input", achievements).oninput = (e) =>
+				renderAchievements(e.target.value.trim());
+			renderAchievements("");
+			qs("#achievements-panel", wrap).prepend(achievements);
+			const pvp = qs("#pvp-panel", wrap),
+				teams = arenaTeams || [];
+			pvp.innerHTML = '<div class="personal-arena"></div>';
+			teams.forEach((t) => {
+				const row = document.createElement("article");
+				row.className = "personal-team";
+				row.innerHTML = `<strong>#${t.rank}</strong><div><h3>${esc(t.name)}</h3><p>${t.bracket}v${t.bracket} · Team rating ${t.rating}</p></div><span><b>${t.personalRating}</b><small> personal rating</small><em>${t.personalWins}W / ${t.personalGames - t.personalWins}L</em></span>`;
+				qs(".personal-arena", pvp).append(row);
+			});
+			const matches = document.createElement("section");
+			matches.className = "insight-card";
+			matches.innerHTML = `<p class="eyebrow">RECENT MATCHES</p><h3>Arena match history</h3><p class="muted">${esc(insights.pvpHistorySource || "")}</p><div class="activity-list">${(insights.pvpMatches || []).map((m) => `<div><strong class="status-${m.result === "win" ? "executed" : "failed"}">${esc(m.result)}</strong><span>${m.bracket}v${m.bracket} vs ${esc(m.opponent)}</span><b>${m.ratingChange > 0 ? "+" : ""}${m.ratingChange}</b><time>${new Date(m.playedAt).toLocaleString()}</time></div>`).join("") || '<p class="muted">No per-match history is available.</p>'}</div>`;
+			pvp.append(matches);
+			if (!teams.length)
+				qs(".personal-arena", pvp).innerHTML =
+					'<p class="empty">This character is not on an active arena team.</p>';
+			const guild = qs("#guild-panel", wrap);
+			guild.innerHTML = `<div class="insight-grid"><section class="insight-card"><p class="eyebrow">RAID COMPOSITION</p><h3>${esc(c.guild || "No guild")}</h3><div class="activity-list">${(insights.raidComposition || []).map((m) => `<a href="/armory?q=${encodeURIComponent(m.name)}"><span>${esc(m.name)}</span><small>${classes[m.class] || "Hero"} · level ${m.level}</small><i class="${m.online ? "is-online" : ""}">${m.online ? "Online" : "Offline"}</i></a>`).join("") || '<p class="muted">No guild roster data.</p>'}</div></section><section class="insight-card"><p class="eyebrow">GUILD ACTIVITY</p><h3>Recent achievements</h3><div class="activity-list">${(insights.guildActivity || []).map((a) => `<div><span>${esc(a.character)}</span><a href="https://www.wowhead.com/wotlk/achievement=${a.achievement}" target="_blank" rel="noreferrer">Achievement ${a.achievement}</a><time>${formatDate(a.date)}</time></div>`).join("") || '<p class="muted">No recent guild activity.</p>'}</div></section></div>`;
+			qsa("[data-profile]", wrap).forEach(
+				(b) =>
+					(b.onclick = () => {
+						qsa("[data-profile]", wrap).forEach((x) =>
+							x.classList.toggle("active", x === b),
+						);
+						["gear", "talents", "achievements", "pvp", "guild"].forEach((id) =>
+							qs("#" + id + "-panel", wrap).classList.toggle(
+								"hidden",
+								b.dataset.profile !== id,
+							),
+						);
+					}),
+			);
+			detail.innerHTML = "";
+			detail.append(wrap);
+			qs("#back-armory").onclick = () => search(form.q.value);
+		} catch (e) {
+			detail.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
+		}
+	}
+	form.addEventListener("submit", (e) => {
+		e.preventDefault();
+		search(form.q.value);
+	});
+	const initialQuery = new URLSearchParams(location.search).get("q") || "";
+	form.q.value = initialQuery;
+	if (initialQuery) show(initialQuery);
+	else search("");
+}
 
-if(page==='guilds'){
-  const list=qs('#guild-list'),detail=qs('#guild-detail');async function showGuild(id){list.classList.add('hidden');detail.innerHTML='<div class="skeleton"></div>';try{const {guild,members}=await api('/api/guilds/'+id);detail.innerHTML=`<button class="ghost-button" id="back-guilds">← All guilds</button><article class="guild-profile"><p class="eyebrow">GUILD ROSTER</p><h2>&lt;${esc(guild.name)}&gt;</h2><p>${esc(guild.motd||'No message of the day.')}</p><div class="roster"></div></article>`;const roster=qs('.roster',detail);members.forEach(m=>{const row=document.createElement('a');row.className='roster-row';row.href='/armory?q='+encodeURIComponent(m.name);row.innerHTML=`<span class="avatar">${initial(m.name)}</span><span><b>${esc(m.name)}</b><small>${esc(m.rank||'Member')} · Level ${m.level} ${classes[m.class]||'Hero'}</small></span><i class="${m.online?'is-online':''}">${m.online?'Online':'Offline'}</i>`;roster.append(row)});qs('#back-guilds').onclick=()=>{detail.innerHTML='';list.classList.remove('hidden')}}catch(e){detail.innerHTML=`<p class="empty">${esc(e.message)}</p>`}}
-  api('/api/guilds').then(({guilds})=>{list.innerHTML='';guilds.forEach(g=>{const card=document.createElement('button');card.className='guild-card';card.innerHTML=`<span class="guild-crest">${initial(g.name)}</span><span><b>${esc(g.name)}</b><small>Led by ${esc(g.leader)} · ${g.members} members</small></span><strong>${g.online}<small> online</small></strong>`;card.onclick=()=>showGuild(g.id);list.append(card)});const id=new URLSearchParams(location.search).get('id');if(id)showGuild(id)}).catch(e=>list.innerHTML=`<p class="empty">${esc(e.message)}</p>`)
+if (page === "rankings") {
+	let activeMetric = "honorable-kills",
+		activeBracket = 2;
+	async function loadRankings(bracket) {
+		activeBracket = bracket;
+		const box = qs("#arena-ranking");
+		box.innerHTML = '<div class="skeleton"></div>';
+		try {
+			const { teams } = await api("/api/arena?bracket=" + bracket);
+			box.innerHTML =
+				'<div class="rank-row rank-head"><span>Rank</span><span>Team</span><span>Rating</span><span>Record</span></div>';
+			teams.forEach((t) => {
+				const row = document.createElement("article");
+				row.className = "rank-row";
+				const members = t.members
+					.map(
+						(m) =>
+							`<a href="/armory?q=${encodeURIComponent(m.name)}"><b>${esc(m.name)}</b><small>${classes[m.class] || "Hero"} · ${m.personalRating}</small></a>`,
+					)
+					.join("");
+				row.innerHTML = `<strong class="rank-number">${t.rank}</strong><div><h3>${esc(t.name)}</h3><div class="team-members">${members}</div></div><strong class="team-rating">${t.rating}</strong><span>${t.seasonWins}W <i>/ ${t.seasonGames - t.seasonWins}L</i></span>`;
+				box.append(row);
+			});
+			if (!teams.length)
+				box.innerHTML = '<p class="empty">No teams in this bracket.</p>';
+		} catch (e) {
+			box.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
+		}
+	}
+	qsa("[data-bracket]").forEach(
+		(b) =>
+			(b.onclick = () => {
+				qsa("[data-bracket]").forEach((x) =>
+					x.classList.toggle("active", x === b),
+				);
+				loadRankings(Number(b.dataset.bracket));
+			}),
+	);
+	loadRankings(2);
+	async function loadCharacterRankings(metric) {
+		activeMetric = metric;
+		const box = qs("#character-ranking"),
+			guilds = metric === "guild-members",
+			params = new URLSearchParams({ metric });
+		if (!guilds) {
+			params.set("class", qs("#ranking-class").value);
+			params.set("faction", qs("#ranking-faction").value);
+			params.set("spec", qs("#ranking-spec").value.trim());
+		}
+		box.innerHTML = '<div class="skeleton"></div>';
+		try {
+			const data = await api("/api/rankings?" + params);
+			box.innerHTML = `<div class="rank-row rank-head"><span>Rank</span><span>${guilds ? "Guild" : "Character"}</span><span>${guilds ? "Type" : "Level"}</span><span>${guilds ? "Members" : "Score"}</span></div>`;
+			data.rows.forEach((x) => {
+				const value =
+					metric === "played-time"
+						? Math.floor(x.value / 3600).toLocaleString() + "h"
+						: Number(x.value).toLocaleString();
+				const row = document.createElement("article");
+				row.className = "rank-row";
+				row.innerHTML = `<strong class="rank-number">${x.rank}</strong><div><a href="${guilds ? "/guilds" : "/armory?q=" + encodeURIComponent(x.name)}"><h3>${esc(x.name)}</h3></a><small>${guilds ? "Guild" : (classes[x.class] || "Hero") + (x.spec ? " · " + esc(x.spec) : "") + (x.faction ? " · " + esc(x.faction) : "") + (x.online ? " · Online" : "")}</small></div><strong>${guilds ? "—" : x.level}</strong><span>${value}</span>`;
+				box.append(row);
+			});
+			if (!data.rows.length)
+				box.innerHTML =
+					'<p class="empty">No ranking entries match these filters.</p>';
+		} catch (e) {
+			box.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
+		}
+	}
+	qsa("[data-metric]").forEach(
+		(b) =>
+			(b.onclick = () => {
+				qsa("[data-metric]").forEach((x) =>
+					x.classList.toggle("active", x === b),
+				);
+				loadCharacterRankings(b.dataset.metric);
+			}),
+	);
+	loadCharacterRankings("honorable-kills");
+	qs("#ranking-class").onchange = () => loadCharacterRankings(activeMetric);
+	qs("#ranking-faction").onchange = () => loadCharacterRankings(activeMetric);
+	let specTimer;
+	qs("#ranking-spec").oninput = () => {
+		clearTimeout(specTimer);
+		specTimer = setTimeout(() => loadCharacterRankings(activeMetric), 250);
+	};
+	qs("#ranking-season").onchange = (e) => {
+		const current = e.target.selectedIndex === 0;
+		qs("#season-note").textContent = current
+			? "Current season uses the live AzerothCore arena tables. Archived seasons require retained snapshots."
+			: `${e.target.value} is an archived season. No snapshot has been imported for this demo.`;
+		if (current) loadRankings(activeBracket);
+		else
+			qs("#arena-ranking").innerHTML =
+				'<p class="empty">No archived ladder snapshot has been imported.</p>';
+	};
+	api("/api/rankings/raids")
+		.then((data) => {
+			const speed = qs("#raid-speed"),
+				recent = qs("#recent-kills");
+			speed.innerHTML = "";
+			(data.speed || []).forEach((x) => {
+				const row = document.createElement("div");
+				row.className = "compact-rank-row";
+				row.innerHTML = `<strong>#${x.rank || "—"}</strong><span><b>${esc(x.guild)}</b><small>${esc(x.raid)} · ${esc(x.difficulty)}</small></span><time>${Math.floor(x.seconds / 60)}m ${x.seconds % 60}s</time>`;
+				speed.append(row);
+			});
+			recent.innerHTML = "";
+			(data.recent || []).forEach((x) => {
+				const row = document.createElement("div");
+				row.className = "compact-rank-row";
+				row.innerHTML = `<span><b>${esc(x.guild)}</b><small>${esc(x.boss)} · ${esc(x.raid)} · ${esc(x.difficulty)}</small></span><time>${new Date(x.killedAt).toLocaleString()}</time>`;
+				recent.append(row);
+			});
+			if (!speed.children.length)
+				speed.innerHTML = '<p class="empty">No timed clears recorded.</p>';
+			if (!recent.children.length)
+				recent.innerHTML = '<p class="empty">No recent kills recorded.</p>';
+		})
+		.catch((e) => {
+			qs("#raid-speed").innerHTML = qs("#recent-kills").innerHTML =
+				`<p class="empty">${esc(e.message)}</p>`;
+		});
+}
+
+if (page === "shop") {
+	const grid = qs("#product-grid"),
+		filters = qs("#shop-filters"),
+		dialog = qs("#purchase-dialog");
+	let products = [],
+		selected = null,
+		characters = [],
+		activeCategory = "All",
+		activeClass = 0,
+		orderHistory = [];
+	function renderProductArt(art, p) {
+		const leadItem =
+			p.itemId || p.items?.[0]?.itemId || classSetPreviewItems[p.classId];
+		if (p.gold > 0 && !leadItem) {
+			const img = document.createElement("img");
+			img.className = "product-icon gold-icon";
+			img.src = iconBase + "inv_misc_coin_01.jpg";
+			img.alt = "";
+			useLocalItemFallback(img);
+			art.classList.add("gold-art");
+			art.append(img);
+			return;
+		}
+		if (leadItem) {
+			const img = document.createElement("img");
+			img.className = "product-icon";
+			img.src = localItemIcon;
+			img.alt = "";
+			useLocalItemFallback(img);
+			resolveItemIcon(img, leadItem);
+			art.append(img);
+			if (p.classId) {
+				art.classList.add("class-art-" + p.classId);
+				const label = document.createElement("span");
+				label.className = "product-art-label";
+				label.textContent = classes[p.classId] || p.className || "Set";
+				art.append(label);
+			}
+			return;
+		}
+		art.textContent = p.classId
+			? classes[p.classId] || p.className || "Class"
+			: p.category || "Package";
+		art.classList.add(p.classId ? "class-art-" + p.classId : "service-art");
+	}
+	function render() {
+		grid.innerHTML = "";
+		const shown = products
+			.filter(
+				(p) =>
+					(activeCategory === "All" || p.category === activeCategory) &&
+					(!activeClass || !p.classId || p.classId === activeClass),
+			)
+			.sort(
+				(a, b) =>
+					Number(b.featured) - Number(a.featured) ||
+					Number(a.categoryOrder) - Number(b.categoryOrder) ||
+					a.price - b.price,
+			);
+		if (!shown.length) {
+			grid.innerHTML = '<p class="empty">No packages match these filters.</p>';
+			return;
+		}
+		shown.forEach((p) => {
+			const soldOut = p.stockLimit > 0 && p.soldCount >= p.stockLimit,
+				effective = p.salePrice > 0 ? p.salePrice : p.price,
+				remaining =
+					p.stockLimit > 0 ? Math.max(0, p.stockLimit - p.soldCount) : null;
+			const card = document.createElement("article");
+			card.className =
+				"product-card" +
+				(p.tier ? " package-card" : "") +
+				(p.featured ? " is-featured" : "") +
+				(soldOut ? " is-sold-out" : "");
+			card.innerHTML = `<div class="product-art"></div><div class="product-body"><div class="product-tags"><span class="category"></span>${p.tier ? '<span class="tier"></span>' : ""}${p.featured ? '<span class="featured-tag">Featured</span>' : ""}${p.salePrice ? '<span class="sale-tag">Sale</span>' : ""}</div><h3></h3><p></p><ul class="package-includes"></ul>${remaining !== null ? `<div class="stock-meter"><i style="width:${Math.min(100, (p.soldCount / p.stockLimit) * 100)}%"></i></div><small>${remaining} remaining</small>` : ""}<div class="product-foot"><strong class="price">${p.salePrice ? `<del>${p.price}</del> ` : ""}${effective} credits</strong><button class="buy" ${soldOut ? "disabled" : ""}>${soldOut ? "Sold out" : "Purchase"}</button></div></div>`;
+			const art = qs(".product-art", card),
+				className = p.className || classes[p.classId];
+			renderProductArt(art, p);
+			qs(".category", card).textContent =
+				p.gold > 0 ? "Gold" : className || p.category;
+			if (qs(".tier", card)) qs(".tier", card).textContent = p.tier;
+			qs("h3", card).textContent = p.name;
+			qs(".product-body>p", card).textContent =
+				p.description || `${p.quantity} × item ${p.itemId}`;
+			const includes = qs(".package-includes", card);
+			(p.includes || []).forEach((x) => {
+				const li = document.createElement("li");
+				li.textContent = x;
+				includes.append(li);
+			});
+			if (!soldOut) qs(".buy", card).onclick = () => openPurchase(p);
+			grid.append(card);
+		});
+	}
+	function categoryButtons() {
+		const cats = [
+			"All",
+			...new Set(
+				[...products]
+					.sort((a, b) => Number(a.categoryOrder) - Number(b.categoryOrder))
+					.map((p) => p.category),
+			),
+		];
+		filters.innerHTML = "";
+		const buttons = document.createElement("div");
+		buttons.className = "filter-buttons";
+		cats.forEach((c, i) => {
+			const b = document.createElement("button");
+			b.className = "filter" + (i === 0 ? " active" : "");
+			b.textContent = c;
+			b.onclick = () => {
+				activeCategory = c;
+				qsa(".filter", buttons).forEach((x) =>
+					x.classList.toggle("active", x === b),
+				);
+				render();
+			};
+			buttons.append(b);
+		});
+		const select = document.createElement("select");
+		select.className = "class-filter";
+		select.innerHTML =
+			'<option value="0">All classes</option>' +
+			Object.entries(classes)
+				.map(([id, name]) => `<option value="${id}">${name}</option>`)
+				.join("");
+		select.onchange = () => {
+			activeClass = Number(select.value);
+			render();
+		};
+		filters.append(buttons, select);
+	}
+	async function openPurchase(p) {
+		selected = p;
+		try {
+			const [me, chars] = await Promise.all([
+				api("/api/me"),
+				api("/api/characters"),
+			]);
+			characters = chars.characters.filter(
+				(c) => !c.online && (!p.classId || c.class === p.classId),
+			);
+			if (!characters.length) {
+				toast(
+					p.classId
+						? `You need an offline ${p.className || classes[p.classId]} for this package`
+						: "You need an offline character for delivery",
+				);
+				return;
+			}
+			qs("#purchase-title").textContent = p.name;
+			qs("#purchase-price").innerHTML = p.salePrice
+				? `<del>${p.price}</del> ${p.salePrice} credits`
+				: p.price + " credits";
+			qs("#purchase-character").innerHTML = "";
+			characters.forEach((c) => {
+				const o = document.createElement("option");
+				o.value = c.guid;
+				o.textContent = `${c.name} — level ${c.level} ${classes[c.class] || ""}`;
+				qs("#purchase-character").append(o);
+			});
+			dialog.showModal();
+		} catch (e) {
+			if (e.status === 401) location.href = "/login?next=/shop";
+			else toast(e.message);
+		}
+	}
+	qs(".dialog-close").onclick = () => dialog.close();
+	qs("#purchase-confirm").onclick = async () => {
+		const btn = qs("#purchase-confirm");
+		btn.disabled = true;
+		setMessage(dialog, "");
+		try {
+			const result = await api("/api/shop/purchase", {
+				method: "POST",
+				body: JSON.stringify({
+					productId: selected.id,
+					characterGuid: Number(qs("#purchase-character").value),
+					coupon: qs("#purchase-coupon").value,
+				}),
+			});
+			dialog.close();
+			toast(result.message);
+			await Promise.all([loadShop(), loadOrderHistory()]);
+		} catch (e) {
+			setMessage(dialog, e.message);
+		} finally {
+			btn.disabled = false;
+		}
+	};
+	async function loadShop() {
+		try {
+			const data = await api("/api/shop");
+			products = data.products;
+			qs("#shop-meta").textContent = data.deliveryEnabled
+				? "Automatic in-game delivery is online."
+				: "Catalog preview · delivery is currently offline.";
+			categoryButtons();
+			render();
+		} catch (e) {
+			grid.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
+		}
+	}
+	function renderOrderHistory() {
+		const term = qs("#history-search").value.toLowerCase(),
+			status = qs("#history-status").value,
+			box = qs("#shop-history");
+		box.innerHTML = "";
+		orderHistory
+			.filter(
+				(o) =>
+					(!status || String(o.status || o.Status).toLowerCase() === status) &&
+					(!term || JSON.stringify(o).toLowerCase().includes(term)),
+			)
+			.forEach((o) => {
+				const row = document.createElement("div");
+				row.className = "admin-row";
+				row.innerHTML = `<span><b>Order #${o.id || o.ID}</b><small>${o.product ? esc(o.product) : "Item #" + (o.itemId || o.ItemID || "—")} · ${o.created ? new Date(o.created).toLocaleString() : ""}</small></span><span><strong>${Number(o.total || 0).toLocaleString()} credits</strong><small class="status-${esc(o.status || o.Status)}">${esc(o.status || o.Status)}</small></span>`;
+				box.append(row);
+			});
+		if (!box.children.length)
+			box.innerHTML = '<p class="muted">No orders match these filters.</p>';
+	}
+	async function loadOrderHistory() {
+		try {
+			const data = await api("/api/orders");
+			orderHistory = data.orders || [];
+			qs("#shop-history-section").classList.remove("hidden");
+			renderOrderHistory();
+		} catch (e) {
+			if (e.status !== 401) toast(e.message);
+		}
+	}
+	loadShop();
+	loadOrderHistory();
+	qs("#history-search").oninput = renderOrderHistory;
+	qs("#history-status").onchange = renderOrderHistory;
+	qsa("[data-credit-package]").forEach(
+		(button) =>
+			(button.onclick = async () => {
+				button.disabled = true;
+				try {
+					const result = await api("/api/billing/checkout", {
+						method: "POST",
+						body: JSON.stringify({ package: button.dataset.creditPackage }),
+					});
+					location.href = result.url;
+				} catch (e) {
+					if (e.status === 401) location.href = "/login?next=/shop";
+					else toast(e.message);
+				} finally {
+					button.disabled = false;
+				}
+			}),
+	);
+}
+
+if (page === "account" || page === "admin") {
+	if (page === "account")
+		Promise.all([
+			api("/api/me"),
+			api("/api/characters"),
+			api("/api/orders"),
+			publicConfigPromise,
+		])
+			.then(([me, chars, orders, cfg]) => {
+				qs("#account-name").textContent = me.account.username;
+				qs("#account-balance").textContent = me.balance;
+				qs("#character-count").textContent =
+					`${chars.characters.length} character${chars.characters.length === 1 ? "" : "s"}`;
+				const box = qs("#account-characters");
+				box.innerHTML = "";
+				if (!chars.characters.length)
+					box.innerHTML =
+						'<p class="muted">No characters on this realm yet.</p>';
+				chars.characters.forEach((c) => {
+					const el = document.createElement("div");
+					el.className = "account-character";
+					el.innerHTML = `<div class="avatar">${initial(c.name)}</div><div><h3></h3><p>Level ${c.level} ${classes[c.class] || "Hero"} · ${c.online ? "Online" : "Offline"}</p></div><span class="row-actions"></span>`;
+					qs("h3", el).textContent = c.name;
+					const actions = qs(".row-actions", el);
+					if (cfg.features?.armory !== false) {
+						const inspect = document.createElement("a");
+						inspect.href = "/armory?q=" + encodeURIComponent(c.name);
+						inspect.textContent = "Inspect";
+						actions.append(inspect);
+					}
+					if (!c.online) {
+						for (const action of ["rename", "customize", "unstuck"]) {
+							const b = document.createElement("button");
+							b.className = "ghost-button";
+							b.textContent = action;
+							b.onclick = () => runCharacterService(c.guid, action);
+							actions.append(b);
+						}
+					}
+					box.append(el);
+				});
+				loadDeletedCharacters();
+				const list = qs("#orders");
+				list.innerHTML = "";
+				if (!orders.orders.length)
+					list.innerHTML = '<p class="muted">No orders yet.</p>';
+				orders.orders.forEach((o) => {
+					const el = document.createElement("div");
+					el.className = "order";
+					el.innerHTML = `<span>Order #${o.id || o.ID} · item ${o.ItemID || o.itemId}</span><b class="status-${esc(o.Status || o.status)}">${esc(o.Status || o.status)}</b>`;
+					list.append(el);
+				});
+			})
+			.catch((e) => {
+				if (e.status === 401) location.href = "/login";
+				else toast(e.message);
+			});
+	async function runCharacterService(guid, action) {
+		if (
+			!confirm(
+				`${action} this character? The change is applied by AzerothCore.`,
+			)
+		)
+			return;
+		try {
+			await api(`/api/characters/${guid}/service`, {
+				method: "POST",
+				body: JSON.stringify({ action }),
+			});
+			toast(`Character ${action} requested`);
+			loadDeletedCharacters();
+		} catch (e) {
+			toast(e.message);
+		}
+	}
+	async function loadDeletedCharacters() {
+		try {
+			const { characters } = await api("/api/characters/deleted"),
+				box = qs("#deleted-characters");
+			box.innerHTML = "";
+			if (!characters.length) {
+				box.innerHTML = '<p class="muted">No restorable characters.</p>';
+				return;
+			}
+			characters.forEach((c) => {
+				const row = document.createElement("div");
+				row.className = "admin-row";
+				row.innerHTML = `<span><b>${esc(c.name)}</b><small>Deleted ${new Date(c.deletedAt * 1000).toLocaleString()}</small></span>`;
+				const b = document.createElement("button");
+				b.className = "ghost-button";
+				b.textContent = "Restore";
+				b.onclick = () => runCharacterService(c.guid, "restore");
+				row.append(b);
+				box.append(row);
+			});
+		} catch (e) {
+			qs("#deleted-characters").innerHTML =
+				`<p class="muted">${esc(e.message)}</p>`;
+		}
+	}
+	async function loadAccounts(q = "") {
+		try {
+			const data = await api("/api/admin/accounts?q=" + encodeURIComponent(q));
+			const box = qs("#admin-accounts");
+			box.innerHTML = "";
+			if (!data.accounts.length) {
+				box.innerHTML = '<p class="muted">No matching accounts.</p>';
+				return;
+			}
+			data.accounts.forEach((a) => {
+				const row = document.createElement("div");
+				row.className = "admin-account";
+				const chars =
+					(a.characters || [])
+						.map(
+							(c) =>
+								`${esc(c.name)} · ${c.level} ${classes[c.class] || "Hero"}${c.online ? " · online" : ""}`,
+						)
+						.join("<br>") || "No characters";
+				row.innerHTML = `<div><b>${esc(a.username)}</b><small>${esc(a.email)} · ${a.banned ? '<i class="danger">BANNED</i>' : "Active"}</small><small>${chars}</small>${a.banReason ? `<small>Reason: ${esc(a.banReason)}</small>` : ""}</div><span class="row-actions"></span>`;
+				const action = a.banned ? "unban" : "ban";
+				const button = document.createElement("button");
+				button.className = "ghost-button";
+				button.textContent = action;
+				button.onclick = () => {
+					const form = qs("#gm-moderation-form");
+					qs("[name=target]", form).value = a.username;
+					qs("[name=action]", form).value = action;
+					qs("[name=reason]", form).focus();
+				};
+				qs(".row-actions", row).append(button);
+				(a.characters || []).forEach((c) => {
+					if (c.online) {
+						const kick = document.createElement("button");
+						kick.className = "ghost-button";
+						kick.textContent = "kick " + c.name;
+						kick.onclick = () => {
+							const form = qs("#gm-moderation-form");
+							qs("[name=target]", form).value = c.name;
+							qs("[name=action]", form).value = "kick";
+							qs("[name=reason]", form).focus();
+						};
+						qs(".row-actions", row).append(kick);
+					}
+				});
+				box.append(row);
+			});
+		} catch (e) {
+			toast(e.message);
+		}
+	}
+	let adminPermissions = new Set();
+	const adminCan = (permission) => adminPermissions.has(permission);
+	async function loadAdminAnalytics() {
+		const box = qs("#admin-analytics");
+		if (!box || !adminCan("overview")) return;
+		try {
+			qs(".admin-chart")?.remove();
+			const data = await api("/api/admin/analytics"),
+				metrics = [
+					["Accounts", data.accounts, `+${data.newAccounts24h} in 24h`],
+					["Characters", data.characters, `${data.onlinePlayers} online`],
+					["Open tickets", data.openTickets, "Awaiting staff"],
+					["Orders today", data.ordersToday, `${data.ordersPending} pending`],
+					["Credits · 30 days", data.credits30d, "Completed orders"],
+				];
+			box.innerHTML = "";
+			metrics.forEach(([label, value, note]) => {
+				const card = document.createElement("article");
+				card.innerHTML = `<span>${esc(label)}</span><strong>${Number(value).toLocaleString()}</strong><small>${esc(note)}</small>`;
+				box.append(card);
+			});
+			const chart = document.createElement("section");
+			chart.className = "admin-chart";
+			const chartData = [
+					["New accounts", data.newAccounts24h],
+					["Online", data.onlinePlayers],
+					["Orders", data.ordersToday],
+					["Tickets", data.openTickets],
+				],
+				max = Math.max(1, ...chartData.map((x) => Number(x[1])));
+			chart.innerHTML =
+				'<h3>Operational pulse</h3><div class="chart-bars">' +
+				chartData
+					.map(
+						([label, value]) =>
+							`<div><span>${esc(label)}</span><i style="--bar:${Math.max(3, (Number(value) / max) * 100)}%"></i><b>${Number(value).toLocaleString()}</b></div>`,
+					)
+					.join("") +
+				"</div>";
+			box.after(chart);
+		} catch (e) {
+			box.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
+		}
+	}
+	let auditEntries = [];
+	function renderAdminAudit() {
+		const mod = qs("#moderation-log");
+		if (!mod) return;
+		const term = (qs("#audit-search")?.value || "").toLowerCase(),
+			status = qs("#audit-status")?.value || "",
+			from = qs("#audit-from")?.value
+				? new Date(qs("#audit-from").value)
+				: null,
+			to = qs("#audit-to")?.value
+				? new Date(qs("#audit-to").value + "T23:59:59")
+				: null;
+		const rows = auditEntries.filter((x) => {
+			const state = String(x.Status || x.status || ""),
+				created =
+					x.Created || x.created ? new Date(x.Created || x.created) : null;
+			return (
+				(!status || state === status) &&
+				(!term || JSON.stringify(x).toLowerCase().includes(term)) &&
+				(!from || !created || created >= from) &&
+				(!to || !created || created <= to)
+			);
+		});
+		mod.innerHTML = "";
+		rows.forEach((x) => {
+			const row = document.createElement("div");
+			row.className = "admin-row";
+			row.innerHTML = `<span><b>${esc(x.Action || x.action)} · ${esc(x.Target || x.target)}</b><small>by ${esc(x.Actor || x.actor)} · ${esc(x.Reason || x.reason)}</small>${x.Created || x.created ? `<small>${new Date(x.Created || x.created).toLocaleString()}</small>` : ""}</span><strong class="status-${esc(x.Status || x.status)}">${esc(x.Status || x.status)}</strong>`;
+			mod.append(row);
+		});
+		if (!rows.length)
+			mod.innerHTML =
+				'<p class="muted">No audit entries match these filters.</p>';
+		return rows;
+	}
+	async function loadAdminAudit() {
+		if (!adminCan("audit")) return;
+		try {
+			const audit = await api("/api/admin/audit");
+			auditEntries = audit.entries || [];
+			renderAdminAudit();
+		} catch (e) {
+			toast(e.message);
+		}
+	}
+	async function loadAdmin() {
+		if (!adminCan("overview")) return;
+		try {
+			const [orders, ledger] = await Promise.all([
+				api("/api/admin/orders"),
+				api("/api/admin/ledger"),
+			]);
+			const box = qs("#admin-orders");
+			box.innerHTML = "";
+			(orders.orders || []).forEach((o) => {
+				const row = document.createElement("div");
+				row.className = "admin-row";
+				const id = o.id || o.ID,
+					status = o.status || o.Status,
+					retryable = ["review", "failed"].includes(status);
+				row.innerHTML = `<span class="order-select"><input type="checkbox" value="${id}" ${retryable ? "" : "disabled"} aria-label="Select order ${id}"><span><b>#${id} · ${esc(o.product || "Shop order")}</b><small>${esc(o.username || "DEMO")} · ${esc(status)}</small></span></span><span class="row-actions"></span>`;
+				if (retryable) {
+					["retry", "refund"].forEach((action) => {
+						const b = document.createElement("button");
+						b.className = "ghost-button";
+						b.textContent = action;
+						b.onclick = async () => {
+							if (
+								action === "refund" &&
+								prompt(`Type REFUND to refund order #${id}`) !== "REFUND"
+							)
+								return;
+							await api(`/api/admin/orders/${id}/${action}`, {
+								method: "POST",
+								body: "{}",
+							});
+							toast(`Order ${action} accepted`);
+							loadAdmin();
+						};
+						qs(".row-actions", row).append(b);
+					});
+				}
+				box.append(row);
+			});
+			const log = qs("#credit-ledger");
+			log.innerHTML = "";
+			(ledger.entries || []).forEach((x) => {
+				const row = document.createElement("div");
+				row.className = "admin-row";
+				row.innerHTML = `<span><b>${esc(x.Target || x.target)}</b><small>${esc(x.Reason || x.reason)}</small></span><strong>+${x.Amount || x.amount}</strong>`;
+				log.append(row);
+			});
+			await Promise.all([loadAdminAudit(), loadAccounts(), loadAdminTickets()]);
+		} catch (e) {
+			toast(e.message);
+		}
+	}
+	async function loadAdminMonitoring() {
+		if (!adminCan("monitoring")) return;
+		const box = qs("#admin-service-status"),
+			announcements = qs("#admin-scheduled-announcements");
+		try {
+			const [status, cfg] = await Promise.all([
+				api("/api/admin/status"),
+				publicConfigPromise,
+			]);
+			box.innerHTML = "";
+			for (const [label, value] of [
+				["Portal", status.portal],
+				["Database", status.database],
+				["Realm", status.online],
+				["Shop delivery", status.shopDelivery],
+			]) {
+				const card = document.createElement("article");
+				card.className = "status-card";
+				card.innerHTML = `<span>${label}</span><strong class="${value ? "is-online" : "is-offline"}">${value ? "Operational" : "Unavailable"}</strong>`;
+				box.append(card);
+			}
+			if (status.maintenance) {
+				const card = document.createElement("article");
+				card.className = "status-card maintenance";
+				card.innerHTML = `<span>Maintenance</span><strong>${esc(status.maintenanceMessage || "Scheduled maintenance in progress")}</strong>`;
+				box.append(card);
+			}
+			announcements.innerHTML = "";
+			(cfg.news || [])
+				.filter((n) => n.kind === "announcement" || n.kind === "maintenance")
+				.forEach((n) => {
+					const card = document.createElement("article");
+					card.className = "news-card";
+					card.innerHTML = `<time>${n.publishAt ? new Date(n.publishAt).toLocaleString() : ""}</time><h3>${esc(n.title)}</h3><p>${esc(n.summary || "")}</p>`;
+					announcements.append(card);
+				});
+			if (!announcements.children.length)
+				announcements.innerHTML = '<p class="muted">No scheduled notices.</p>';
+		} catch (e) {
+			box.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
+		}
+	}
+	const iso = (value) => (value ? new Date(value).toISOString() : null);
+	const inventorySlots = {
+		1: "Head",
+		2: "Neck",
+		3: "Shoulders",
+		4: "Shirt",
+		5: "Chest",
+		6: "Waist",
+		7: "Legs",
+		8: "Feet",
+		9: "Wrists",
+		10: "Hands",
+		11: "Ring",
+		12: "Trinket",
+		13: "One-hand weapon",
+		14: "Shield",
+		15: "Ranged",
+		16: "Back",
+		17: "Two-hand weapon",
+		18: "Bag",
+		19: "Tabard",
+		20: "Chest",
+		21: "Main hand",
+		22: "Off hand",
+		23: "Held off-hand",
+		25: "Thrown",
+		26: "Ranged",
+		28: "Relic",
+	};
+	let catalogItems = [],
+		catalogSearchTimer,
+		adminProducts = [],
+		catalogSort = { key: "id", direction: 1 };
+	function catalogItemIcon(img, item) {
+		useLocalItemFallback(img);
+		resolveItemIcon(img, item.itemId);
+	}
+	function renderCatalogItems() {
+		const list = qs("#catalog-items"),
+			preview = qs("#catalog-equipment"),
+			kind = qs("#catalog-product-kind");
+		list.innerHTML = "";
+		preview.innerHTML = "";
+		kind.textContent =
+			catalogItems.length === 0
+				? "Service or gold product · no items"
+				: catalogItems.length === 1
+					? "Single-item product · icon comes from this item ID"
+					: `Set / bundle · ${catalogItems.length} different items`;
+		const equipped = catalogItems.filter(
+				(i) => inventorySlots[i.inventoryType] && i.inventoryType !== 18,
+			),
+			bags = catalogItems.filter((i) => i.inventoryType === 18);
+		if (!equipped.length)
+			preview.innerHTML =
+				'<p class="muted">Add equipment to preview its slots.</p>';
+		equipped.forEach((item) => {
+			const card = document.createElement("article");
+			card.className = `catalog-slot q-border-${item.quality || 0}`;
+			card.innerHTML = `<img alt=""/><span><small>${inventorySlots[item.inventoryType]}</small><b>${esc(item.name || "Item " + item.itemId)}</b><em>iLvl ${item.itemLevel || "—"}</em></span>`;
+			const img = qs("img", card);
+			img.src = localItemIcon;
+			catalogItemIcon(img, item);
+			preview.append(card);
+		});
+		catalogItems.forEach((item, index) => {
+			const row = document.createElement("div");
+			row.className = "catalog-bundle-row";
+			row.innerHTML = `<img alt=""/><span><b>${esc(item.name || "Item " + item.itemId)}</b><small>#${item.itemId} · ${item.inventoryType === 18 ? "Bag · " : ""}iLvl ${item.itemLevel || "—"}</small></span><label>Qty<input type="number" min="1" max="1000" value="${item.quantity || 1}"/></label><button type="button" class="ghost-button">Remove</button>`;
+			const img = qs("img", row);
+			img.src = localItemIcon;
+			catalogItemIcon(img, item);
+			qs("input", row).onchange = (e) =>
+				(item.quantity = Math.max(
+					1,
+					Math.min(1000, Number(e.target.value) || 1),
+				));
+			qs("button", row).onclick = () => {
+				catalogItems.splice(index, 1);
+				renderCatalogItems();
+			};
+			list.append(row);
+		});
+		if (bags.length) {
+			const note = document.createElement("p");
+			note.className = "catalog-bag-count";
+			note.textContent = `${bags.reduce((n, b) => n + (b.quantity || 1), 0)} bag(s) included`;
+			list.prepend(note);
+		}
+	}
+	function renderCatalogTable() {
+		const box = qs("#admin-products");
+		if (!box) return;
+		const term = (qs("#catalog-table-search")?.value || "")
+				.trim()
+				.toLowerCase(),
+			status = qs("#catalog-table-status")?.value || "all";
+		const rows = adminProducts
+			.filter(
+				(p) =>
+					(status === "all" || (status === "active") === Boolean(p.active)) &&
+					(!term ||
+						[p.id, p.name, p.category, p.tier, classes[p.classId]].some((v) =>
+							String(v || "")
+								.toLowerCase()
+								.includes(term),
+						)),
+			)
+			.sort((a, b) => {
+				let av = a[catalogSort.key],
+					bv = b[catalogSort.key];
+				if (typeof av === "string" || typeof bv === "string")
+					return (
+						String(av || "").localeCompare(String(bv || "")) *
+						catalogSort.direction
+					);
+				return (Number(av) - Number(bv)) * catalogSort.direction;
+			});
+		box.innerHTML = "";
+		if (!rows.length) {
+			box.innerHTML =
+				'<tr><td colspan="7" class="table-empty">No matching products.</td></tr>';
+			return;
+		}
+		rows.forEach((p) => {
+			const row = document.createElement("tr");
+			const packageSummary = [
+					p.serviceLevel ? `Level ${p.serviceLevel}` : "",
+					p.gold ? `${Number(p.gold).toLocaleString()} gold` : "",
+					p.serviceAction ? String(p.serviceAction).replaceAll("_", " ") : "",
+					p.itemId ? `Item #${p.itemId} × ${p.quantity}` : "Bundle",
+				]
+					.filter(Boolean)
+					.join(" · "),
+				price = p.salePrice
+					? `<del>${Number(p.price).toLocaleString()}</del> <strong>${Number(p.salePrice).toLocaleString()}</strong>`
+					: `<strong>${Number(p.price).toLocaleString()}</strong>`,
+				stock = p.stockLimit ? `${p.soldCount}/${p.stockLimit}` : "Unlimited";
+			row.innerHTML = `<td>#${p.id}</td><td><b>${esc(p.name)}</b><small>${esc(p.tier || "")} ${p.featured ? "· Featured" : ""}</small></td><td>${esc(p.category)}<small>Order ${p.categoryOrder || 0} · ${p.classId ? classes[p.classId] : "Any class"}</small></td><td>${esc(packageSummary)}<small>Stock: ${stock}</small></td><td>${price} credits</td><td><span class="table-status ${p.active ? "is-active" : "is-archived"}">${p.active ? "Active" : "Archived"}</span></td><td><button type="button" class="ghost-button">Edit</button></td>`;
+			qs("button", row).onclick = () =>
+				navigateAdmin(`/admin/catalog/${p.id}/edit`);
+			box.append(row);
+		});
+	}
+	function fillCatalogForm(p = {}) {
+		const f = qs("#catalog-editor");
+		f.reset();
+		catalogItems = (p.items || []).map((i) => ({
+			...i,
+			quantity: i.quantity || 1,
+		}));
+		for (const key of [
+			"id",
+			"name",
+			"price",
+			"salePrice",
+			"stockLimit",
+			"categoryOrder",
+			"category",
+			"classId",
+			"tier",
+			"serviceLevel",
+			"gold",
+			"serviceAction",
+			"description",
+			"perAccountLimit",
+		])
+			if (f.elements[key])
+				f.elements[key].value =
+					p[key] ??
+					{
+						category: "Items",
+						classId: 0,
+						serviceLevel: 0,
+						gold: 0,
+						perAccountLimit: 0,
+						salePrice: 0,
+						stockLimit: 0,
+						categoryOrder: 0,
+					}[key] ??
+					"";
+		f.elements.active.checked = p.id ? Boolean(p.active) : true;
+		f.elements.featured.checked = Boolean(p.featured);
+		qs("#catalog-sold-count").textContent = Number(
+			p.soldCount || 0,
+		).toLocaleString();
+		f.elements.startsAt.value = p.startsAt
+			? new Date(p.startsAt).toISOString().slice(0, 16)
+			: "";
+		f.elements.endsAt.value = p.endsAt
+			? new Date(p.endsAt).toISOString().slice(0, 16)
+			: "";
+		qs("#catalog-editor-title").textContent = p.id
+			? `Edit #${p.id} · ${p.name}`
+			: "New product";
+		qs("#catalog-archive").classList.toggle("hidden", !p.id || !p.active);
+		qs("#catalog-item-results").innerHTML = "";
+		qs("#catalog-item-search").value = "";
+		renderCatalogItems();
+		qs("#catalog-list").classList.add("hidden");
+		f.classList.remove("hidden");
+		window.scrollTo({ top: 0, behavior: "smooth" });
+	}
+	async function openCatalogEditor(id) {
+		try {
+			const { product } = await api("/api/admin/products/" + id);
+			fillCatalogForm(product);
+		} catch (e) {
+			toast(e.message);
+		}
+	}
+	function mountCatalogEditor() {
+		const form = qs("#catalog-editor"),
+			search = qs("#catalog-item-search"),
+			results = qs("#catalog-item-results");
+		qs("#catalog-new").onclick = (e) => {
+			e.preventDefault();
+			navigateAdmin("/admin/catalog/new");
+		};
+		qs("#catalog-cancel").onclick = () => navigateAdmin("/admin/catalog");
+		search.oninput = () => {
+			clearTimeout(catalogSearchTimer);
+			const term = search.value.trim();
+			if (term.length < 2) {
+				results.innerHTML = "";
+				return;
+			}
+			catalogSearchTimer = setTimeout(async () => {
+				try {
+					const data = await api(
+						"/api/admin/items?q=" + encodeURIComponent(term),
+					);
+					results.innerHTML = "";
+					data.items.forEach((item) => {
+						const b = document.createElement("button");
+						b.type = "button";
+						b.innerHTML = `<span class="q${item.quality || 0}">${esc(item.name)}</span><small>#${item.itemId} · ${inventorySlots[item.inventoryType] || "Item"} · iLvl ${item.itemLevel}</small>`;
+						b.onclick = () => {
+							const existing = catalogItems.find(
+								(x) => x.itemId === item.itemId,
+							);
+							if (existing) existing.quantity++;
+							else catalogItems.push({ ...item, quantity: 1 });
+							renderCatalogItems();
+							results.innerHTML = "";
+							search.value = "";
+						};
+						results.append(b);
+					});
+					if (!data.items.length)
+						results.innerHTML = '<p class="muted">No matching items.</p>';
+				} catch (e) {
+					results.innerHTML = `<p class="muted">${esc(e.message)}</p>`;
+				}
+			}, 250);
+		};
+		form.onsubmit = async (e) => {
+			e.preventDefault();
+			const fd = new FormData(form),
+				id = Number(fd.get("id") || 0),
+				payload = Object.fromEntries(fd);
+			for (const key of [
+				"price",
+				"salePrice",
+				"stockLimit",
+				"categoryOrder",
+				"classId",
+				"serviceLevel",
+				"gold",
+				"perAccountLimit",
+			])
+				payload[key] = Number(payload[key] || 0);
+			payload.active = fd.has("active");
+			payload.featured = fd.has("featured");
+			payload.startsAt = iso(payload.startsAt);
+			payload.endsAt = iso(payload.endsAt);
+			payload.imageUrl = "";
+			if (catalogItems.length === 1) {
+				payload.itemId = catalogItems[0].itemId;
+				payload.quantity = catalogItems[0].quantity;
+				payload.items = [];
+			} else {
+				payload.itemId = 0;
+				payload.quantity = 0;
+				payload.items = catalogItems.map((i) => ({
+					itemId: i.itemId,
+					quantity: i.quantity,
+				}));
+			}
+			delete payload.id;
+			try {
+				const result = await api(
+					id ? "/api/admin/products/" + id : "/api/admin/products",
+					{ method: id ? "PUT" : "POST", body: JSON.stringify(payload) },
+				);
+				setMessage(
+					form,
+					id ? "Product updated." : `Product #${result.id} created.`,
+					true,
+				);
+				await loadPortalAdmin();
+				if (!id && result.id) navigateAdmin(`/admin/catalog/${result.id}/edit`);
+			} catch (err) {
+				setMessage(form, err.message);
+			}
+		};
+		qs("#catalog-archive").onclick = async () => {
+			const id = Number(form.elements.id.value),
+				typed = prompt(
+					`Type ARCHIVE to archive product #${id}. Existing orders remain intact.`,
+				);
+			if (id && typed === "ARCHIVE") {
+				await api("/api/admin/products/" + id, { method: "DELETE" });
+				await loadPortalAdmin();
+				navigateAdmin("/admin/catalog");
+			}
+		};
+	}
+	async function loadPortalAdmin() {
+		try {
+			const [products, coupons, news, settings] = await Promise.all([
+				adminCan("commerce")
+					? api("/api/admin/products")
+					: Promise.resolve({ products: [] }),
+				adminCan("commerce")
+					? api("/api/admin/coupons")
+					: Promise.resolve({ coupons: [] }),
+				adminCan("content")
+					? api("/api/admin/news")
+					: Promise.resolve({ news: [] }),
+				adminCan("settings")
+					? api("/api/admin/settings")
+					: Promise.resolve({ settings: null }),
+			]);
+			if (adminCan("commerce")) {
+				adminProducts = products.products;
+				renderCatalogTable();
+				const couponBox = qs("#admin-coupons");
+				couponBox.innerHTML = "";
+				coupons.coupons.forEach((c) => {
+					const row = document.createElement("div");
+					row.className = "admin-row";
+					row.innerHTML = `<span><b>${esc(c.code)}</b><small>${c.discountPercent || 0}% + ${c.discountCredits || 0} credits · ${c.active ? "active" : "disabled"}</small></span>`;
+					const b = document.createElement("button");
+					b.className = "ghost-button";
+					b.textContent = "Disable";
+					b.onclick = async () => {
+						if (prompt(`Type DISABLE to disable ${c.code}`) !== "DISABLE")
+							return;
+						await api("/api/admin/coupons/" + c.id, { method: "DELETE" });
+						loadPortalAdmin();
+					};
+					row.append(b);
+					couponBox.append(row);
+				});
+			}
+			if (adminCan("content")) {
+				const newsBox = qs("#admin-news");
+				newsBox.innerHTML = "";
+				news.news.forEach((n) => {
+					const row = document.createElement("div");
+					row.className = "admin-row";
+					row.innerHTML = `<span><b>${esc(n.title)}</b><small>${esc(n.kind)} · ${n.active ? "published" : "archived"}</small></span><span class="row-actions"></span>`;
+					const edit = document.createElement("button");
+					edit.className = "ghost-button";
+					edit.textContent = "Edit";
+					edit.onclick = async () => {
+						const title = prompt("Title", n.title),
+							summary = prompt("Summary", n.summary || "");
+						if (title === null || summary === null) return;
+						await api("/api/admin/news/" + n.id, {
+							method: "PUT",
+							body: JSON.stringify({ ...n, title, summary }),
+						});
+						loadPortalAdmin();
+					};
+					const archive = document.createElement("button");
+					archive.className = "ghost-button";
+					archive.textContent = "Archive";
+					archive.onclick = async () => {
+						if (prompt("Type ARCHIVE to archive this post") !== "ARCHIVE")
+							return;
+						await api("/api/admin/news/" + n.id, { method: "DELETE" });
+						loadPortalAdmin();
+					};
+					qs(".row-actions", row).append(edit, archive);
+					newsBox.append(row);
+				});
+			}
+			if (settings.settings) {
+				const form = qs("#gm-settings-form"),
+					cfg = settings.settings;
+				for (const [key, value] of Object.entries(cfg)) {
+					const input = form.elements[key];
+					if (!input) continue;
+					if (input.type === "checkbox") input.checked = Boolean(value);
+					else if (input.type === "datetime-local")
+						input.value = value
+							? new Date(value).toISOString().slice(0, 16)
+							: "";
+					else input.value = value ?? "";
+				}
+			}
+		} catch (e) {
+			toast(e.message);
+		}
+	}
+	async function loadGMConsoleHistory() {
+		const data = await api("/api/admin/console"),
+			box = qs("#gm-command-history");
+		box.innerHTML = "";
+		qs("#gm-command-policy").textContent = data.allowAll
+			? "Unrestricted mode: every valid one-line command is permitted."
+			: "Allowed command prefixes: " + data.allowedPrefixes.join(", ");
+		if (!data.entries.length) {
+			box.innerHTML = '<p class="muted">No commands have been run.</p>';
+			return;
+		}
+		data.entries.forEach((entry) => {
+			const row = document.createElement("div");
+			row.className = "admin-row command-history";
+			const info = document.createElement("span"),
+				command = document.createElement("code"),
+				meta = document.createElement("small"),
+				result = document.createElement("strong");
+			command.textContent = "> " + entry.command;
+			meta.textContent = `${entry.actor} · ${new Date(entry.created).toLocaleString()}\n${entry.response}`;
+			result.textContent = entry.success ? "OK" : "FAILED";
+			result.className = entry.success ? "status-executed" : "status-failed";
+			info.append(command, meta);
+			row.append(info, result);
+			box.append(row);
+		});
+	}
+	function mountGMConsole() {
+		const panel = qs("#gm-command-console"),
+			form = qs("#gm-command-form"),
+			output = qs("#gm-command-output");
+		qs("#gm-command-disabled", panel)?.classList.add("hidden");
+		qs("#gm-command-enabled", panel)?.classList.remove("hidden");
+		loadGMConsoleHistory().catch((e) => {
+			output.textContent = e.message;
+		});
+		form.onsubmit = async (e) => {
+			e.preventDefault();
+			const button = qs("button[type=submit]", form),
+				command = new FormData(form).get("command");
+			button.disabled = true;
+			setMessage(form, "");
+			output.textContent = "Executing…";
+			try {
+				const result = await api("/api/admin/console", {
+					method: "POST",
+					body: JSON.stringify({ command }),
+				});
+				output.textContent = result.output;
+				form.reset();
+				await loadGMConsoleHistory();
+			} catch (err) {
+				output.textContent = err.message;
+				setMessage(form, err.message);
+			} finally {
+				button.disabled = false;
+			}
+		};
+	}
+	async function loadAdminTickets() {
+		try {
+			const { tickets } = await api("/api/admin/tickets");
+			const box = qs("#admin-tickets");
+			box.innerHTML = "";
+			if (!tickets.length)
+				box.innerHTML = '<p class="muted">No support tickets.</p>';
+			tickets.forEach((t) => {
+				const row = document.createElement("div");
+				row.className = "ticket-row";
+				row.innerHTML = `<div><b>#${t.id} · ${esc(t.subject)}</b><small>${esc(t.username || "Player")} · ${esc(t.message)}</small>${t.response ? `<small>Reply: ${esc(t.response)}</small>` : ""}</div><span class="row-actions"></span>`;
+				for (const action of ["answer", "close"]) {
+					const b = document.createElement("button");
+					b.className = "ghost-button";
+					b.textContent = action;
+					b.onclick = async () => {
+						const response =
+							action === "answer"
+								? prompt("Reply to this ticket", t.response || "")
+								: t.response || "Closed by staff";
+						if (response === null) return;
+						await api("/api/admin/tickets/" + t.id, {
+							method: "POST",
+							body: JSON.stringify({
+								status: action === "answer" ? "answered" : "closed",
+								response,
+							}),
+						});
+						loadAdminTickets();
+					};
+					qs(".row-actions", row).append(b);
+				}
+				box.append(row);
+			});
+		} catch (e) {
+			toast(e.message);
+		}
+	}
+	async function loadMyTickets() {
+		try {
+			const { tickets } = await api("/api/tickets");
+			const box = qs("#my-tickets");
+			box.innerHTML = "";
+			if (!tickets.length)
+				box.innerHTML = '<p class="muted">No support tickets.</p>';
+			tickets.forEach((t) => {
+				const row = document.createElement("div");
+				row.className = "ticket-row";
+				row.innerHTML = `<div><b>#${t.id} · ${esc(t.subject)}</b><small>${esc(t.message)}</small>${t.response ? `<small>GM reply: ${esc(t.response)}</small>` : ""}</div><strong class="status-${esc(t.status)}">${esc(t.status)}</strong>`;
+				box.append(row);
+			});
+		} catch (e) {
+			toast(e.message);
+		}
+	}
+	async function loadSessions() {
+		try {
+			const { sessions } = await api("/api/security/sessions");
+			const box = qs("#security-sessions");
+			box.innerHTML = "";
+			sessions.forEach((s) => {
+				const row = document.createElement("div");
+				row.className = "session-row";
+				row.innerHTML = `<span><b>${s.Current ? "This session" : esc(s.IP || "Unknown location")}</b><small>${esc(s.UserAgent || "Unknown browser")} · last seen ${new Date(s.LastSeen).toLocaleString()}</small></span>`;
+				if (!s.Current) {
+					const b = document.createElement("button");
+					b.className = "ghost-button";
+					b.textContent = "Revoke";
+					b.onclick = async () => {
+						await api("/api/security/sessions/" + encodeURIComponent(s.id), {
+							method: "DELETE",
+						});
+						loadSessions();
+					};
+					row.append(b);
+				}
+				box.append(row);
+			});
+		} catch (e) {
+			qs("#security-sessions").innerHTML =
+				`<p class="muted">${esc(e.message)}</p>`;
+		}
+	}
+	async function loadPlayerDashboard() {
+		try {
+			const data = await api("/api/dashboard"),
+				daily = data.dailyReward || {},
+				claim = qs("#claim-daily");
+			qs("#daily-reward-copy").textContent = daily.available
+				? `Your ${daily.credits} credits are ready. Current streak: ${daily.streak} days.`
+				: `Already claimed today · ${daily.streak} day streak.`;
+			claim.disabled = !daily.available;
+			claim.onclick = async () => {
+				claim.disabled = true;
+				try {
+					const result = await api("/api/rewards/daily", {
+						method: "POST",
+						body: "{}",
+					});
+					toast(`${result.credits} daily credits claimed`);
+					qs("#account-balance").textContent = result.balance;
+					loadPlayerDashboard();
+				} catch (e) {
+					toast(e.message);
+				}
+			};
+			const referral = data.referral || {},
+				code = qs("#referral-code");
+			qs("code", code).textContent = referral.code || "Unavailable";
+			code.dataset.copy = referral.code || "";
+			qs("#referral-stats").textContent =
+				`${referral.uses || 0} successful referrals · ${referral.creditsEarned || 0} credits earned`;
+			if (data.vote?.url) {
+				qs("#vote-reward").classList.remove("hidden");
+				qs("#vote-link").href = data.vote.url;
+				qs("#vote-reward-copy").textContent =
+					`Earn ${data.vote.credits || 0} credits through the configured voting provider.`;
+			}
+			const history = qs("#service-history");
+			history.innerHTML = "";
+			(data.services || []).forEach((item) => {
+				const row = document.createElement("div");
+				row.className = "admin-row";
+				row.innerHTML = `<span><b>${esc(String(item.Action || item.action).replaceAll("_", " "))}</b><small>${esc(item.Character || item.character)} · ${new Date(item.Created || item.created).toLocaleString()}</small></span><strong class="${item.Success || item.success ? "status-executed" : "status-failed"}">${item.Success || item.success ? "Completed" : "Failed"}</strong>`;
+				history.append(row);
+			});
+			if (!history.children.length)
+				history.innerHTML = '<p class="muted">No character services yet.</p>';
+			const activity = qs("#account-activity");
+			activity.innerHTML = "";
+			(data.activity || []).forEach((item) => {
+				const row = document.createElement("div");
+				row.className = "admin-row";
+				row.innerHTML = `<span><b>${esc(item.kind || "session")}</b><small>${esc(item.ip || "Unknown address")} · ${esc(item.agent || "Unknown client")}</small></span><time>${new Date(item.at).toLocaleString()}</time>`;
+				activity.append(row);
+			});
+			if (!activity.children.length)
+				activity.innerHTML = '<p class="muted">No recent account activity.</p>';
+		} catch (e) {
+			toast(e.message);
+		}
+	}
+	if (page === "account") {
+		loadSessions();
+		loadPlayerDashboard();
+		publicConfigPromise.then((c) => {
+			if (c.features?.support !== false) {
+				loadMyTickets();
+				submitJSON(qs("#ticket-form"), "/api/tickets", () => {
+					setMessage(qs("#ticket-form"), "Ticket submitted.", true);
+					qs("#ticket-form").reset();
+					loadMyTickets();
+				});
+			}
+		});
+		submitJSON(qs("#password-form"), "/api/security/password", () => {
+			toast("Password changed. Please sign in again.");
+			setTimeout(() => (location.href = "/login"), 900);
+		});
+		qs("#totp-setup").onclick = async () => {
+			try {
+				const data = await api("/api/security/totp/setup", {
+					method: "POST",
+					body: "{}",
+				});
+				qs("#totp-secret").textContent = data.secret;
+				qs("#totp-enroll").classList.remove("hidden");
+			} catch (e) {
+				toast(e.message);
+			}
+		};
+		submitJSON(qs("#totp-form"), "/api/security/totp/enable", () => {
+			setMessage(qs("#totp-form"), "Authenticator enabled.", true);
+			qs("#totp-setup").textContent = "Reset authenticator";
+		});
+		qs("#logout").onclick = () =>
+			api("/api/auth/logout", { method: "POST", body: "{}" }).finally(
+				() => (location.href = "/"),
+			);
+	}
+	if (page === "admin") {
+		let adminRouteToken = 0;
+		function parseAdminRoute(path = location.pathname) {
+			const clean = path.replace(/\/+$/, "") || "/admin";
+			const editor = clean.match(/^\/admin\/catalog\/(\d+)\/edit$/);
+			if (editor) return { view: "catalog", editor: Number(editor[1]) };
+			if (clean === "/admin/catalog/new")
+				return { view: "catalog", editor: "new" };
+			const routes = {
+				"/admin": { view: "overview" },
+				"/admin/monitoring": { view: "monitoring" },
+				"/admin/catalog": { view: "catalog" },
+				"/admin/players/accounts": { view: "players", subview: "accounts" },
+				"/admin/players/credits": { view: "players", subview: "credits" },
+				"/admin/players/moderation": { view: "players", subview: "moderation" },
+				"/admin/realm/operations": {
+					view: "realm-admin",
+					subview: "operations",
+				},
+				"/admin/realm/console": { view: "realm-admin", subview: "console" },
+				"/admin/content": { view: "content" },
+				"/admin/support": { view: "support-admin" },
+				"/admin/settings": { view: "settings" },
+				"/admin/audit": { view: "audit" },
+			};
+			return routes[clean] || { view: "overview", canonical: "/admin" };
+		}
+		async function applyAdminRoute() {
+			const route = parseAdminRoute(),
+				token = ++adminRouteToken;
+			qsa("[data-admin-route]").forEach((x) =>
+				x.classList.toggle("active", x.dataset.adminRoute === route.view),
+			);
+			qsa("[data-admin-view]").forEach((x) =>
+				x.classList.toggle("active", x.dataset.adminView === route.view),
+			);
+			qsa("[data-admin-subroute]").forEach((x) =>
+				x.classList.toggle(
+					"active",
+					x.dataset.adminSubroute === route.subview &&
+						x.closest("[data-admin-view]")?.dataset.adminView === route.view,
+				),
+			);
+			qsa("[data-admin-subview]").forEach((x) =>
+				x.classList.toggle(
+					"active",
+					x.dataset.adminSubview === route.subview &&
+						x.closest("[data-admin-view]")?.dataset.adminView === route.view,
+				),
+			);
+			const list = qs("#catalog-list"),
+				editor = qs("#catalog-editor");
+			if (route.view === "catalog") {
+				const editing = route.editor !== undefined;
+				list.classList.toggle("hidden", editing);
+				editor.classList.toggle("hidden", !editing);
+				if (route.editor === "new") fillCatalogForm();
+				else if (Number.isInteger(route.editor)) {
+					await openCatalogEditor(route.editor);
+					if (token !== adminRouteToken) return;
+				}
+			} else {
+				list.classList.remove("hidden");
+				editor.classList.add("hidden");
+			}
+			if (route.canonical) history.replaceState(null, "", route.canonical);
+			qs(".admin-workspace")?.classList.remove("route-changing");
+		}
+		function navigateAdmin(path, { replace = false } = {}) {
+			if (path !== location.pathname)
+				(replace ? history.replaceState : history.pushState).call(
+					history,
+					null,
+					"",
+					path,
+				);
+			qs(".admin-workspace")?.classList.add("route-changing");
+			applyAdminRoute();
+		}
+		document.addEventListener("click", (event) => {
+			const link = event.target.closest('a[href^="/admin"]');
+			if (
+				!link ||
+				event.defaultPrevented ||
+				event.button !== 0 ||
+				event.metaKey ||
+				event.ctrlKey ||
+				event.shiftKey ||
+				event.altKey
+			)
+				return;
+			event.preventDefault();
+			navigateAdmin(new URL(link.href).pathname);
+		});
+		window.addEventListener("popstate", applyAdminRoute);
+		function syncModerationFields() {
+			const form = qs("#gm-moderation-form"),
+				ban = form.elements.action.value === "ban",
+				field = qs('[data-moderation-field="duration"]', form),
+				input = form.elements.duration;
+			field.classList.toggle("hidden", !ban);
+			input.required = ban;
+		}
+		function syncOperationFields() {
+			const form = qs("#gm-operation-form"),
+				action = form.elements.action.value;
+			const config = {
+				start: [
+					"Start realm",
+					"Starts the realm through the configured start webhook.",
+				],
+				mute: [
+					"Mute character",
+					"Enter a character and a duration in minutes.",
+				],
+				unmute: ["Unmute character", "Remove an active character mute."],
+				ip_ban: ["Ban IP", "Duration examples: 30m, 7d, 1w, or -1."],
+				ip_unban: ["Unban IP", "Remove an IP address ban."],
+				gm_level: [
+					"Set GM level",
+					"Choose an account, security level, and realm scope.",
+				],
+				announce: [
+					"Send announcement",
+					"Broadcast this message to online players.",
+				],
+				motd: ["Set message of the day", "Replace the realm MOTD."],
+				restart: ["Schedule restart", "Delay must be 10–3600 seconds."],
+				shutdown: ["Schedule shutdown", "Delay must be 10–3600 seconds."],
+				cancel_shutdown: [
+					"Cancel shutdown or restart",
+					"Cancels the pending worldserver timer.",
+				],
+			}[action];
+			const visible = {
+				target: ["mute", "unmute", "ip_ban", "ip_unban", "gm_level"].includes(
+					action,
+				),
+				duration: ["mute", "ip_ban", "restart", "shutdown"].includes(action),
+				gm: action === "gm_level",
+				reason: true,
+			};
+			for (const [name, show] of Object.entries(visible)) {
+				const field = qs(`[data-operation-field="${name}"]`, form);
+				field.classList.toggle("hidden", !show);
+				qsa("input,select,textarea", field).forEach(
+					(input) =>
+						(input.required =
+							show &&
+							(name === "target" || name === "duration" || name === "reason")),
+				);
+			}
+			const target = form.elements.target,
+				duration = form.elements.duration,
+				reason = form.elements.reason;
+			target.placeholder =
+				action === "ip_ban" || action === "ip_unban"
+					? "IPv4 or IPv6 address"
+					: action === "gm_level"
+						? "Account name"
+						: "Character name";
+			duration.placeholder =
+				action === "mute"
+					? "Minutes (1–525600)"
+					: action === "ip_ban"
+						? "30m, 7d, 1w, or -1"
+						: "Seconds (10–3600)";
+			reason.placeholder =
+				action === "announce"
+					? "Announcement text"
+					: action === "motd"
+						? "New realm message of the day"
+						: "Required audit reason";
+			qs("#operation-title").textContent = config[0];
+			qs("#operation-help").textContent = config[1];
+		}
+		const settingsForm = qs("#gm-settings-form"),
+			features = qs(".feature-switches", settingsForm);
+		if (settingsForm && features && !settingsForm.elements.homeHeadline) {
+			const fields = document.createElement("fieldset");
+			fields.className = "homepage-fields";
+			fields.innerHTML =
+				'<legend>Homepage content</legend><div class="gm-fields"><label>Hero headline<input name="homeHeadline" maxlength="120" placeholder="Defaults to realm name"></label><label>Status label<input name="homeEyebrow" maxlength="80"></label></div><div class="gm-fields"><label>Primary button<input name="homePrimaryCta" maxlength="80"></label><label>Connection section title<input name="homeConnectTitle" maxlength="120"></label></div><label>Connection guide introduction<textarea name="homeGuideText" maxlength="500"></textarea></label><div class="gm-fields"><label>Realm rules<textarea name="homeRules" maxlength="500"></textarea></label><label>Discord status<textarea name="discordStatus" maxlength="500"></textarea></label></div><label>Changelog<textarea name="homeChangelog" maxlength="500"></textarea></label><label>Featured news ID<input name="featuredNewsId" type="number" min="0"></label>';
+			settingsForm.insertBefore(fields, features);
+		}
+		if (settingsForm && features && !settingsForm.elements.logoUrl) {
+			const fields = document.createElement("fieldset");
+			fields.className = "homepage-fields";
+			fields.innerHTML =
+				'<legend>Realm branding</legend><div class="gm-fields"><label>Logo URL<input name="logoUrl" type="url" placeholder="https://…"></label><label>Hero background URL<input name="heroImageUrl" type="url" placeholder="https://…"></label></div><label>Favicon URL<input name="faviconUrl" type="url" placeholder="https://…"></label>';
+			settingsForm.insertBefore(fields, features);
+		}
+		if (settingsForm && features && !settingsForm.elements.realmType) {
+			const fields = document.createElement("fieldset");
+			fields.className = "homepage-fields";
+			fields.innerHTML = `<legend>Realm gameplay profile</legend>
+				<p class="muted">These values describe the realm in the portal. Keep them aligned with worldserver.conf; saving here does not rewrite the worldserver configuration.</p>
+				<div class="gm-fields"><label>Realm type<select name="realmType"><option value="PvE">PvE / Normal</option><option value="PvP">PvP</option><option value="RP">Roleplaying</option><option value="RP-PvP">Roleplaying PvP</option></select></label><label>Timezone<input name="realmTimezone" maxlength="80" placeholder="Europe/Paris"></label></div>
+				<label>Realm description<textarea name="realmDescription" maxlength="500"></textarea></label>
+				<div class="gm-fields"><label>Season / phase label<input name="seasonName" maxlength="80" placeholder="Season 8 · ICC"></label><label>Faction policy<select name="factionPolicy"><option value="both">Alliance and Horde</option><option value="alliance">Alliance only</option><option value="horde">Horde only</option></select></label></div>
+				<div class="gm-fields"><label>Starting level<input name="startLevel" type="number" min="1" max="80"></label><label>Maximum level<input name="maxLevel" type="number" min="1" max="80"></label></div>
+				<div class="gm-fields"><label>Population cap<input name="populationCap" type="number" min="0" max="1000000"><small>0 means not advertised.</small></label><span></span></div>
+				<fieldset class="feature-switches cross-faction-switches"><legend>Cross-faction capabilities</legend><label><input name="crossFactionGroups" type="checkbox"> Groups</label><label><input name="crossFactionChannels" type="checkbox"> Shared channels / talk</label><label><input name="crossFactionGuilds" type="checkbox"> Guilds</label><label><input name="crossFactionTrade" type="checkbox"> Trading</label><label><input name="crossFactionMail" type="checkbox"> Mail</label><label><input name="crossFactionAuctions" type="checkbox"> Auction house</label><label><input name="crossFactionWho" type="checkbox"> /who visibility</label><label><input name="crossFactionFriends" type="checkbox"> Friends</label><label><input name="crossFactionCalendar" type="checkbox"> Calendar</label><label><input name="crossFactionAccounts" type="checkbox"> Both factions per account</label></fieldset>
+				<div class="rate-grid"><label>Quest XP<input name="questExperienceRate" maxlength="30" placeholder="2×"></label><label>Kill XP<input name="killExperienceRate" maxlength="30" placeholder="2×"></label><label>Exploration XP<input name="explorationExperienceRate" maxlength="30" placeholder="2×"></label><label>Item drops<input name="dropRate" maxlength="30" placeholder="1×"></label><label>Reputation<input name="reputationRate" maxlength="30" placeholder="1×"></label><label>Honor<input name="honorRate" maxlength="30" placeholder="1×"></label><label>Professions<input name="professionRate" maxlength="30" placeholder="1×"></label></div>`;
+			settingsForm.insertBefore(fields, features);
+		}
+		api("/api/me")
+			.then((me) => {
+				adminPermissions = new Set(me.permissions || []);
+				qsa("[data-permission]").forEach((link) =>
+					link.classList.toggle("hidden", !adminCan(link.dataset.permission)),
+				);
+				const viewPermission = {
+					overview: "overview",
+					monitoring: "monitoring",
+					catalog: "commerce",
+					players: "players",
+					"realm-admin": "realm",
+					content: "content",
+					"support-admin": "support",
+					settings: "settings",
+					audit: "audit",
+				};
+				const route = parseAdminRoute(),
+					subviewPermission =
+						route.view === "players"
+							? {
+									accounts: "players",
+									credits: "commerce",
+									moderation: "moderation",
+								}[route.subview]
+							: route.view === "realm-admin"
+								? { operations: "realm", console: "console" }[route.subview]
+								: "";
+				if (
+					!adminCan(subviewPermission || viewPermission[route.view] || "admin")
+				) {
+					const first = qsa("[data-admin-route]").find(
+						(link) => !link.classList.contains("hidden"),
+					);
+					if (first) {
+						history.replaceState(null, "", first.getAttribute("href"));
+						applyAdminRoute();
+					}
+				}
+				if (adminCan("support")) loadAdminTickets();
+				if (adminCan("players")) loadAccounts();
+				if (adminCan("audit")) loadAdminAudit();
+				if (adminCan("monitoring")) loadAdminMonitoring();
+				if (adminCan("commerce") || adminCan("content") || adminCan("settings"))
+					loadPortalAdmin();
+				if (adminCan("overview")) {
+					loadAdmin();
+					loadPortalAdmin();
+					loadAdminAnalytics();
+					qsa("[data-admin-refresh]").forEach((button) =>
+						button.addEventListener("click", loadAdminAnalytics),
+					);
+				}
+			})
+			.catch(() => {});
+		const exportCSV = (name, fields, rows) => {
+			const csv = [
+					fields.join(","),
+					...rows.map((x) =>
+						fields
+							.map(
+								(k) =>
+									'"' +
+									String(x[k] ?? x[k.toLowerCase()] ?? "").replaceAll(
+										'"',
+										'""',
+									) +
+									'"',
+							)
+							.join(","),
+					),
+				].join("\n"),
+				blob = new Blob([csv], { type: "text/csv" }),
+				a = document.createElement("a");
+			a.href = URL.createObjectURL(blob);
+			a.download = name;
+			a.click();
+			URL.revokeObjectURL(a.href);
+		};
+		qs("#catalog-export").onclick = () =>
+			exportCSV(
+				"shop-catalog.csv",
+				[
+					"id",
+					"name",
+					"category",
+					"price",
+					"salePrice",
+					"stockLimit",
+					"soldCount",
+					"active",
+				],
+				adminProducts,
+			);
+		qs("#orders-select-all").onclick = () =>
+			qsa("#admin-orders input[type=checkbox]:not(:disabled)").forEach(
+				(x) => (x.checked = true),
+			);
+		qs("#orders-bulk-retry").onclick = async () => {
+			const ids = qsa("#admin-orders input:checked").map((x) => x.value);
+			if (!ids.length) return toast("Select at least one retryable order");
+			if (
+				prompt(`Type RETRY to retry ${ids.length} selected order(s)`) !==
+				"RETRY"
+			)
+				return;
+			const results = await Promise.allSettled(
+				ids.map((id) =>
+					api(`/api/admin/orders/${id}/retry`, { method: "POST", body: "{}" }),
+				),
+			);
+			toast(
+				`${results.filter((x) => x.status === "fulfilled").length} orders queued`,
+			);
+			loadAdmin();
+		};
+		Promise.all([api("/api/me"), publicConfigPromise])
+			.then(([me, cfg]) => {
+				if (!(me.permissions || []).length || cfg.features?.admin === false)
+					throw Object.assign(new Error("Staff access required"), {
+						status: 403,
+					});
+				qs("#admin-access").classList.remove("hidden");
+				mountCatalogEditor();
+				qs("#catalog-table-search").oninput = renderCatalogTable;
+				qs("#catalog-table-status").onchange = renderCatalogTable;
+				qsa("[data-catalog-sort]").forEach(
+					(button) =>
+						(button.onclick = () => {
+							const key = button.dataset.catalogSort;
+							if (catalogSort.key === key) catalogSort.direction *= -1;
+							else catalogSort = { key, direction: 1 };
+							renderCatalogTable();
+						}),
+				);
+				qsa("[data-admin-refresh]").forEach(
+					(button) =>
+						(button.onclick = () =>
+							Promise.all([
+								loadAdmin(),
+								loadPortalAdmin(),
+								loadAdminMonitoring(),
+							])),
+				);
+				qs("[data-monitoring-refresh]").onclick = loadAdminMonitoring;
+				for (const id of [
+					"audit-search",
+					"audit-status",
+					"audit-from",
+					"audit-to",
+				])
+					qs("#" + id).addEventListener("input", renderAdminAudit);
+				qs("#audit-export").onclick = () => {
+					const rows = renderAdminAudit(),
+						fields = [
+							"Action",
+							"Target",
+							"Actor",
+							"Reason",
+							"Status",
+							"Created",
+						],
+						csv = [
+							fields.join(","),
+							...rows.map((x) =>
+								fields
+									.map(
+										(k) =>
+											'"' +
+											String(x[k] ?? x[k.toLowerCase()] ?? "").replaceAll(
+												'"',
+												'""',
+											) +
+											'"',
+									)
+									.join(","),
+							),
+						].join("\n"),
+						blob = new Blob([csv], { type: "text/csv" }),
+						a = document.createElement("a");
+					a.href = URL.createObjectURL(blob);
+					a.download = "staff-audit.csv";
+					a.click();
+					URL.revokeObjectURL(a.href);
+				};
+				const gm = qs("#gm-credit-form");
+				gm.onsubmit = async (e) => {
+					e.preventDefault();
+					const button = qs("button[type=submit]", gm);
+					button.disabled = true;
+					setMessage(gm, "");
+					const values = Object.fromEntries(new FormData(gm));
+					values.amount = Number(values.amount);
+					try {
+						const result = await api("/api/admin/credits", {
+							method: "POST",
+							body: JSON.stringify(values),
+						});
+						setMessage(
+							gm,
+							`${result.amount} credits granted to ${result.username}. New balance: ${result.balance}.`,
+							true,
+						);
+						gm.reset();
+						loadAdmin();
+					} catch (err) {
+						setMessage(gm, err.message);
+					} finally {
+						button.disabled = false;
+					}
+				};
+				qs("#gm-coupon-form").onsubmit = async (e) => {
+					e.preventDefault();
+					const f = e.currentTarget,
+						v = Object.fromEntries(new FormData(f));
+					for (const k of [
+						"discountPercent",
+						"discountCredits",
+						"maxUses",
+						"perAccountLimit",
+					])
+						v[k] = Number(v[k]);
+					v.startsAt = iso(v.startsAt);
+					v.endsAt = iso(v.endsAt);
+					try {
+						await api("/api/admin/coupons", {
+							method: "POST",
+							body: JSON.stringify(v),
+						});
+						f.reset();
+						setMessage(f, "Coupon created.", true);
+						loadPortalAdmin();
+					} catch (err) {
+						setMessage(f, err.message);
+					}
+				};
+				qs("#gm-news-form").onsubmit = async (e) => {
+					e.preventDefault();
+					const f = e.currentTarget,
+						v = Object.fromEntries(new FormData(f));
+					v.active = true;
+					v.publishAt = iso(v.publishAt);
+					v.expiresAt = iso(v.expiresAt);
+					try {
+						await api("/api/admin/news", {
+							method: "POST",
+							body: JSON.stringify(v),
+						});
+						f.reset();
+						setMessage(f, "Published.", true);
+						loadPortalAdmin();
+					} catch (err) {
+						setMessage(f, err.message);
+					}
+				};
+				qs("#gm-settings-form").onsubmit = async (e) => {
+					e.preventDefault();
+					const f = e.currentTarget,
+						fd = new FormData(f),
+						v = Object.fromEntries(fd);
+					for (const k of [
+						"maintenanceEnabled",
+						"registration",
+						"armory",
+						"rankings",
+						"guilds",
+						"realm",
+						"shop",
+						"support",
+						"admin",
+						"gmConsole",
+					])
+						v[k] = fd.has(k);
+					for (const k of [
+						"crossFactionAccounts",
+						"crossFactionCalendar",
+						"crossFactionChannels",
+						"crossFactionGroups",
+						"crossFactionGuilds",
+						"crossFactionAuctions",
+						"crossFactionMail",
+						"crossFactionWho",
+						"crossFactionFriends",
+						"crossFactionTrade",
+					])
+						v[k] = fd.has(k);
+					v.crossFaction = v.crossFactionGroups;
+					v.featuredNewsId = Number(v.featuredNewsId || 0);
+					for (const k of ["startLevel", "maxLevel", "populationCap"])
+						v[k] = Number(v[k] || 0);
+					v.maintenanceStarts = iso(v.maintenanceStarts);
+					v.maintenanceEnds = iso(v.maintenanceEnds);
+					try {
+						await api("/api/admin/settings", {
+							method: "PUT",
+							body: JSON.stringify(v),
+						});
+						setMessage(f, "Website settings saved.", true);
+						toast("Configuration updated");
+					} catch (err) {
+						setMessage(f, err.message);
+					}
+				};
+				const search = qs("#gm-account-search");
+				search.onsubmit = (e) => {
+					e.preventDefault();
+					loadAccounts(new FormData(search).get("q"));
+				};
+				const moderate = async (form) => {
+					const button = qs("button[type=submit]", form);
+					button.disabled = true;
+					setMessage(form, "");
+					try {
+						const values = Object.fromEntries(new FormData(form));
+						if (
+							["ban", "kick", "ip_ban", "shutdown", "restart"].includes(
+								values.action,
+							) &&
+							prompt(
+								`Type ${String(values.action).toUpperCase()} to confirm this operation`,
+							) !== String(values.action).toUpperCase()
+						) {
+							button.disabled = false;
+							return;
+						}
+						if ("level" in values) values.level = Number(values.level);
+						if ("realmId" in values) values.realmId = Number(values.realmId);
+						const result = await api("/api/admin/moderation", {
+							method: "POST",
+							body: JSON.stringify(values),
+						});
+						setMessage(
+							form,
+							`${result.action} applied to ${result.target}.`,
+							true,
+						);
+						await loadAdmin();
+					} catch (err) {
+						setMessage(form, err.message);
+					} finally {
+						button.disabled = false;
+					}
+				};
+				const moderationForm = qs("#gm-moderation-form"),
+					operationForm = qs("#gm-operation-form");
+				moderationForm.onsubmit = (e) => {
+					e.preventDefault();
+					moderate(e.currentTarget);
+				};
+				operationForm.onsubmit = (e) => {
+					e.preventDefault();
+					moderate(e.currentTarget);
+				};
+				moderationForm.elements.action.onchange = syncModerationFields;
+				operationForm.elements.action.onchange = syncOperationFields;
+				syncModerationFields();
+				syncOperationFields();
+				applyAdminRoute();
+				loadAdmin();
+				loadPortalAdmin();
+				loadAdminMonitoring();
+				if (cfg.features?.gmConsole) mountGMConsole();
+			})
+			.catch((e) => {
+				if (e.status === 401) {
+					location.href =
+						"/login?next=" + encodeURIComponent(location.pathname);
+					return;
+				}
+				qs("#admin-denied").classList.remove("hidden");
+			});
+	}
+}
+
+if (page === "realm")
+	Promise.all([api("/api/realm"), publicConfigPromise])
+		.then(([r, c]) => {
+			const hours = Math.floor(r.uptime / 3600),
+				total = Math.max(1, r.allianceOnline + r.hordeOnline),
+				alliance = Math.round((r.allianceOnline / total) * 100);
+			const profile = c.realmProfile || {},
+				rates = profile.rates || {};
+			qs("#realm-overview").innerHTML =
+				`<div class="realm-title"><i></i><div><p class="eyebrow">${esc(profile.type || "PvE")} REALM</p><h2>${esc(r.name)}</h2><code>set realmlist ${esc(r.address)}</code>${profile.description ? `<p>${esc(profile.description)}</p>` : ""}</div><strong>${Number(r.online).toLocaleString()}<small> players</small></strong></div><div class="realm-stats"><article><span>Total characters</span><b>${Number(r.characters).toLocaleString()}</b></article><article><span>Current uptime</span><b>${hours.toLocaleString()}h</b></article><article><span>Online record</span><b>${Number(r.recordOnline).toLocaleString()}</b></article><article><span>Level range</span><b>${profile.startLevel || 1}–${profile.maxLevel || 80}</b></article></div><div class="realm-rate-grid"><article><span>Quest XP</span><b>${esc(rates.questXp || c.experienceRate || "1×")}</b></article><article><span>Kill XP</span><b>${esc(rates.killXp || c.experienceRate || "1×")}</b></article><article><span>Exploration XP</span><b>${esc(rates.explorationXp || c.experienceRate || "1×")}</b></article><article><span>Drops</span><b>${esc(rates.drop || "1×")}</b></article><article><span>Reputation</span><b>${esc(rates.reputation || "1×")}</b></article><article><span>Honor</span><b>${esc(rates.honor || "1×")}</b></article><article><span>Professions</span><b>${esc(rates.profession || "1×")}</b></article><article><span>Faction policy</span><b>${esc(profile.factionPolicy || "both")}${profile.crossFaction ? " · Cross-faction" : ""}</b></article></div>${profile.season ? `<div class="realm-season"><span>Current season / phase</span><strong>${esc(profile.season)}</strong><small>${esc(profile.timezone || "UTC")}</small></div>` : ""}<div class="faction-balance"><div><span>Alliance · ${r.allianceOnline}</span><span>Horde · ${r.hordeOnline}</span></div><i style="--alliance:${alliance}%"></i></div>`;
+			const enabledCrossFaction = Object.entries(
+				profile.crossFactionFeatures || {},
+			)
+				.filter(([, enabled]) => enabled)
+				.map(([feature]) => feature);
+			if (enabledCrossFaction.length) {
+				const capabilities = document.createElement("section");
+				capabilities.className = "realm-capabilities";
+				capabilities.innerHTML = `<span>Cross-faction enabled</span><div>${enabledCrossFaction.map((feature) => `<b>${esc(feature)}</b>`).join("")}</div>`;
+				qs("#realm-overview").append(capabilities);
+			}
+		})
+		.catch(
+			(e) =>
+				(qs("#realm-overview").innerHTML =
+					`<p class="empty">${esc(e.message)}</p>`),
+		);
+
+if (page === "guilds") {
+	const list = qs("#guild-list"),
+		detail = qs("#guild-detail");
+	async function showGuild(id) {
+		list.classList.add("hidden");
+		detail.innerHTML = '<div class="skeleton"></div>';
+		try {
+			const { guild, members } = await api("/api/guilds/" + id);
+			detail.innerHTML = `<button class="ghost-button" id="back-guilds">← All guilds</button><article class="guild-profile"><p class="eyebrow">GUILD ROSTER</p><h2>&lt;${esc(guild.name)}&gt;</h2><p>${esc(guild.motd || "No message of the day.")}</p><div class="roster"></div></article>`;
+			const roster = qs(".roster", detail);
+			members.forEach((m) => {
+				const row = document.createElement("a");
+				row.className = "roster-row";
+				row.href = "/armory?q=" + encodeURIComponent(m.name);
+				row.innerHTML = `<span class="avatar">${initial(m.name)}</span><span><b>${esc(m.name)}</b><small>${esc(m.rank || "Member")} · Level ${m.level} ${classes[m.class] || "Hero"}</small></span><i class="${m.online ? "is-online" : ""}">${m.online ? "Online" : "Offline"}</i>`;
+				roster.append(row);
+			});
+			qs("#back-guilds").onclick = () => {
+				detail.innerHTML = "";
+				list.classList.remove("hidden");
+			};
+		} catch (e) {
+			detail.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
+		}
+	}
+	api("/api/guilds")
+		.then(({ guilds }) => {
+			list.innerHTML = "";
+			guilds.forEach((g) => {
+				const card = document.createElement("button");
+				card.className = "guild-card";
+				card.innerHTML = `<span class="guild-crest">${initial(g.name)}</span><span><b>${esc(g.name)}</b><small>Led by ${esc(g.leader)} · ${g.members} members</small></span><strong>${g.online}<small> online</small></strong>`;
+				card.onclick = () => showGuild(g.id);
+				list.append(card);
+			});
+			const id = new URLSearchParams(location.search).get("id");
+			if (id) showGuild(id);
+		})
+		.catch((e) => (list.innerHTML = `<p class="empty">${esc(e.message)}</p>`));
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type arenaMember struct {
@@ -98,31 +99,61 @@ func (s *Server) expandedRankings(w http.ResponseWriter, r *http.Request) {
 		metric = "honorable-kills"
 	}
 	type row struct {
-		Rank   uint32 `json:"rank"`
-		Name   string `json:"name"`
-		Class  uint8  `json:"class,omitempty"`
-		Level  uint8  `json:"level,omitempty"`
-		Value  uint64 `json:"value"`
-		Online bool   `json:"online,omitempty"`
+		Rank    uint32 `json:"rank"`
+		Name    string `json:"name"`
+		Class   uint8  `json:"class,omitempty"`
+		Race    uint8  `json:"race,omitempty"`
+		Spec    string `json:"spec,omitempty"`
+		Faction string `json:"faction,omitempty"`
+		Level   uint8  `json:"level,omitempty"`
+		Value   uint64 `json:"value"`
+		Online  bool   `json:"online,omitempty"`
 	}
 	out := []row{}
 	var query string
+	classID, _ := strconv.Atoi(r.URL.Query().Get("class"))
+	if classID < 0 || classID > 11 || classID == 10 {
+		problem(w, 422, "Invalid class filter")
+		return
+	}
+	faction := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("faction")))
+	if faction != "" && faction != "alliance" && faction != "horde" {
+		problem(w, 422, "Invalid faction filter")
+		return
+	}
+	spec := strings.TrimSpace(r.URL.Query().Get("spec"))
+	if len(spec) > 40 {
+		problem(w, 422, "Invalid specialization filter")
+		return
+	}
+	where := "c.deleteDate IS NULL"
+	args := []any{}
+	if classID > 0 {
+		where += " AND c.class=?"
+		args = append(args, classID)
+	}
+	if faction == "alliance" {
+		where += " AND c.race IN (1,3,4,7,11)"
+	} else if faction == "horde" {
+		where += " AND c.race IN (2,5,6,8,10)"
+	}
 	switch metric {
 	case "honorable-kills":
-		query = fmt.Sprintf("SELECT name,class,level,totalKills,online FROM `%s`.characters WHERE deleteDate IS NULL ORDER BY totalKills DESC,guid LIMIT 100", s.c.CharactersDB)
+		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,c.totalKills,c.online FROM `%s`.characters c WHERE %s ORDER BY c.totalKills DESC,c.guid LIMIT 100", s.c.CharactersDB, where)
 	case "played-time":
-		query = fmt.Sprintf("SELECT name,class,level,totaltime,online FROM `%s`.characters WHERE deleteDate IS NULL ORDER BY totaltime DESC,guid LIMIT 100", s.c.CharactersDB)
+		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,c.totaltime,c.online FROM `%s`.characters c WHERE %s ORDER BY c.totaltime DESC,c.guid LIMIT 100", s.c.CharactersDB, where)
 	case "level":
-		query = fmt.Sprintf("SELECT name,class,level,level,online FROM `%s`.characters WHERE deleteDate IS NULL ORDER BY level DESC,totaltime DESC,guid LIMIT 100", s.c.CharactersDB)
+		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,c.level,c.online FROM `%s`.characters c WHERE %s ORDER BY c.level DESC,c.totaltime DESC,c.guid LIMIT 100", s.c.CharactersDB, where)
 	case "achievements":
-		query = fmt.Sprintf("SELECT c.name,c.class,c.level,COUNT(a.achievement),c.online FROM `%s`.characters c LEFT JOIN `%s`.character_achievement a ON a.guid=c.guid WHERE c.deleteDate IS NULL GROUP BY c.guid,c.name,c.class,c.level,c.online ORDER BY COUNT(a.achievement) DESC,c.guid LIMIT 100", s.c.CharactersDB, s.c.CharactersDB)
+		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,COALESCE(a.score,0),c.online FROM `%s`.characters c LEFT JOIN (SELECT guid,COUNT(*) score FROM `%s`.character_achievement GROUP BY guid) a ON a.guid=c.guid WHERE %s ORDER BY a.score DESC,c.guid LIMIT 100", s.c.CharactersDB, s.c.CharactersDB, where)
 	case "guild-members":
-		query = fmt.Sprintf("SELECT g.name,0,0,COUNT(gm.guid),0 FROM `%s`.guild g LEFT JOIN `%s`.guild_member gm ON gm.guildid=g.guildid GROUP BY g.guildid,g.name ORDER BY COUNT(gm.guid) DESC,g.guildid LIMIT 100", s.c.CharactersDB, s.c.CharactersDB)
+		query = fmt.Sprintf("SELECT g.name,0,0,0,COUNT(gm.guid),0 FROM `%s`.guild g LEFT JOIN `%s`.guild_member gm ON gm.guildid=g.guildid GROUP BY g.guildid,g.name ORDER BY COUNT(gm.guid) DESC,g.guildid LIMIT 100", s.c.CharactersDB, s.c.CharactersDB)
+		args = nil
 	default:
 		problem(w, 422, "Unknown ranking metric")
 		return
 	}
-	rows, e := s.s.Characters.QueryContext(r.Context(), query)
+	rows, e := s.s.Characters.QueryContext(r.Context(), query, args...)
 	if e != nil {
 		problem(w, 500, "Could not load rankings")
 		return
@@ -131,11 +162,21 @@ func (s *Server) expandedRankings(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var x row
 		x.Rank = uint32(len(out) + 1)
-		if rows.Scan(&x.Name, &x.Class, &x.Level, &x.Value, &x.Online) == nil {
-			out = append(out, x)
+		if rows.Scan(&x.Name, &x.Class, &x.Race, &x.Level, &x.Value, &x.Online) == nil {
+			if isAllianceRace(x.Race) {
+				x.Faction = "Alliance"
+			} else if isHordeRace(x.Race) {
+				x.Faction = "Horde"
+			}
+			if spec == "" || strings.EqualFold(spec, x.Spec) {
+				out = append(out, x)
+			}
 		}
 	}
-	jsonOut(w, 200, map[string]any{"metric": metric, "rows": out, "source": "AzerothCore character data"})
+	for i := range out {
+		out[i].Rank = uint32(i + 1)
+	}
+	jsonOut(w, 200, map[string]any{"metric": metric, "rows": out, "filters": map[string]any{"class": classID, "faction": faction, "spec": spec}, "source": "AzerothCore character data; specialization requires a compatible talent metadata provider"})
 }
 
 func (s *Server) mockExpandedRankings(w http.ResponseWriter, r *http.Request) {
@@ -159,7 +200,19 @@ func (s *Server) mockExpandedRankings(w http.ResponseWriter, r *http.Request) {
 		jsonOut(w, 200, map[string]any{"metric": metric, "rows": rows, "source": "Demo AzerothCore data"})
 		return
 	}
+	classID, _ := strconv.Atoi(r.URL.Query().Get("class"))
+	faction := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("faction")))
+	specFilter := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("spec")))
+	specs := map[string]string{"Arthoria": "Retribution", "Thornhoof": "Feral", "Velistra": "Frost", "Grimward": "Unholy", "Quickarrow": "Marksmanship", "Emberhex": "Affliction", "Ironward": "Protection", "Nightshiv": "Assassination", "Dawnprayer": "Holy", "Stormcaller": "Elemental"}
 	for i, c := range mockCharacters {
+		characterFaction := "Horde"
+		if isAllianceRace(c.Race) {
+			characterFaction = "Alliance"
+		}
+		spec := specs[c.Name]
+		if classID > 0 && int(c.Class) != classID || faction != "" && !strings.EqualFold(faction, characterFaction) || specFilter != "" && !strings.EqualFold(specFilter, spec) {
+			continue
+		}
 		value := uint64(12000 - i*713)
 		if metric == "played-time" {
 			value = uint64(c.TotalTime)
@@ -170,7 +223,7 @@ func (s *Server) mockExpandedRankings(w http.ResponseWriter, r *http.Request) {
 		} else if metric == "guild-members" {
 			value = uint64(80 - i*5)
 		}
-		rows = append(rows, map[string]any{"rank": i + 1, "name": c.Name, "class": c.Class, "level": c.Level, "value": value, "online": c.Online})
+		rows = append(rows, map[string]any{"rank": len(rows) + 1, "name": c.Name, "class": c.Class, "race": c.Race, "faction": characterFaction, "spec": spec, "level": c.Level, "value": value, "online": c.Online})
 	}
 	jsonOut(w, 200, map[string]any{"metric": metric, "rows": rows, "source": "Demo AzerothCore data"})
 }

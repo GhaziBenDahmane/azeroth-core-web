@@ -206,8 +206,70 @@ func (s *Server) requireGM(r *http.Request) (account, bool) {
 	a, e := s.auth(r)
 	return a, e == nil && int(s.gmLevel(r.Context(), a.ID)) >= s.c.GMLevel
 }
+
+func (s *Server) staffPermissions(level uint8) []string {
+	return s.staffPermissionsFor(level, "")
+}
+
+func (s *Server) staffPermissionsFor(level uint8, username string) []string {
+	permissions := []string{}
+	add := func(values ...string) {
+		for _, value := range values {
+			found := false
+			for _, existing := range permissions {
+				if existing == value {
+					found = true
+					break
+				}
+			}
+			if !found {
+				permissions = append(permissions, value)
+			}
+		}
+	}
+	if int(level) >= s.c.SupportGMLevel {
+		add("support", "monitoring")
+	}
+	if int(level) >= s.c.ModeratorGMLevel {
+		add("players", "moderation", "audit")
+	}
+	if int(level) >= s.c.GMLevel {
+		add("overview", "commerce", "content", "realm", "settings", "admin")
+	}
+	if s.c.StaffShopManagers[strings.ToUpper(username)] {
+		add("commerce")
+	}
+	if s.c.EnableGMConsole && int(level) >= s.c.GMConsoleLevel {
+		add("console", "realm")
+	}
+	return permissions
+}
+
+func (s *Server) requireStaffPermission(r *http.Request, permission string) (account, bool) {
+	var a account
+	if s.c.MockMode {
+		if username, ok := s.mockUser(r); ok {
+			a = account{ID: 1, Username: username, Email: "demo@example.com", GMLevel: 3}
+		} else {
+			return account{}, false
+		}
+	} else {
+		var err error
+		a, err = s.auth(r)
+		if err != nil {
+			return account{}, false
+		}
+		a.GMLevel = s.gmLevel(r.Context(), a.ID)
+	}
+	for _, allowed := range s.staffPermissionsFor(a.GMLevel, a.Username) {
+		if allowed == permission || allowed == "admin" {
+			return a, true
+		}
+	}
+	return account{}, false
+}
 func (s *Server) adminRetryOrder(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireGM(r); !ok {
+	if _, ok := s.requireStaffPermission(r, "commerce"); !ok {
 		problem(w, 403, "GM access required")
 		return
 	}
@@ -229,7 +291,7 @@ func (s *Server) adminRetryOrder(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, 200, map[string]bool{"ok": true})
 }
 func (s *Server) adminRefundOrder(w http.ResponseWriter, r *http.Request) {
-	actor, ok := s.requireGM(r)
+	actor, ok := s.requireStaffPermission(r, "commerce")
 	if !ok {
 		problem(w, 403, "GM access required")
 		return

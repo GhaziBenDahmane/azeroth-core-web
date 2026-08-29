@@ -120,6 +120,81 @@ func TestMockCommunityAndOperations(t *testing.T) {
 	}
 }
 
+func TestStaffPermissionTiers(t *testing.T) {
+	s := &Server{c: config.Config{SupportGMLevel: 1, ModeratorGMLevel: 2, GMLevel: 3}}
+	tests := []struct {
+		level uint8
+		role  string
+		want  []string
+	}{
+		{0, "Player", []string{}},
+		{1, "Support", []string{"support", "monitoring"}},
+		{2, "Moderator", []string{"support", "monitoring", "players", "moderation", "audit"}},
+		{3, "Administrator", []string{"support", "monitoring", "players", "moderation", "audit", "overview", "commerce", "content", "realm", "settings", "admin"}},
+	}
+	for _, test := range tests {
+		if got := s.staffPermissions(test.level); !reflect.DeepEqual(got, test.want) {
+			t.Errorf("level %d permissions = %v; want %v", test.level, got, test.want)
+		}
+		if got := staffRole(account{GMLevel: test.level}, s.c); got != test.role {
+			t.Errorf("level %d role = %q; want %q", test.level, got, test.role)
+		}
+	}
+	s.c.StaffShopManagers = map[string]bool{"MERCHANT": true}
+	merchant := account{Username: "merchant"}
+	if got := staffRole(merchant, s.c); got != "Shop manager" || !reflect.DeepEqual(s.staffPermissionsFor(merchant.GMLevel, merchant.Username), []string{"commerce"}) {
+		t.Fatalf("shop manager role or permissions not applied")
+	}
+}
+
+func TestPublicConfigIncludesHomepageContent(t *testing.T) {
+	c := config.Config{
+		MockMode: true, PortalName: "Frosthold", RealmName: "Frosthold", RealmKey: "frost",
+		HomeHeadline: "Enter Frosthold", HomeEyebrow: "Realm status", HomePrimaryCTA: "Join now", HomeConnectTitle: "Connect today",
+	}
+	s := &Server{c: c, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/public-config", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("public config returned %d: %s", w.Code, w.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode public config: %v", err)
+	}
+	for key, want := range map[string]string{
+		"homeHeadline": "Enter Frosthold", "homeEyebrow": "Realm status", "homePrimaryCta": "Join now", "homeConnectTitle": "Connect today",
+	} {
+		if got := body[key]; got != want {
+			t.Errorf("%s = %#v; want %q", key, got, want)
+		}
+	}
+}
+
+func TestMockVoteCallbackIsAuthenticatedAndIdempotent(t *testing.T) {
+	s := &Server{c: config.Config{MockMode: true, VoteCallbackSecret: "provider-secret-123", VoteRewardCredits: 10}, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
+	h := s.Handler()
+	request := func(secret string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodPost, "/api/rewards/vote/callback", strings.NewReader(`{"username":"DEMO","eventId":"vote-42"}`))
+		r.Header.Set("Authorization", "Bearer "+secret)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	if w := request("wrong"); w.Code != http.StatusUnauthorized {
+		t.Fatalf("invalid vote secret returned %d", w.Code)
+	}
+	if w := request("provider-secret-123"); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"credits":10`) {
+		t.Fatalf("vote reward failed: %d %s", w.Code, w.Body.String())
+	}
+	if w := request("provider-secret-123"); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"duplicate":true`) {
+		t.Fatalf("duplicate vote was not idempotent: %d %s", w.Code, w.Body.String())
+	}
+	if s.mock.balance != 510 {
+		t.Fatalf("vote reward balance = %d; want 510", s.mock.balance)
+	}
+}
+
 func TestMockPortalManagementAndSelfService(t *testing.T) {
 	c := config.Config{MockMode: true, PortalName: "Azeroth", RealmName: "Azeroth", RealmAddress: "logon.test", BrandMark: "A", ThemePrimary: "#d3ae68", ThemeSecondary: "#f3d89c", ThemeAccent: "#3fd0be", ThemeBackground: "#07110f", EnableArmory: true, EnableRankings: true, EnableShop: true, EnableAdminPanel: true}
 	s := &Server{c: c, limiter: &limiter{hits: map[string][]time.Time{}}, mock: newMockState()}
@@ -188,7 +263,9 @@ func TestMockPortalManagementAndSelfService(t *testing.T) {
 		t.Fatalf("discounted purchase returned %d: %s", w.Code, w.Body.String())
 	}
 	me := do(http.MethodGet, "/api/me", "")
-	if !strings.Contains(me.Body.String(), `"balance":392`) {
+	// Product 1 is on sale for 95 credits in the mock catalog; the coupon
+	// removes another 9 credits (integer percentage calculation).
+	if !strings.Contains(me.Body.String(), `"balance":414`) {
 		t.Fatalf("coupon was not applied transactionally: %s", me.Body.String())
 	}
 }
@@ -406,6 +483,19 @@ func TestModerationInputAllowLists(t *testing.T) {
 	}
 	if !validModerationReason("Repeated harassment") || validModerationReason("reason\nserver shutdown") || validModerationReason(`bad "quote"`) {
 		t.Fatal("moderation reason allow-list is incorrect")
+	}
+}
+
+func TestRealmActionsRequireRealmPermission(t *testing.T) {
+	for _, action := range []string{"start", "announce", "motd", "gm_level", "restart", "shutdown", "cancel_shutdown"} {
+		if got := moderationPermission(action); got != "realm" {
+			t.Errorf("%s requires %q; want realm", action, got)
+		}
+	}
+	for _, action := range []string{"ban", "unban", "kick", "mute", "unmute", "ip_ban", "ip_unban"} {
+		if got := moderationPermission(action); got != "moderation" {
+			t.Errorf("%s requires %q; want moderation", action, got)
+		}
 	}
 }
 

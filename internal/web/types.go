@@ -42,6 +42,11 @@ type product struct {
 	StartsAt        *time.Time   `json:"startsAt,omitempty"`
 	EndsAt          *time.Time   `json:"endsAt,omitempty"`
 	PerAccountLimit uint32       `json:"perAccountLimit,omitempty"`
+	Featured        bool         `json:"featured"`
+	SalePrice       uint32       `json:"salePrice,omitempty"`
+	StockLimit      uint32       `json:"stockLimit,omitempty"`
+	SoldCount       uint32       `json:"soldCount,omitempty"`
+	CategoryOrder   int          `json:"categoryOrder,omitempty"`
 }
 
 type bundleItem struct {

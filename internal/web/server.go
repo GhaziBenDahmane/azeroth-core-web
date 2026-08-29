@@ -74,8 +74,10 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /api/characters", s.characters)
 	m.HandleFunc("GET /api/armory", s.feature(s.c.EnableArmory, "Armory", s.armorySearch))
 	m.HandleFunc("GET /api/armory/{name}", s.feature(s.c.EnableArmory, "Armory", s.armoryCharacter))
+	m.HandleFunc("GET /api/armory/{name}/insights", s.feature(s.c.EnableArmory, "Armory", s.armoryInsights))
 	m.HandleFunc("GET /api/arena", s.feature(s.c.EnableRankings, "Rankings", s.arenaRankings))
 	m.HandleFunc("GET /api/rankings", s.feature(s.c.EnableRankings, "Rankings", s.expandedRankings))
+	m.HandleFunc("GET /api/rankings/raids", s.feature(s.c.EnableRankings, "Rankings", s.raidRankings))
 	m.HandleFunc("GET /api/progression/{name}", s.feature(s.c.EnableArmory, "Armory", s.raidProgression))
 	m.HandleFunc("GET /api/realm", s.feature(s.c.EnableRealmStatus, "Realm status", s.realmOverview))
 	m.HandleFunc("GET /api/guilds", s.feature(s.c.EnableGuilds, "Guilds", s.guildList))
@@ -88,6 +90,9 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /api/characters/deleted", s.deletedCharacters)
 	m.HandleFunc("POST /api/characters/{guid}/service", s.rate(8, time.Hour, s.characterService))
 	m.HandleFunc("GET /api/orders", s.orders)
+	m.HandleFunc("GET /api/dashboard", s.dashboard)
+	m.HandleFunc("POST /api/rewards/daily", s.rate(3, time.Hour, s.claimDailyReward))
+	m.HandleFunc("POST /api/rewards/vote/callback", s.rate(60, time.Minute, s.voteRewardCallback))
 	m.HandleFunc("GET /api/tickets", s.feature(s.c.EnableSupport, "Support", s.tickets))
 	m.HandleFunc("POST /api/tickets", s.feature(s.c.EnableSupport, "Support", s.rate(5, time.Hour, s.createTicket)))
 	m.HandleFunc("POST /api/admin/products", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProduct))
@@ -96,6 +101,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("POST /api/admin/orders/{id}/refund", s.feature(s.c.EnableAdminPanel, "Administration", s.adminRefundOrder))
 	m.HandleFunc("GET /api/admin/orders", s.feature(s.c.EnableAdminPanel, "Administration", s.adminOrders))
 	m.HandleFunc("GET /api/admin/status", s.feature(s.c.EnableAdminPanel, "Administration", s.adminStatus))
+	m.HandleFunc("GET /api/admin/analytics", s.feature(s.c.EnableAdminPanel, "Administration", s.adminAnalytics))
 	m.HandleFunc("GET /api/admin/ledger", s.feature(s.c.EnableAdminPanel, "Administration", s.adminLedger))
 	m.HandleFunc("GET /api/admin/products", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProducts))
 	m.HandleFunc("GET /api/admin/products/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProductDetail))
@@ -114,6 +120,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /api/admin/accounts", s.feature(s.c.EnableAdminPanel, "Administration", s.adminAccounts))
 	m.HandleFunc("POST /api/admin/moderation", s.feature(s.c.EnableAdminPanel, "Administration", s.rate(30, time.Minute, s.adminModeration)))
 	m.HandleFunc("GET /api/admin/moderation", s.feature(s.c.EnableAdminPanel, "Administration", s.adminModerationLog))
+	m.HandleFunc("GET /api/admin/audit", s.feature(s.c.EnableAdminPanel, "Administration", s.adminAudit))
 	m.HandleFunc("GET /api/admin/console", s.feature(s.c.EnableAdminPanel && s.c.EnableGMConsole, "GM console", s.adminConsoleHistory))
 	m.HandleFunc("POST /api/admin/console", s.feature(s.c.EnableAdminPanel && s.c.EnableGMConsole, "GM console", s.rate(20, time.Minute, s.adminConsoleExecute)))
 	m.HandleFunc("GET /api/admin/tickets", s.feature(s.c.EnableAdminPanel && s.c.EnableSupport, "Administration", s.adminTickets))
@@ -191,7 +198,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminStatus(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireGM(r); !ok {
+	if _, ok := s.requireStaffPermission(r, "monitoring"); !ok {
 		problem(w, http.StatusForbidden, "GM access required")
 		return
 	}
@@ -219,7 +226,10 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	var in struct{ Username, Password, Email, TurnstileToken string }
+	var in struct {
+		Username, Password, Email, TurnstileToken string
+		ReferralCode                              string `json:"referralCode"`
+	}
 	if !decode(w, r, &in) {
 		return
 	}
@@ -267,10 +277,34 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	_, err = tx.ExecContext(r.Context(), "INSERT INTO portal_wallets (account_id,balance) VALUES (?,?)", id, s.c.StartingCredits)
+	var referredBy uint32
+	in.ReferralCode = strings.ToUpper(strings.TrimSpace(in.ReferralCode))
+	if in.ReferralCode != "" {
+		if !couponCodePattern.MatchString(in.ReferralCode) || tx.QueryRowContext(r.Context(), "SELECT account_id FROM portal_referrals WHERE code=?", in.ReferralCode).Scan(&referredBy) != nil || referredBy == uint32(id) {
+			problem(w, 422, "Referral code is invalid")
+			return
+		}
+	}
+	startingCredits := s.c.StartingCredits
+	if referredBy > 0 {
+		startingCredits += 10
+	}
+	_, err = tx.ExecContext(r.Context(), "INSERT INTO portal_wallets (account_id,balance) VALUES (?,?)", id, startingCredits)
 	if err != nil {
 		problem(w, 500, "Could not initialize account")
 		return
+	}
+	if _, err = tx.ExecContext(r.Context(), "INSERT INTO portal_referrals(account_id,code,referred_by) VALUES(?,?,?)", id, referralCode(in.Username, uint32(id)), referredBy); err != nil {
+		problem(w, 500, "Could not initialize referral account")
+		return
+	}
+	if referredBy > 0 {
+		if _, err = tx.ExecContext(r.Context(), "UPDATE portal_wallets SET balance=balance+25 WHERE account_id=?", referredBy); err != nil {
+			problem(w, 500, "Could not credit referral")
+			return
+		}
+		_, _ = tx.ExecContext(r.Context(), "UPDATE portal_referrals SET uses=uses+1,credits_earned=credits_earned+25 WHERE account_id=?", referredBy)
+		_, _ = tx.ExecContext(r.Context(), "INSERT INTO portal_credit_ledger(actor_account_id,target_account_id,amount,reason) VALUES(0,?,25,'Successful referral')", referredBy)
 	}
 	realms := fmt.Sprintf("INSERT IGNORE INTO `%s`.realmcharacters (realmid,acctid,numchars) SELECT id,?,0 FROM `%s`.realmlist", s.c.AuthDB, s.c.AuthDB)
 	if _, err = tx.ExecContext(r.Context(), realms, id); err != nil {
@@ -281,6 +315,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "Could not create account")
 		return
 	}
+	s.notifyDiscordAsync("New account", "**%s** registered on **%s**.", in.Username, s.c.RealmName)
 	if s.c.RequireEmailVerification {
 		go func() {
 			if err := s.sendVerificationEmail(in.Email, in.Username, verificationToken); err != nil {
@@ -363,7 +398,23 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	var balance uint32
 	_ = s.s.Auth.QueryRowContext(r.Context(), "SELECT balance FROM portal_wallets WHERE account_id=?", a.ID).Scan(&balance)
 	a.GMLevel = s.gmLevel(r.Context(), a.ID)
-	jsonOut(w, 200, map[string]any{"account": a, "balance": balance})
+	jsonOut(w, 200, map[string]any{"account": a, "balance": balance, "staffRole": staffRole(a, s.c), "permissions": s.staffPermissionsFor(a.GMLevel, a.Username)})
+}
+
+func staffRole(a account, c config.Config) string {
+	if int(a.GMLevel) >= c.GMLevel {
+		return "Administrator"
+	}
+	if c.StaffShopManagers[strings.ToUpper(a.Username)] {
+		return "Shop manager"
+	}
+	if int(a.GMLevel) >= c.ModeratorGMLevel {
+		return "Moderator"
+	}
+	if int(a.GMLevel) >= c.SupportGMLevel {
+		return "Support"
+	}
+	return "Player"
 }
 
 func (s *Server) characterRows(ctx context.Context, accountID uint32) ([]character, error) {
@@ -470,7 +521,7 @@ func (s *Server) armoryCharacter(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
-	rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit FROM portal_products WHERE active=1 AND (starts_at IS NULL OR starts_at<=NOW()) AND (ends_at IS NULL OR ends_at>NOW()) ORDER BY category,class_id,price,name")
+	rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit,featured,sale_price,stock_limit,sold_count,category_order FROM portal_products WHERE realm_key=? AND active=1 AND (starts_at IS NULL OR starts_at<=NOW()) AND (ends_at IS NULL OR ends_at>NOW()) ORDER BY featured DESC,category_order,category,class_id,price,name", s.c.RealmKey)
 	if e != nil {
 		problem(w, 500, "Could not load shop")
 		return
@@ -479,7 +530,7 @@ func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
 	out := []product{}
 	for rows.Next() {
 		var p product
-		if rows.Scan(&p.ID, &p.Name, &p.Description, &p.ItemID, &p.Quantity, &p.Price, &p.Category, &p.ImageURL, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold, &p.ServiceAction, &p.Active, &p.StartsAt, &p.EndsAt, &p.PerAccountLimit) == nil {
+		if rows.Scan(&p.ID, &p.Name, &p.Description, &p.ItemID, &p.Quantity, &p.Price, &p.Category, &p.ImageURL, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold, &p.ServiceAction, &p.Active, &p.StartsAt, &p.EndsAt, &p.PerAccountLimit, &p.Featured, &p.SalePrice, &p.StockLimit, &p.SoldCount, &p.CategoryOrder) == nil {
 			out = append(out, p)
 		}
 	}
@@ -567,7 +618,7 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	var p product
-	if e = tx.QueryRowContext(r.Context(), "SELECT id,name,item_id,quantity,price,class_id,tier_label,service_level,gold_amount,service_action,per_account_limit FROM portal_products WHERE id=? AND active=1 AND (starts_at IS NULL OR starts_at<=NOW()) AND (ends_at IS NULL OR ends_at>NOW()) FOR UPDATE", in.ProductID).Scan(&p.ID, &p.Name, &p.ItemID, &p.Quantity, &p.Price, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold, &p.ServiceAction, &p.PerAccountLimit); e != nil {
+	if e = tx.QueryRowContext(r.Context(), "SELECT id,name,item_id,quantity,price,class_id,tier_label,service_level,gold_amount,service_action,per_account_limit,featured,sale_price,stock_limit,sold_count,category_order FROM portal_products WHERE id=? AND realm_key=? AND active=1 AND (starts_at IS NULL OR starts_at<=NOW()) AND (ends_at IS NULL OR ends_at>NOW()) FOR UPDATE", in.ProductID, s.c.RealmKey).Scan(&p.ID, &p.Name, &p.ItemID, &p.Quantity, &p.Price, &p.ClassID, &p.Tier, &p.ServiceLevel, &p.Gold, &p.ServiceAction, &p.PerAccountLimit, &p.Featured, &p.SalePrice, &p.StockLimit, &p.SoldCount, &p.CategoryOrder); e != nil {
 		problem(w, 404, "Product not found")
 		return
 	}
@@ -582,12 +633,20 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	discount, couponID, couponCode, e := s.applyCoupon(r, tx, a.ID, in.Coupon, p.Price)
+	if p.StockLimit > 0 && p.SoldCount >= p.StockLimit {
+		problem(w, 409, "This product is sold out")
+		return
+	}
+	basePrice := p.Price
+	if p.SalePrice > 0 && p.SalePrice < basePrice {
+		basePrice = p.SalePrice
+	}
+	discount, couponID, couponCode, e := s.applyCoupon(r, tx, a.ID, in.Coupon, basePrice)
 	if e != nil {
 		problem(w, 422, e.Error())
 		return
 	}
-	total := p.Price - discount
+	total := basePrice - discount
 	var balance uint32
 	if e = tx.QueryRowContext(r.Context(), "SELECT balance FROM portal_wallets WHERE account_id=? FOR UPDATE", a.ID).Scan(&balance); e != nil || balance < total {
 		problem(w, 422, "Not enough credits")
@@ -617,7 +676,7 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "Could not debit wallet")
 		return
 	}
-	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_orders(account_id,character_guid,realm_key,product_id,item_id,quantity,total,subtotal,discount,coupon_code,status,service_level,gold_amount,service_action) VALUES(?,?,?,?,?,?,?,?,?,?,'pending',?,?,?)", a.ID, in.CharacterGUID, s.c.RealmKey, p.ID, p.ItemID, p.Quantity, total, p.Price, discount, couponCode, p.ServiceLevel, p.Gold, p.ServiceAction)
+	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_orders(account_id,character_guid,realm_key,product_id,item_id,quantity,total,subtotal,discount,coupon_code,status,service_level,gold_amount,service_action) VALUES(?,?,?,?,?,?,?,?,?,?,'pending',?,?,?)", a.ID, in.CharacterGUID, s.c.RealmKey, p.ID, p.ItemID, p.Quantity, total, basePrice, discount, couponCode, p.ServiceLevel, p.Gold, p.ServiceAction)
 	if e != nil {
 		problem(w, 500, "Could not create order")
 		return
@@ -678,11 +737,23 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if p.StockLimit > 0 {
+		result, stockErr := tx.ExecContext(r.Context(), "UPDATE portal_products SET sold_count=sold_count+1 WHERE id=? AND realm_key=? AND sold_count<stock_limit", p.ID, s.c.RealmKey)
+		if stockErr != nil {
+			problem(w, 500, "Could not reserve product stock")
+			return
+		}
+		if changed, _ := result.RowsAffected(); changed != 1 {
+			problem(w, 409, "This product just sold out")
+			return
+		}
+	}
 	if e = tx.Commit(); e != nil {
 		problem(w, 500, "Could not queue order")
 		return
 	}
 	s.metrics.orders.Add(1)
+	s.notifyDiscordAsync("New shop order", "Order **#%d** · **%s** bought **%s** for **%d credits** on **%s**.", orderID, a.Username, p.Name, total, s.c.RealmName)
 	jsonOut(w, 202, map[string]any{"ok": true, "orderId": orderID, "message": "Order accepted and queued for in-game delivery."})
 }
 
@@ -739,7 +810,7 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 	gmOK := false
 	var actorID uint32
 	if !tokenOK {
-		actor, ok := s.requireGM(r)
+		actor, ok := s.requireStaffPermission(r, "commerce")
 		gmOK = ok
 		actorID = actor.ID
 	}
@@ -784,7 +855,7 @@ func (s *Server) adminProduct(w http.ResponseWriter, r *http.Request) {
 		problem(w, 422, "Gold amount exceeds the WotLK safe limit")
 		return
 	}
-	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_products(name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)", p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL, p.ClassID, p.Tier, p.ServiceLevel, p.Gold, p.ServiceAction, p.StartsAt, p.EndsAt, p.PerAccountLimit)
+	res, e := tx.ExecContext(r.Context(), "INSERT INTO portal_products(name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit,realm_key,featured,sale_price,stock_limit,category_order) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?)", p.Name, p.Description, p.ItemID, p.Quantity, p.Price, p.Category, p.ImageURL, p.ClassID, p.Tier, p.ServiceLevel, p.Gold, p.ServiceAction, p.StartsAt, p.EndsAt, p.PerAccountLimit, s.c.RealmKey, p.Featured, p.SalePrice, p.StockLimit, p.CategoryOrder)
 	if e != nil {
 		problem(w, 500, "Could not create product")
 		return
@@ -819,15 +890,12 @@ func (s *Server) gmLevel(ctx context.Context, accountID uint32) uint8 {
 }
 
 func (s *Server) adminCredits(w http.ResponseWriter, r *http.Request) {
-	actor, err := s.auth(r)
-	if err != nil {
-		problem(w, 401, "Sign in required")
-		return
-	}
-	if int(s.gmLevel(r.Context(), actor.ID)) < s.c.GMLevel {
+	actor, ok := s.requireStaffPermission(r, "commerce")
+	if !ok {
 		problem(w, 403, "GM access required")
 		return
 	}
+	var err error
 	var in struct {
 		Username string `json:"username"`
 		Amount   uint32 `json:"amount"`

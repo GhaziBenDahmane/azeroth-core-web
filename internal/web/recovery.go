@@ -39,17 +39,25 @@ func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
 			news = append(news, newsEntry{ID: uint64(i + 1), Title: item.Title, Summary: item.Summary, URL: item.URL, Kind: "news", Active: true})
 		}
 	}
+	for i := range news {
+		news[i].Featured = cfg.FeaturedNewsID > 0 && news[i].ID == cfg.FeaturedNewsID
+	}
 	now := time.Now()
 	maintenance := cfg.MaintenanceEnabled && (cfg.MaintenanceStarts == nil || !now.Before(*cfg.MaintenanceStarts)) && (cfg.MaintenanceEnds == nil || now.Before(*cfg.MaintenanceEnds))
 	jsonOut(w, 200, map[string]any{
 		"portalName": cfg.PortalName, "realmName": cfg.RealmName, "brandMark": cfg.BrandMark,
 		"realmKey": s.c.RealmKey, "realms": realms,
-		"tagline": cfg.Tagline, "expansionName": s.c.ExpansionName,
+		"tagline": cfg.Tagline, "homeHeadline": cfg.HomeHeadline, "homeEyebrow": cfg.HomeEyebrow,
+		"homePrimaryCta": cfg.HomePrimaryCTA, "homeConnectTitle": cfg.HomeConnectTitle, "expansionName": s.c.ExpansionName,
+		"homeGuideText": cfg.HomeGuideText, "homeRules": cfg.HomeRules, "discordStatus": cfg.DiscordStatus, "homeChangelog": cfg.HomeChangelog,
 		"clientVersion": s.c.ClientVersion, "clientBuild": s.c.ClientBuild,
 		"experienceRate": cfg.ExperienceRate, "uptimeLabel": s.c.UptimeLabel,
+		"realmProfile": map[string]any{"type": cfg.RealmType, "timezone": cfg.RealmTimezone, "description": cfg.RealmDescription, "season": cfg.SeasonName, "startLevel": cfg.StartLevel, "maxLevel": cfg.MaxLevel, "populationCap": cfg.PopulationCap, "factionPolicy": cfg.FactionPolicy, "crossFaction": settingBool(cfg.CrossFactionGroups, settingBool(cfg.CrossFaction, false)),
+			"crossFactionFeatures": map[string]bool{"accounts": settingBool(cfg.CrossFactionAccounts, false), "calendar": settingBool(cfg.CrossFactionCalendar, false), "channels": settingBool(cfg.CrossFactionChannels, false), "groups": settingBool(cfg.CrossFactionGroups, false), "guilds": settingBool(cfg.CrossFactionGuilds, false), "auctions": settingBool(cfg.CrossFactionAuctions, false), "mail": settingBool(cfg.CrossFactionMail, false), "who": settingBool(cfg.CrossFactionWho, false), "friends": settingBool(cfg.CrossFactionFriends, false), "trade": settingBool(cfg.CrossFactionTrade, false)},
+			"rates":                map[string]string{"questXp": cfg.QuestExperienceRate, "killXp": cfg.KillExperienceRate, "explorationXp": cfg.ExplorationExperienceRate, "drop": cfg.DropRate, "reputation": cfg.ReputationRate, "honor": cfg.HonorRate, "profession": cfg.ProfessionRate}},
 		"footerText": s.c.FooterText, "realmAddress": cfg.RealmAddress,
 		"downloadUrl": cfg.DownloadURL, "communityUrl": cfg.CommunityURL,
-		"logoUrl": s.c.LogoURL, "heroImageUrl": s.c.HeroImageURL, "faviconUrl": s.c.FaviconURL,
+		"logoUrl": cfg.LogoURL, "heroImageUrl": cfg.HeroImageURL, "faviconUrl": cfg.FaviconURL,
 		"themePrimary": cfg.ThemePrimary, "themeSecondary": cfg.ThemeSecondary,
 		"themeAccent": cfg.ThemeAccent, "themeBackground": cfg.ThemeBackground,
 		"locale": s.c.Locale, "translations": s.c.UIText, "news": news,

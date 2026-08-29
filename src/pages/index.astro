@@ -5,11 +5,11 @@ import Layout from '../layouts/Layout.astro';
   <section class="home-hero">
     <div class="hero wrap">
       <div class="hero-copy">
-      <p class="eyebrow"><span class="status-dot"></span><span id="realm-status">Realm status loading</span></p>
-      <h1 data-home-realm>Azeroth</h1>
+      <p class="eyebrow"><span class="status-dot"></span><span id="home-eyebrow">Realm status</span> · <span id="realm-status">Loading</span></p>
+      <h1 id="home-headline" data-home-realm>Azeroth</h1>
       <p class="lede" id="portal-tagline">A timeless realm, shaped by its community. Forge alliances, conquer raids, and write your story.</p>
       <p class="expansion-pill"><span id="expansion-name">Wrath of the Lich King</span> · Private server</p>
-      <div class="hero-actions"><a class="button" href="/register"><span data-i18n="home.createAccount">Create account</span> <span>→</span></a><a class="play" href="#start"><b>↓</b> <span data-i18n="home.howToConnect">How to connect</span></a></div>
+      <div class="hero-actions"><a class="button" href="/register"><span id="home-primary-cta" data-i18n="home.createAccount">Create account</span> <span>→</span></a><a class="play" href="#start"><b>↓</b> <span data-i18n="home.howToConnect">How to connect</span></a></div>
       <dl class="stats"><div><dt id="client-version">3.3.5a</dt><dd>Client version</dd></div><div><dt id="experience-rate">2×</dt><dd>Experience rate</dd></div><div><dt id="uptime-label">24/7</dt><dd>Realm uptime</dd></div></dl>
       </div>
     </div>
@@ -23,8 +23,13 @@ import Layout from '../layouts/Layout.astro';
   </section>
   <section id="news-section" class="wrap content-section hidden"><div class="section-head"><div><p class="eyebrow" data-i18n="news.eyebrow">REALM NEWS</p><h2 data-i18n="news.title">Latest updates</h2></div></div><div id="news-grid" class="news-grid"></div></section>
   <section class="panel-section" id="start"><div class="wrap">
-    <div class="section-head"><div><p class="eyebrow">Getting started</p><h2>Connect in three steps</h2></div><p>Everything you need to join the server.</p></div>
+    <div class="section-head"><div><p class="eyebrow">Getting started</p><h2 id="home-connect-title">Connect in three steps</h2></div><p id="home-guide-text">Everything you need to join the server.</p></div>
     <div class="steps"><article><b>01</b><span class="step-icon">✦</span><h3>Create your account</h3><p>Register a free game account in moments.</p><a href="/register">Register now →</a></article><article><b>02</b><span class="step-icon">⬇</span><h3>Prepare the client</h3><p>Use a clean <span id="client-description">Wrath of the Lich King 3.3.5a</span> client.</p><span>Version <i id="client-build">12340</i></span><a id="download-link" class="hidden" rel="noreferrer">Download client →</a></article><article><b>03</b><span class="step-icon">⌁</span><h3>Set your realmlist</h3><p>Open realmlist.wtf and replace its contents with:</p><button class="code-copy" data-copy=""><code>set realmlist <i id="realm-address">logon.example.com</i></code><span>Copy</span></button></article></div>
   </div></section>
+  <section id="home-community" class="wrap home-community-grid hidden" aria-label="Realm information">
+    <article id="home-rules-card" class="account-panel hidden"><p class="eyebrow">REALM RULES</p><h2>Play fair</h2><p id="home-rules"></p></article>
+    <article id="home-discord-card" class="account-panel hidden"><p class="eyebrow">COMMUNITY</p><h2>Discord status</h2><p id="home-discord-status"></p><a class="config-community hidden">Open Discord →</a></article>
+    <article id="home-changelog-card" class="account-panel hidden"><p class="eyebrow">CHANGELOG</p><h2>Latest realm changes</h2><p id="home-changelog"></p></article>
+  </section>
   <section class="cta wrap"><p class="eyebrow">Ready to play?</p><h2>Create your account</h2><p>Join the realm and manage everything from one place.</p><a class="button" href="/register">Get started →</a></section>
 </Layout>

@@ -146,6 +146,7 @@ func (s *Store) resolveSet(ctx context.Context, d catalogSet) ([]catalogItem, er
 func (s *Store) SeedDefaultCatalog(ctx context.Context) (int, error) {
 	seeded := 0
 	for _, d := range defaultCatalog() {
+		seedKey := s.C.RealmKey + ":" + d.key
 		items, err := s.resolveSet(ctx, d)
 		if err != nil {
 			return seeded, fmt.Errorf("resolve %s: %w", d.key, err)
@@ -156,14 +157,14 @@ func (s *Store) SeedDefaultCatalog(ctx context.Context) (int, error) {
 		name := fmt.Sprintf("%s %s %s Package", d.class, d.spec, d.tier)
 		description := fmt.Sprintf("Complete %s level-80 loadout for %s %s: five-piece set, matching off-pieces, jewelry, trinkets, weapons, gems, and armor enhancements.", d.tier, d.spec, d.class)
 		var id int64
-		if err = s.Auth.QueryRowContext(ctx, "SELECT id FROM portal_products WHERE seed_key=? LIMIT 1", d.key).Scan(&id); err == sql.ErrNoRows {
-			res, insertErr := s.Auth.ExecContext(ctx, `INSERT INTO portal_products(seed_key,name,description,item_id,quantity,price,category,class_id,tier_label,service_level,active) VALUES(?,?,?,0,0,?,?,?,?,80,1)`, d.key, name, description, d.price, d.category, d.classID, d.tier)
+		if err = s.Auth.QueryRowContext(ctx, "SELECT id FROM portal_products WHERE seed_key=? AND realm_key=? LIMIT 1", seedKey, s.C.RealmKey).Scan(&id); err == sql.ErrNoRows {
+			res, insertErr := s.Auth.ExecContext(ctx, `INSERT INTO portal_products(seed_key,name,description,item_id,quantity,price,category,class_id,tier_label,service_level,active,realm_key) VALUES(?,?,?,0,0,?,?,?,?,80,1,?)`, seedKey, name, description, d.price, d.category, d.classID, d.tier, s.C.RealmKey)
 			if insertErr != nil {
 				return seeded, insertErr
 			}
 			id, err = res.LastInsertId()
 		} else if err == nil {
-			_, err = s.Auth.ExecContext(ctx, "UPDATE portal_products SET name=?,description=?,category=?,class_id=?,tier_label=?,active=1 WHERE id=?", name, description, d.category, d.classID, d.tier, id)
+			_, err = s.Auth.ExecContext(ctx, "UPDATE portal_products SET name=?,description=?,category=?,class_id=?,tier_label=?,active=1 WHERE id=? AND realm_key=?", name, description, d.category, d.classID, d.tier, id, s.C.RealmKey)
 		}
 		if err != nil {
 			return seeded, err

@@ -10,7 +10,7 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - 2v2, 3v3, and 5v5 arena team ladders with ratings, records, and rosters
 - Character ladders for honorable kills, achievements, played time, and level
 - PvE raid progression from character achievement dates, including guild-first dates
-- Account dashboard with characters, credit balance, and order history
+- Account dashboard with characters, credit balance, activity, service history, daily rewards, referrals, and provider-verified voting rewards
 - Safe self-service rename, customization, unstuck, and deleted-character restoration through AzerothCore SOAP
 - Password changes, TOTP two-factor authentication, and session revocation
 - Single-use email password recovery and optional Cloudflare Turnstile registration protection
@@ -24,10 +24,14 @@ A production-minded AzerothCore web portal in one container: a Go API serves an 
 - Queued race-change and faction-change services using AzerothCore's supported character commands
 - 51 specialization-aware, full-slot WotLK S6, S7, and T8 loadouts resolved from the installed world database
 - Stripe Checkout credit packs with signed, replay-safe webhooks
-- Categorized shop with full product CRUD, WotLK item autocomplete, equipment/bag preview, scheduling, purchase limits, and limited-use coupons
+- Realm-scoped shop with full product CRUD, featured products, sales, bundles, stock limits, category ordering, purchase-history filters, WotLK item autocomplete, equipment/bag preview, scheduling, and limited-use coupons
 - Durable queued fulfillment through AzerothCore SOAP, with review/refund controls
 - Realm status, faction population, guild directory, and guild rosters
 - Database-backed news/announcement editor, live website configuration, scheduled maintenance, and GM-only service monitoring
+- Tiered staff access for support agents, moderators, and administrators
+- Independent shop-manager assignments, CSV exports, bulk order retries, typed confirmations, dashboard charts, and audit filters
+- Optional Discord notifications for registrations, purchases, tickets, and moderation actions
+- Admin dashboard analytics for accounts, characters, population, tickets, orders, and credits
 - Health, readiness, and Prometheus metrics endpoints
 - Responsive, dependency-light Astro UI
 - One multi-stage Docker image; no Node runtime in production
@@ -252,13 +256,19 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `PUBLIC_URL` | Canonical origin used for CSRF checks | `http://localhost:8080` |
 | `COOKIE_SECURE` | Require HTTPS for session cookies; mandatory with an HTTPS `PUBLIC_URL` | `false` |
 | `TRUST_PROXY` | Trust proxy-provided client IP headers for sessions and rate limiting | `false` |
-| `REALM_NAME`, `REALM_ADDRESS` | UI realm identity and realmlist address | `Azeroth`, example host |
+| `REALM_NAME`, `REALM_ADDRESS`, `REALM_TYPE`, `REALM_TIMEZONE` | Per-realm identity, realmlist address, PvE/PvP/RP mode, and timezone | `Azeroth`, example host, `PvE`, `UTC` |
 | `REALM_KEY` | Stable key identifying this realm in the frontend realm switcher | `default` |
 | `REALMS_JSON` | Optional in-process realm definitions with per-realm ID, character/world DSNs and SOAP connection; omitted fields inherit the single-realm variables | current realm only |
 | `PORTAL_NAME`, `BRAND_MARK` | Site-wide display name and short sigil (up to 3 characters recommended) | realm name, `A` |
 | `PORTAL_TAGLINE`, `FOOTER_TEXT` | Home-page introduction and footer copy | community-oriented defaults |
+| `HOME_HEADLINE`, `HOME_EYEBROW`, `HOME_PRIMARY_CTA`, `HOME_CONNECT_TITLE`, `HOME_GUIDE_TEXT`, `HOME_RULES`, `DISCORD_STATUS`, `HOME_CHANGELOG` | Homepage content defaults, also editable from Administration | realm name and built-in labels |
 | `EXPANSION_NAME`, `CLIENT_VERSION`, `CLIENT_BUILD` | Client information shown in connection instructions | WotLK, `3.3.5a`, `12340` |
-| `EXPERIENCE_RATE`, `UPTIME_LABEL` | Home-page realm facts | `2×`, `24/7` |
+| `EXPERIENCE_RATE`, `XP_QUEST_RATE`, `XP_KILL_RATE`, `XP_EXPLORATION_RATE` | Overall and granular displayed XP rates | `2×` |
+| `DROP_RATE`, `REPUTATION_RATE`, `HONOR_RATE`, `PROFESSION_RATE` | Displayed gameplay rates | `1×` |
+| `START_LEVEL`, `MAX_LEVEL`, `POPULATION_CAP`, `FACTION_POLICY`, `CROSS_FACTION`, `SEASON_NAME` | Realm rules and current phase metadata | `1`, `80`, `0`, `both`, `false`, unset |
+| `CROSS_FACTION_ACCOUNTS`, `CROSS_FACTION_CALENDAR`, `CROSS_FACTION_CHANNELS`, `CROSS_FACTION_GROUPS`, `CROSS_FACTION_GUILDS`, `CROSS_FACTION_AUCTIONS`, `CROSS_FACTION_MAIL`, `CROSS_FACTION_WHO`, `CROSS_FACTION_FRIENDS`, `CROSS_FACTION_TRADE` | Granular public cross-faction capability flags matching AzerothCore's `AllowTwoSide.*` options | `CROSS_FACTION` fallback |
+
+Realm gameplay values edited in the portal are public profile metadata. They do not rewrite `worldserver.conf`; configure the same rates and policies in AzerothCore, then mirror them here so players see accurate information.
 | `DOWNLOAD_URL`, `COMMUNITY_URL` | Optional HTTP(S) client-download and Discord/community links | unset/hidden |
 | `LOGO_URL`, `HERO_IMAGE_URL`, `FAVICON_URL` | Optional root-relative or HTTPS brand assets; the hero image identifies the server on the home page | bundled Northrend image for the hero, others unset |
 | `THEME_PRIMARY`, `THEME_SECONDARY`, `THEME_ACCENT`, `THEME_BACKGROUND` | Six-digit hex colors used by the runtime theme | built-in green/gold theme |
@@ -275,7 +285,8 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `SETUP_GM_LEVEL`, `SETUP_GM_REALM_ID` | Initial administrator access level and realm scope | `3`, `-1` |
 | `ACCOUNT_EXPANSION` | New account expansion field | `2` |
 | `REALM_ID` | Realm used when resolving GM access | `1` |
-| `GM_LEVEL` | Minimum AzerothCore GM level allowed to grant credits | `3` |
+| `STAFF_SUPPORT_GM_LEVEL`, `STAFF_MODERATOR_GM_LEVEL`, `GM_LEVEL` | Ordered minimum AzerothCore levels for support, moderation, and full administration | `GM_LEVEL` for all three |
+| `STAFF_SHOP_MANAGERS` | Comma-separated account names granted only shop and order management access | unset |
 | `STARTING_CREDITS` | New wallet balance | `0` |
 | `SOAP_URL`, `SOAP_USER`, `SOAP_PASSWORD` | Worldserver delivery endpoint | unset |
 | `REALM_START_WEBHOOK`, `REALM_CONTROL_TOKEN` | Optional authenticated orchestrator webhook for starting an offline worldserver | unset/disabled |
@@ -285,6 +296,10 @@ For UI-only work, run `npm run dev`. API calls still expect the Go service, so u
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Optional registration bot protection | unset/disabled |
 | `REQUIRE_EMAIL_VERIFICATION` | Lock new accounts until their one-time email link is confirmed; requires SMTP configuration | `false` |
 | `SMTP_ADDR`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | SMTP transport for password recovery and account verification (`SMTP_ADDR` is `host:port`) | unset/disabled |
+| `DISCORD_WEBHOOK_URL` | Optional Discord webhook for registrations, purchases, tickets, and moderation actions | unset |
+| `VOTE_URL`, `VOTE_REWARD_CREDITS`, `VOTE_CALLBACK_SECRET` | Voting-provider link, verified reward, and bearer secret for `POST /api/rewards/vote/callback` | unset, `0`, unset |
+
+Configure the voting provider to POST `{"username":"PLAYER","eventId":"provider-unique-id"}` to `/api/rewards/vote/callback` with `Authorization: Bearer <VOTE_CALLBACK_SECRET>`. Event IDs are stored once, so provider retries cannot award credits twice.
 
 Set `PUBLIC_URL=https://your-domain`, `COOKIE_SECURE=true`, terminate TLS at your proxy, and keep the portal and SOAP ports behind a firewall in production. Set `TRUST_PROXY=true` only when the portal cannot be reached directly and your proxy overwrites (rather than appends to) incoming client-IP headers.
 

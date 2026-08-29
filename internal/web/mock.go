@@ -28,11 +28,15 @@ type mockState struct {
 	couponUses  map[string]uint32
 	purchases   map[uint32]uint32
 	deleted     []deletedCharacter
+	dailyClaim  time.Time
+	services    []dashboardService
+	products    []product
+	voteEvents  map[string]bool
 }
 
 func newMockState() *mockState {
 	published := time.Now().Add(-time.Hour)
-	return &mockState{balance: 500, users: map[string]string{"DEMO": "demo1234"}, bans: map[string]string{}, couponUses: map[string]uint32{}, purchases: map[uint32]uint32{}, tickets: []supportTicket{{ID: 1, AccountID: 1, Username: "DEMO", CharacterGUID: 1, Subject: "Missing quest item", Message: "The quest item did not drop after the boss encounter.", Status: "open", Created: time.Now().Add(-2 * time.Hour), Updated: time.Now().Add(-2 * time.Hour)}}, orders: []map[string]any{{"id": 1042, "itemId": 49623, "quantity": 1, "total": 85, "status": "delivered", "created": time.Now().Add(-24 * time.Hour)}}, news: []newsEntry{{ID: 1, Title: "Welcome to Azeroth", Summary: "The portal is ready for your community.", Kind: "news", Active: true, PublishAt: &published}}, deleted: []deletedCharacter{{GUID: 99, Name: "Oldhero", DeletedAt: uint64(time.Now().Add(-24 * time.Hour).Unix())}}}
+	return &mockState{balance: 500, users: map[string]string{"DEMO": "demo1234"}, bans: map[string]string{}, couponUses: map[string]uint32{}, purchases: map[uint32]uint32{}, products: buildMockProducts(), tickets: []supportTicket{{ID: 1, AccountID: 1, Username: "DEMO", CharacterGUID: 1, Subject: "Missing quest item", Message: "The quest item did not drop after the boss encounter.", Status: "open", Created: time.Now().Add(-2 * time.Hour), Updated: time.Now().Add(-2 * time.Hour)}}, orders: []map[string]any{{"id": 1042, "itemId": 49623, "quantity": 1, "total": 85, "status": "delivered", "created": time.Now().Add(-24 * time.Hour)}}, news: []newsEntry{{ID: 1, Title: "Welcome to Azeroth", Summary: "The portal is ready for your community.", Kind: "news", Active: true, Featured: true, PublishAt: &published}}, services: []dashboardService{{Action: "unstuck", Character: "Arthoria", Response: "Character moved to homebind.", Success: true, Created: time.Now().Add(-3 * time.Hour)}}, deleted: []deletedCharacter{{GUID: 99, Name: "Oldhero", DeletedAt: uint64(time.Now().Add(-24 * time.Hour).Unix())}}}
 }
 
 var mockCharacters = []character{
@@ -47,8 +51,6 @@ var mockCharacters = []character{
 	{GUID: 9, Name: "Dawnprayer", Race: 11, Class: 5, Gender: 1, Level: 74, Zone: 65, Online: false, TotalTime: 1296000, Guild: "Silver Covenant"},
 	{GUID: 10, Name: "Stormcaller", Race: 8, Class: 7, Level: 69, Zone: 3483, Online: false, TotalTime: 907200, Guild: ""},
 }
-
-var mockProducts = buildMockProducts()
 
 func buildMockProducts() []product {
 	products := []product{
@@ -105,6 +107,13 @@ func buildMockProducts() []product {
 	)
 	for i := range products {
 		products[i].Active = true
+		products[i].CategoryOrder = map[string]int{"Featured": -10, "PvP": 10, "PvE": 20, "Mounts": 30, "Weapons": 40, "Gold": 50, "Services": 60, "Utility": 70, "Companions": 80}[products[i].Category]
+		if products[i].ID == 1 {
+			products[i].Featured = true
+			products[i].SalePrice = 95
+			products[i].StockLimit = 10
+			products[i].SoldCount = 7
+		}
 	}
 	return products
 }
@@ -136,8 +145,10 @@ func (s *Server) mockHandler() http.Handler {
 	m.HandleFunc("GET /api/characters", s.mockOwnCharacters)
 	m.HandleFunc("GET /api/armory", s.feature(s.c.EnableArmory, "Armory", s.mockArmory))
 	m.HandleFunc("GET /api/armory/{name}", s.feature(s.c.EnableArmory, "Armory", s.mockCharacter))
+	m.HandleFunc("GET /api/armory/{name}/insights", s.feature(s.c.EnableArmory, "Armory", s.armoryInsights))
 	m.HandleFunc("GET /api/arena", s.feature(s.c.EnableRankings, "Rankings", s.mockArena))
 	m.HandleFunc("GET /api/rankings", s.feature(s.c.EnableRankings, "Rankings", s.mockExpandedRankings))
+	m.HandleFunc("GET /api/rankings/raids", s.feature(s.c.EnableRankings, "Rankings", s.raidRankings))
 	m.HandleFunc("GET /api/progression/{name}", s.feature(s.c.EnableArmory, "Armory", s.mockProgression))
 	m.HandleFunc("GET /api/realm", s.feature(s.c.EnableRealmStatus, "Realm status", s.mockRealm))
 	m.HandleFunc("GET /api/guilds", s.feature(s.c.EnableGuilds, "Guilds", s.mockGuilds))
@@ -146,7 +157,7 @@ func (s *Server) mockHandler() http.Handler {
 		now := time.Now()
 		out := []product{}
 		s.mock.mu.Lock()
-		for _, p := range mockProducts {
+		for _, p := range s.mock.products {
 			if p.Active && (p.StartsAt == nil || !now.Before(*p.StartsAt)) && (p.EndsAt == nil || now.Before(*p.EndsAt)) {
 				out = append(out, p)
 			}
@@ -158,22 +169,30 @@ func (s *Server) mockHandler() http.Handler {
 	m.HandleFunc("GET /api/characters/deleted", s.mockDeletedCharacters)
 	m.HandleFunc("POST /api/characters/{guid}/service", s.mockCharacterService)
 	m.HandleFunc("GET /api/orders", s.mockOrders)
+	m.HandleFunc("GET /api/dashboard", s.dashboard)
+	m.HandleFunc("POST /api/rewards/daily", s.rate(3, time.Hour, s.claimDailyReward))
+	m.HandleFunc("POST /api/rewards/vote/callback", s.rate(60, time.Minute, s.voteRewardCallback))
 	m.HandleFunc("GET /api/tickets", s.feature(s.c.EnableSupport, "Support", s.mockTickets))
 	m.HandleFunc("POST /api/tickets", s.feature(s.c.EnableSupport, "Support", s.mockCreateTicket))
 	m.HandleFunc("POST /api/admin/credits", s.feature(s.c.EnableAdminPanel, "Administration", s.rate(30, time.Minute, s.mockCredits)))
 	m.HandleFunc("GET /api/admin/orders", s.feature(s.c.EnableAdminPanel, "Administration", s.mockAdminOrders))
 	m.HandleFunc("GET /api/admin/status", s.feature(s.c.EnableAdminPanel, "Administration", s.mockAdminStatus))
+	m.HandleFunc("GET /api/admin/analytics", s.feature(s.c.EnableAdminPanel, "Administration", s.adminAnalytics))
 	m.HandleFunc("GET /api/admin/ledger", s.feature(s.c.EnableAdminPanel, "Administration", func(w http.ResponseWriter, _ *http.Request) {
 		jsonOut(w, 200, map[string]any{"entries": []map[string]any{{"id": 1, "Actor": "DEMO", "Target": "DEMO", "Amount": 500, "Reason": "Demo starting balance", "Created": time.Now().Add(-48 * time.Hour)}}})
 	}))
 	m.HandleFunc("GET /api/admin/products", s.feature(s.c.EnableAdminPanel, "Administration", func(w http.ResponseWriter, _ *http.Request) {
-		jsonOut(w, 200, map[string]any{"products": mockProducts})
+		s.mock.mu.Lock()
+		out := append([]product(nil), s.mock.products...)
+		s.mock.mu.Unlock()
+		jsonOut(w, 200, map[string]any{"products": out})
 	}))
 	m.HandleFunc("GET /api/admin/products/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminProductDetail))
 	m.HandleFunc("GET /api/admin/items", s.feature(s.c.EnableAdminPanel, "Administration", s.adminItemSearch))
 	m.HandleFunc("GET /api/admin/accounts", s.feature(s.c.EnableAdminPanel, "Administration", s.mockAdminAccounts))
 	m.HandleFunc("POST /api/admin/moderation", s.feature(s.c.EnableAdminPanel, "Administration", s.rate(30, time.Minute, s.mockAdminModeration)))
 	m.HandleFunc("GET /api/admin/moderation", s.feature(s.c.EnableAdminPanel, "Administration", s.mockAdminModerationLog))
+	m.HandleFunc("GET /api/admin/audit", s.feature(s.c.EnableAdminPanel, "Administration", s.adminAudit))
 	m.HandleFunc("GET /api/admin/console", s.feature(s.c.EnableAdminPanel && s.c.EnableGMConsole, "GM console", s.mockAdminConsoleHistory))
 	m.HandleFunc("POST /api/admin/console", s.feature(s.c.EnableAdminPanel && s.c.EnableGMConsole, "GM console", s.rate(20, time.Minute, s.mockAdminConsoleExecute)))
 	m.HandleFunc("GET /api/admin/tickets", s.feature(s.c.EnableAdminPanel && s.c.EnableSupport, "Administration", s.mockAdminTickets))
@@ -263,7 +282,8 @@ func (s *Server) mockMe(w http.ResponseWriter, r *http.Request) {
 	s.mock.mu.Lock()
 	balance := s.mock.balance
 	s.mock.mu.Unlock()
-	jsonOut(w, 200, map[string]any{"account": account{ID: 1, Username: u, Email: "demo@example.com", GMLevel: 3}, "balance": balance})
+	a := account{ID: 1, Username: u, Email: "demo@example.com", GMLevel: 3}
+	jsonOut(w, 200, map[string]any{"account": a, "balance": balance, "staffRole": staffRole(a, s.c), "permissions": s.staffPermissionsFor(a.GMLevel, a.Username)})
 }
 func (s *Server) mockOwnCharacters(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.mockUser(r); !ok {
@@ -366,10 +386,12 @@ func (s *Server) mockPurchase(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
+	s.mock.mu.Lock()
+	defer s.mock.mu.Unlock()
 	var p *product
-	for i := range mockProducts {
-		if mockProducts[i].ID == in.ProductID {
-			p = &mockProducts[i]
+	for i := range s.mock.products {
+		if s.mock.products[i].ID == in.ProductID {
+			p = &s.mock.products[i]
 		}
 	}
 	if p == nil {
@@ -396,13 +418,18 @@ func (s *Server) mockPurchase(w http.ResponseWriter, r *http.Request) {
 		problem(w, 422, "This package does not match the selected character's class")
 		return
 	}
-	s.mock.mu.Lock()
-	defer s.mock.mu.Unlock()
 	if p.PerAccountLimit > 0 && s.mock.purchases[p.ID] >= p.PerAccountLimit {
 		problem(w, 409, "This product's account purchase limit has been reached")
 		return
 	}
+	if p.StockLimit > 0 && p.SoldCount >= p.StockLimit {
+		problem(w, 409, "This product is sold out")
+		return
+	}
 	total := p.Price
+	if p.SalePrice > 0 && p.SalePrice < total {
+		total = p.SalePrice
+	}
 	code := strings.ToUpper(strings.TrimSpace(in.Coupon))
 	couponApplied := false
 	if code != "" {
@@ -430,6 +457,9 @@ func (s *Server) mockPurchase(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mock.balance -= total
 	s.mock.purchases[p.ID]++
+	if p.StockLimit > 0 {
+		p.SoldCount++
+	}
 	if couponApplied {
 		s.mock.couponUses[code]++
 	}
@@ -449,7 +479,7 @@ func (s *Server) mockOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) mockAdminStatus(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireGM(r); !ok {
+	if _, ok := s.requireStaffPermission(r, "monitoring"); !ok {
 		problem(w, http.StatusForbidden, "GM access required")
 		return
 	}
@@ -829,9 +859,9 @@ func (s *Server) mockAdminProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mock.mu.Lock()
-	p.ID = uint32(len(mockProducts) + 1)
+	p.ID = uint32(len(s.mock.products) + 1)
 	p.Active = true
-	mockProducts = append(mockProducts, p)
+	s.mock.products = append(s.mock.products, p)
 	s.mock.mu.Unlock()
 	jsonOut(w, 201, map[string]any{"id": p.ID})
 }

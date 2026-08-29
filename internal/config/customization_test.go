@@ -80,3 +80,55 @@ func TestGMConsoleConfiguration(t *testing.T) {
 		t.Fatalf("unexpected console configuration: %#v", c)
 	}
 }
+
+func TestDiscordWebhookValidation(t *testing.T) {
+	for _, webhook := range []string{
+		"http://discord.com/api/webhooks/123/token",
+		"https://example.com/api/webhooks/123/token",
+		"https://discord.com/channels/123/456",
+		"javascript:alert(1)",
+	} {
+		t.Run(webhook, func(t *testing.T) {
+			t.Setenv("MOCK_MODE", "true")
+			t.Setenv("DISCORD_WEBHOOK_URL", webhook)
+			if _, err := Load(); err == nil {
+				t.Fatalf("unsafe Discord webhook %q was accepted", webhook)
+			}
+		})
+	}
+
+	t.Setenv("MOCK_MODE", "true")
+	t.Setenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/123/token")
+	if _, err := Load(); err != nil {
+		t.Fatalf("valid Discord webhook rejected: %v", err)
+	}
+}
+
+func TestHomepageAndStaffConfiguration(t *testing.T) {
+	t.Setenv("MOCK_MODE", "true")
+	t.Setenv("HOME_HEADLINE", "Enter Frosthold")
+	t.Setenv("HOME_EYEBROW", "Two realms online")
+	t.Setenv("HOME_PRIMARY_CTA", "Begin your journey")
+	t.Setenv("HOME_CONNECT_TITLE", "Join the realm")
+	t.Setenv("STAFF_SUPPORT_GM_LEVEL", "1")
+	t.Setenv("STAFF_MODERATOR_GM_LEVEL", "2")
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("valid homepage and staff configuration rejected: %v", err)
+	}
+	if c.HomeHeadline != "Enter Frosthold" || c.HomeEyebrow != "Two realms online" || c.HomePrimaryCTA != "Begin your journey" || c.HomeConnectTitle != "Join the realm" {
+		t.Fatalf("homepage configuration was not loaded: %#v", c)
+	}
+	if c.SupportGMLevel != 1 || c.ModeratorGMLevel != 2 {
+		t.Fatalf("staff thresholds = support %d, moderator %d", c.SupportGMLevel, c.ModeratorGMLevel)
+	}
+}
+
+func TestRejectsInvertedStaffLevels(t *testing.T) {
+	t.Setenv("MOCK_MODE", "true")
+	t.Setenv("STAFF_SUPPORT_GM_LEVEL", "2")
+	t.Setenv("STAFF_MODERATOR_GM_LEVEL", "1")
+	if _, err := Load(); err == nil {
+		t.Fatal("inverted staff thresholds were accepted")
+	}
+}

@@ -457,6 +457,24 @@ body[data-page="shop"] main > .content-section { padding-top: 24px; }
 .admin-view-head { align-items: center; }
 .admin-view-head h2 { margin: 3px 0; font-size: 27px; }
 .admin-view-head p:not(.eyebrow) { font-size: 13px; }
+.admin-analytics { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 10px; margin-bottom: 20px; }
+.admin-analytics > article { display: grid; gap: 7px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: #0f1726; }
+.admin-analytics > article span { color: var(--muted); font-size: 10px; font-weight: 650; text-transform: uppercase; }
+.admin-analytics > article strong { color: #dbeafe; font-size: 24px; line-height: 1; }
+.admin-analytics > article small { color: var(--muted); font-size: 10px; }
+.homepage-fields { margin-block: 22px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; }
+.homepage-fields legend { padding-inline: 8px; color: var(--muted); font-size: 11px; font-weight: 650; text-transform: uppercase; }
+.home-community-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; padding-block: 34px; }
+.home-community-grid article { min-width: 0; }
+.home-community-grid p { white-space: pre-line; overflow-wrap: anywhere; }
+.news-card:has(.featured-badge) { border-color: var(--gold); box-shadow: 0 12px 35px rgba(211,174,104,.12); }
+.featured-badge { display: inline-flex; margin-bottom: 8px; color: var(--gold2); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.dashboard-benefits { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; margin-bottom: 18px; }
+.dashboard-benefits .account-panel { min-width: 0; }
+.sale-price { color: var(--gold2); }
+.old-price { margin-left: 7px; color: var(--muted); font-size: 12px; text-decoration: line-through; }
+.stock-note { color: var(--muted); font-size: 11px; }
+.product-card.is-sold-out { opacity: .7; }
 .admin-subnav { gap: 4px; border-color: var(--line); }
 .admin-subnav a { padding: 9px 13px; border-radius: 7px; color: var(--muted); font-size: 12px; letter-spacing: 0; text-transform: none; }
 .admin-subnav a.active { border-color: #334155; background: #1e293b; color: #fff; }
@@ -635,6 +653,8 @@ html[data-theme="light"] .gear-icon { background: #e8eef7; }
 html[data-theme="light"] .item-tooltip { border-color: #94a3b8; background: rgba(255,255,255,.98); box-shadow: 0 18px 50px rgba(15,23,42,.18); }
 html[data-theme="light"] .realm-stats article { border-color: #d9e1ec; background: #f8fafc; }
 html[data-theme="light"] .admin-sidebar { border-color: #d9e1ec; background: #fff; }
+html[data-theme="light"] .admin-analytics > article { border-color: #d9e1ec; background: #fff; }
+html[data-theme="light"] .admin-analytics > article strong { color: #1d4ed8; }
 html[data-theme="light"] .admin-sidebar > a:hover { background: #f1f5f9; color: #0f172a; }
 html[data-theme="light"] .admin-sidebar > a.active { background: #2563eb; color: #fff; }
 html[data-theme="light"] .admin-subnav a.active { border-color: #cbd5e1; background: #e8eef7; color: #0f172a; }
@@ -649,9 +669,65 @@ html[data-theme="light"] .panel-section { border-color: #d9e1ec; background: #ee
 /* The photographic home hero intentionally remains dark for readable overlay text. */
 html[data-theme="light"] .home-hero :where(h1, .lede, .stats dt) { color: #f8fafc; }
 
+/* Expanded armory, commerce, rankings, and operations surfaces. */
+.insight-grid,.ranking-split { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin-top:18px; }
+.insight-card,.achievement-browser,.admin-chart { min-width:0; padding:20px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+.spell-chip-list { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.spell-chip-list a { padding:7px 10px; border:1px solid var(--line); border-radius:7px; color:var(--gold2); font-size:12px; }
+.achievement-browser { margin:0 0 20px; }
+.achievement-browser .view-heading { align-items:center; }
+.achievement-browser input { max-width:260px; }
+.achievement-list,.activity-list { display:grid; gap:8px; margin-top:14px; }
+.achievement-row,.activity-list>div,.activity-list>a { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; padding:11px 12px; border:1px solid var(--line); border-radius:8px; background:rgba(255,255,255,.025); }
+.activity-list span { min-width:0; overflow-wrap:anywhere; }
+.activity-list time,.achievement-row time { color:var(--muted); font-size:11px; }
+.ranking-controls,.ranking-filterbar,.history-filters,.editor-switches { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.ranking-controls label,.ranking-filterbar label { display:flex; align-items:center; gap:8px; margin:0; font-size:11px; }
+.ranking-filterbar { margin:0 0 14px; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+.ranking-filterbar select,.ranking-filterbar input,.ranking-controls select,.history-filters input,.history-filters select { width:auto; min-width:150px; }
+.ranking-split>article { min-width:0; }
+.compact-rank-row { display:flex; align-items:center; gap:12px; padding:13px 15px; border-bottom:1px solid var(--line); }
+.compact-rank-row:last-child { border-bottom:0; }
+.compact-rank-row>span { min-width:0; flex:1; }
+.compact-rank-row b,.compact-rank-row small { display:block; overflow-wrap:anywhere; }
+.compact-rank-row small,.compact-rank-row time { color:var(--muted); font-size:11px; }
+.product-card.is-featured { border-color:color-mix(in srgb,var(--gold) 65%,var(--line)); box-shadow:0 0 0 1px rgba(211,174,104,.13); }
+.featured-tag,.sale-tag { border-radius:999px; padding:3px 7px; font-size:9px; font-weight:800; text-transform:uppercase; }
+.featured-tag { background:rgba(211,174,104,.16); color:var(--gold2); }
+.sale-tag { background:rgba(239,68,68,.16); color:#fca5a5; }
+.product-card.is-sold-out { opacity:.68; }
+.product-foot del { color:var(--muted); font-size:12px; font-weight:400; }
+.stock-meter { height:4px; margin-top:12px; overflow:hidden; border-radius:99px; background:var(--line); }
+.stock-meter i { display:block; width:0; height:100%; background:var(--gold); }
+.admin-chart { margin:-6px 0 20px; }
+.chart-bars { display:grid; gap:11px; margin-top:15px; }
+.chart-bars>div { display:grid; grid-template-columns:110px minmax(80px,1fr) 70px; align-items:center; gap:10px; font-size:11px; }
+.chart-bars i { height:8px; border-radius:99px; background:linear-gradient(90deg,var(--teal) var(--bar),rgba(255,255,255,.06) var(--bar)); }
+.chart-bars b { text-align:right; }
+.audit-tools { grid-template-columns:minmax(220px,1fr) repeat(3,auto); }
+.order-select { display:flex; align-items:center; gap:10px; }
+.order-select>input { width:auto; }
+.rate-grid,.realm-rate-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+.realm-rate-grid { margin:18px 0; }
+.realm-rate-grid article,.realm-season { padding:14px; border:1px solid var(--line); border-radius:9px; background:rgba(255,255,255,.025); }
+.realm-rate-grid span,.realm-season span,.realm-season small { display:block; color:var(--muted); font-size:10px; text-transform:uppercase; }
+.realm-rate-grid b { display:block; margin-top:5px; color:var(--gold2); }
+.realm-season { display:flex; align-items:center; gap:16px; margin-bottom:18px; }
+.realm-season strong { flex:1; }
+.realm-capabilities { margin-top:18px; padding-top:18px; border-top:1px solid var(--line); }
+.realm-capabilities>span { color:var(--muted); font-size:10px; text-transform:uppercase; }
+.realm-capabilities>div { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+.realm-capabilities b { padding:6px 9px; border-radius:999px; background:rgba(63,208,190,.12); color:var(--teal); font-size:10px; text-transform:capitalize; }
+.data-table td,.data-table th,.admin-row>* { min-width:0; overflow-wrap:anywhere; }
+html[data-theme="light"] :where(.insight-card,.achievement-browser,.admin-chart,.ranking-filterbar) { border-color:#d9e1ec; background:#fff; }
+html[data-theme="light"] .activity-list>div,html[data-theme="light"] .activity-list>a,html[data-theme="light"] .achievement-row { border-color:#d9e1ec; background:#f8fafc; }
+
 @media (max-width: 560px) {
   .theme-toggle { flex: 0 0 36px; }
   .account-menu-trigger { padding-inline: 10px; }
   .account-menu-trigger > span:first-child { max-width: 72px; overflow: hidden; text-overflow: ellipsis; }
   .realm-live-section .section-head > p { text-align: left; }
 }
+
+@media (max-width: 950px) { .admin-analytics { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 520px) { .admin-analytics { grid-template-columns: 1fr; } }

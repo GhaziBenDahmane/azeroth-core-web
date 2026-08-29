@@ -76,11 +76,12 @@ func (s *Server) createTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := res.LastInsertId()
+	s.notifyDiscordAsync("New support ticket", "Ticket **#%d** from **%s** on **%s**: %s", id, a.Username, s.c.RealmName, in.Subject)
 	jsonOut(w, 201, map[string]any{"ok": true, "id": id})
 }
 
 func (s *Server) adminTickets(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireGM(r); !ok {
+	if _, ok := s.requireStaffPermission(r, "support"); !ok {
 		problem(w, 403, "GM access required")
 		return
 	}
@@ -101,7 +102,7 @@ func (s *Server) adminTickets(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminTicketUpdate(w http.ResponseWriter, r *http.Request) {
-	a, ok := s.requireGM(r)
+	a, ok := s.requireStaffPermission(r, "support")
 	if !ok {
 		problem(w, 403, "GM access required")
 		return

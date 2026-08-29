@@ -13,12 +13,7 @@ const { title = 'Azeroth Portal', page = 'home' } = Astro.props;
   <meta name="viewport" content="width=device-width" />
   <meta name="description" content="Your gateway to the realm: account registration, armory and shop." />
   <title>{title}</title>
-  <script is:inline>
-    (() => {
-      const saved = localStorage.getItem('portal-theme');
-      document.documentElement.dataset.theme = saved || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-    })();
-  </script>
+  <script is:inline src="/theme.js"></script>
 </head>
 <body data-page={page}>
 	<div id="maintenance-banner" class="maintenance-banner hidden"></div>

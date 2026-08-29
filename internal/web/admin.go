@@ -15,7 +15,7 @@ import (
 var banDurationPattern = regexp.MustCompile(`^(?:-1|(?:[0-9]+[smhdwy]){1,4})$`)
 
 func (s *Server) adminOrders(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireGM(r); !ok {
+	if _, ok := s.requireStaffPermission(r, "commerce"); !ok {
 		problem(w, http.StatusForbidden, "GM access required")
 		return
 	}
@@ -47,7 +47,7 @@ func (s *Server) adminOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminLedger(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireGM(r); !ok {
+	if _, ok := s.requireStaffPermission(r, "commerce"); !ok {
 		problem(w, 403, "GM access required")
 		return
 	}
@@ -75,11 +75,11 @@ func (s *Server) adminLedger(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminProducts(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireGM(r); !ok {
+	if _, ok := s.requireStaffPermission(r, "commerce"); !ok {
 		problem(w, 403, "GM access required")
 		return
 	}
-	rows, err := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit FROM portal_products ORDER BY id DESC LIMIT 200")
+	rows, err := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit,featured,sale_price,stock_limit,sold_count,category_order FROM portal_products WHERE realm_key=? ORDER BY category_order,category,id DESC LIMIT 200", s.c.RealmKey)
 	if err != nil {
 		problem(w, 500, "Could not load products")
 		return
@@ -88,7 +88,7 @@ func (s *Server) adminProducts(w http.ResponseWriter, r *http.Request) {
 	out := []product{}
 	for rows.Next() {
 		var x product
-		if rows.Scan(&x.ID, &x.Name, &x.Description, &x.ItemID, &x.Quantity, &x.Price, &x.Category, &x.ImageURL, &x.ClassID, &x.Tier, &x.ServiceLevel, &x.Gold, &x.ServiceAction, &x.Active, &x.StartsAt, &x.EndsAt, &x.PerAccountLimit) == nil {
+		if rows.Scan(&x.ID, &x.Name, &x.Description, &x.ItemID, &x.Quantity, &x.Price, &x.Category, &x.ImageURL, &x.ClassID, &x.Tier, &x.ServiceLevel, &x.Gold, &x.ServiceAction, &x.Active, &x.StartsAt, &x.EndsAt, &x.PerAccountLimit, &x.Featured, &x.SalePrice, &x.StockLimit, &x.SoldCount, &x.CategoryOrder) == nil {
 			out = append(out, x)
 		}
 	}
@@ -96,7 +96,7 @@ func (s *Server) adminProducts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminAccounts(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireGM(r); !ok {
+	if _, ok := s.requireStaffPermission(r, "players"); !ok {
 		problem(w, 403, "GM access required")
 		return
 	}
@@ -155,11 +155,6 @@ func (s *Server) adminAccounts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminModeration(w http.ResponseWriter, r *http.Request) {
-	actor, ok := s.requireGM(r)
-	if !ok {
-		problem(w, 403, "GM access required")
-		return
-	}
 	var in struct {
 		Action, Target, Duration, Reason string
 		Level, RealmID                   int
@@ -171,6 +166,11 @@ func (s *Server) adminModeration(w http.ResponseWriter, r *http.Request) {
 	in.Target = strings.TrimSpace(in.Target)
 	in.Duration = strings.ToLower(strings.TrimSpace(in.Duration))
 	in.Reason = strings.TrimSpace(in.Reason)
+	actor, ok := s.requireStaffPermission(r, moderationPermission(in.Action))
+	if !ok {
+		problem(w, 403, "Insufficient staff permission")
+		return
+	}
 	if !validModerationReason(in.Reason) {
 		problem(w, 422, "Reason must be 3–255 characters without quotes or line breaks")
 		return
@@ -304,11 +304,21 @@ func (s *Server) adminModeration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, _ = s.s.Auth.ExecContext(r.Context(), "UPDATE portal_moderation_log SET status='executed' WHERE id=?", logID)
+	s.notifyDiscordAsync("Moderation action", "**%s** applied `%s` to **%s** on **%s**. Reason: %s", actor.Username, in.Action, in.Target, s.c.RealmName, in.Reason)
 	jsonOut(w, 200, map[string]any{"ok": true, "action": in.Action, "target": in.Target})
 }
 
+func moderationPermission(action string) string {
+	switch action {
+	case "start", "announce", "motd", "gm_level", "restart", "shutdown", "cancel_shutdown":
+		return "realm"
+	default:
+		return "moderation"
+	}
+}
+
 func (s *Server) adminModerationLog(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireGM(r); !ok {
+	if _, ok := s.requireStaffPermission(r, "audit"); !ok {
 		problem(w, 403, "GM access required")
 		return
 	}
