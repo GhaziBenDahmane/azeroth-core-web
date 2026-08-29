@@ -5,7 +5,7 @@ ARG NPM_CONFIG_REPLACE_REGISTRY_HOST=never
 ARG NPM_CONFIG_STRICT_SSL=true
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
-COPY astro.config.mjs tsconfig.json ./
+COPY astro.config.mjs tsconfig.json webcore.config.scss ./
 COPY src ./src
 COPY public ./public
 RUN npm run build
