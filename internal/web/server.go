@@ -593,9 +593,37 @@ func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
 		if (byID[ref.productID].Tier == "S6" || byID[ref.productID].Tier == "S7") && name == "Medallion of the Alliance" {
 			name = "Medallion of the Alliance/Horde (selected for character)"
 		}
+		if byID[ref.productID].ServiceLevel == 80 {
+			switch ref.item.ItemID {
+			case allianceGroundMountItem:
+				name = "Faction-appropriate epic ground mount"
+			case allianceFlyingMountItem:
+				name = "Faction-appropriate epic flying mount"
+			}
+		}
 		byID[ref.productID].Includes = append(byID[ref.productID].Includes, fmt.Sprintf("%d × %s", ref.item.Quantity, name))
 	}
+	for i := range out {
+		if out[i].ServiceLevel == 80 {
+			out[i].Includes = append(out[i].Includes,
+				"All class trainer spell ranks",
+				"All class weapon proficiencies at 400",
+				"Artisan Riding and Cold Weather Flying",
+			)
+		}
+		if out[i].Gold > 0 {
+			out[i].Includes = append(out[i].Includes, fmt.Sprintf("%s gold", commaNumber(out[i].Gold)))
+		}
+	}
 	jsonOut(w, 200, map[string]any{"products": out, "deliveryEnabled": s.soap.Enabled()})
+}
+
+func commaNumber(value uint32) string {
+	digits := strconv.FormatUint(uint64(value), 10)
+	for i := len(digits) - 3; i > 0; i -= 3 {
+		digits = digits[:i] + "," + digits[i:]
+	}
+	return digits
 }
 
 func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
@@ -731,6 +759,12 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if p.ServiceLevel == 80 {
+		if e = applyStarterMountFaction(items, characterRace); e != nil {
+			problem(w, 422, e.Error())
+			return
+		}
+	}
 	for _, item := range items {
 		if _, e = tx.ExecContext(r.Context(), "INSERT INTO portal_order_items(order_id,item_id,quantity) VALUES(?,?,?)", orderID, item.ItemID, item.Quantity); e != nil {
 			problem(w, 500, "Could not snapshot order items")
@@ -755,6 +789,32 @@ func (s *Server) purchase(w http.ResponseWriter, r *http.Request) {
 	s.metrics.orders.Add(1)
 	s.notifyDiscordAsync("New shop order", "Order **#%d** · **%s** bought **%s** for **%d credits** on **%s**.", orderID, a.Username, p.Name, total, s.c.RealmName)
 	jsonOut(w, 202, map[string]any{"ok": true, "orderId": orderID, "message": "Order accepted and queued for in-game delivery."})
+}
+
+const (
+	allianceGroundMountItem uint32 = 18777
+	hordeGroundMountItem    uint32 = 18796
+	allianceFlyingMountItem uint32 = 25528
+	hordeFlyingMountItem    uint32 = 25533
+)
+
+func applyStarterMountFaction(items []bundleItem, race uint8) error {
+	alliance := isAllianceRace(race)
+	if !alliance && !isHordeRace(race) {
+		return fmt.Errorf("character race has no supported faction")
+	}
+	if alliance {
+		return nil
+	}
+	for i := range items {
+		switch items[i].ItemID {
+		case allianceGroundMountItem:
+			items[i].ItemID = hordeGroundMountItem
+		case allianceFlyingMountItem:
+			items[i].ItemID = hordeFlyingMountItem
+		}
+	}
+	return nil
 }
 
 func (s *Server) pvpMedallionIDs(ctx context.Context) (alliance, horde uint32, err error) {

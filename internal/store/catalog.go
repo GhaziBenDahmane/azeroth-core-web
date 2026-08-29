@@ -16,6 +16,17 @@ type catalogSet struct {
 
 type catalogItem struct{ id, quantity uint32 }
 
+const level80StarterGold uint32 = 10000
+
+// These are stable 3.3.5a item IDs from AzerothCore's world database. Alliance
+// mounts are stored as placeholders and swapped for Horde equivalents when the
+// order is created. Mounts remain tangible items the player can learn in game.
+var level80StarterItems = []catalogItem{
+	{id: 41599, quantity: 4}, // Frostweave Bag (20 slots)
+	{id: 18777, quantity: 1}, // Swift Brown Steed
+	{id: 25528, quantity: 1}, // Swift Green Gryphon
+}
+
 var pvpCatalog = []struct {
 	class, spec, armor, role string
 	classID                  uint8
@@ -140,6 +151,7 @@ func (s *Store) resolveSet(ctx context.Context, d catalogSet) ([]catalogItem, er
 	if len(items) != 5+len(loadout)+len(suppliesFor(d)) {
 		return nil, nil
 	}
+	items = append(items, level80StarterItems...)
 	return items, nil
 }
 
@@ -155,16 +167,16 @@ func (s *Store) SeedDefaultCatalog(ctx context.Context) (int, error) {
 			continue
 		}
 		name := fmt.Sprintf("%s %s %s Package", d.class, d.spec, d.tier)
-		description := fmt.Sprintf("Complete %s level-80 loadout for %s %s: five-piece set, matching off-pieces, jewelry, trinkets, weapons, gems, and armor enhancements.", d.tier, d.spec, d.class)
+		description := fmt.Sprintf("Complete %s level-80 loadout for %s %s with gear, gems, enchants, trained class spells and weapon skills, bags, riding mounts, and 10,000 gold.", d.tier, d.spec, d.class)
 		var id int64
 		if err = s.Auth.QueryRowContext(ctx, "SELECT id FROM portal_products WHERE seed_key=? AND realm_key=? LIMIT 1", seedKey, s.C.RealmKey).Scan(&id); err == sql.ErrNoRows {
-			res, insertErr := s.Auth.ExecContext(ctx, `INSERT INTO portal_products(seed_key,name,description,item_id,quantity,price,category,class_id,tier_label,service_level,active,realm_key) VALUES(?,?,?,0,0,?,?,?,?,80,1,?)`, seedKey, name, description, d.price, d.category, d.classID, d.tier, s.C.RealmKey)
+			res, insertErr := s.Auth.ExecContext(ctx, `INSERT INTO portal_products(seed_key,name,description,item_id,quantity,price,category,class_id,tier_label,service_level,gold_amount,active,realm_key) VALUES(?,?,?,0,0,?,?,?,?,80,?,1,?)`, seedKey, name, description, d.price, d.category, d.classID, d.tier, level80StarterGold, s.C.RealmKey)
 			if insertErr != nil {
 				return seeded, insertErr
 			}
 			id, err = res.LastInsertId()
 		} else if err == nil {
-			_, err = s.Auth.ExecContext(ctx, "UPDATE portal_products SET name=?,description=?,category=?,class_id=?,tier_label=?,active=1 WHERE id=? AND realm_key=?", name, description, d.category, d.classID, d.tier, id, s.C.RealmKey)
+			_, err = s.Auth.ExecContext(ctx, "UPDATE portal_products SET name=?,description=?,category=?,class_id=?,tier_label=?,service_level=80,gold_amount=?,active=1 WHERE id=? AND realm_key=?", name, description, d.category, d.classID, d.tier, level80StarterGold, id, s.C.RealmKey)
 		}
 		if err != nil {
 			return seeded, err

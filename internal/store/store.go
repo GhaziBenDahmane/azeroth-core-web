@@ -325,20 +325,48 @@ func (s *Store) ensureColumn(ctx context.Context, table, column, definition stri
 
 func (s *Store) SeedDefaultServices(ctx context.Context) error {
 	services := []struct {
-		key, name, description, action string
-		price                          uint32
+		key, name, description, tier, action string
+		price, gold                          uint32
+		level                                uint8
+		items                                []catalogItem
 	}{
-		{"service-race-change", "Race Change", "Choose a new race from your current faction on your next login.", "race_change", 35},
-		{"service-faction-change", "Faction Change", "Choose a compatible race from the opposite faction on your next login.", "faction_change", 50},
+		{"service-level-80", "Complete Level 80 Boost", "Reach level 80 with all class spell ranks, every supported weapon skill at 400, Artisan Riding, Cold Weather Flying, four bags, faction mounts, and 10,000 gold.", "Level 80", "", 40, level80StarterGold, 80, level80StarterItems},
+		{"service-race-change", "Race Change", "Choose a new race from your current faction on your next login.", "Character", "race_change", 35, 0, 0, nil},
+		{"service-faction-change", "Faction Change", "Choose a compatible race from the opposite faction on your next login.", "Character", "faction_change", 50, 0, 0, nil},
 	}
 	for _, service := range services {
 		seedKey := s.C.RealmKey + ":" + service.key
-		_, err := s.Auth.ExecContext(ctx, `INSERT INTO portal_products(seed_key,name,description,item_id,quantity,price,category,tier_label,service_action,active,realm_key)
-			VALUES(?,?,?,0,0,?,'Services','Character',?,1,?)
-			ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),price=VALUES(price),category=VALUES(category),tier_label=VALUES(tier_label),service_action=VALUES(service_action),active=1`,
-			seedKey, service.name, service.description, service.price, service.action, s.C.RealmKey)
+		_, err := s.Auth.ExecContext(ctx, `INSERT INTO portal_products(seed_key,name,description,item_id,quantity,price,category,tier_label,service_level,gold_amount,service_action,active,realm_key)
+			VALUES(?,?,?,0,0,?,'Services',?,?,?,?,1,?)
+			ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),price=VALUES(price),category=VALUES(category),tier_label=VALUES(tier_label),service_level=VALUES(service_level),gold_amount=VALUES(gold_amount),service_action=VALUES(service_action),active=1`,
+			seedKey, service.name, service.description, service.price, service.tier, service.level, service.gold, service.action, s.C.RealmKey)
 		if err != nil {
 			return fmt.Errorf("seed %s: %w", service.key, err)
+		}
+		if len(service.items) == 0 {
+			continue
+		}
+		var productID uint32
+		if err = s.Auth.QueryRowContext(ctx, "SELECT id FROM portal_products WHERE seed_key=? AND realm_key=?", seedKey, s.C.RealmKey).Scan(&productID); err != nil {
+			return fmt.Errorf("resolve seeded service %s: %w", service.key, err)
+		}
+		tx, beginErr := s.Auth.BeginTx(ctx, nil)
+		if beginErr != nil {
+			return beginErr
+		}
+		if _, err = tx.ExecContext(ctx, "DELETE FROM portal_product_items WHERE product_id=?", productID); err == nil {
+			for _, item := range service.items {
+				if _, err = tx.ExecContext(ctx, "INSERT INTO portal_product_items(product_id,item_id,quantity) VALUES(?,?,?)", productID, item.id, item.quantity); err != nil {
+					break
+				}
+			}
+		}
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("seed %s contents: %w", service.key, err)
+		}
+		if err = tx.Commit(); err != nil {
+			return err
 		}
 	}
 	return nil

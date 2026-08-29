@@ -1284,7 +1284,7 @@ if (page === "shop") {
 				className = p.className || classes[p.classId];
 			renderProductArt(art, p);
 			qs(".category", card).textContent =
-				p.gold > 0 ? "Gold" : className || p.category;
+				p.category === "Gold" ? "Gold" : className || p.category;
 			if (qs(".tier", card)) qs(".tier", card).textContent = p.tier;
 			qs("h3", card).textContent = p.name;
 			qs(".product-body>p", card).textContent =

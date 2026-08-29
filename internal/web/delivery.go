@@ -18,6 +18,27 @@ type queuedOrder struct {
 	ServiceAction            string
 }
 
+var level80WeaponSkills = map[uint8][]uint16{
+	1:  {43, 44, 45, 46, 54, 55, 95, 136, 160, 162, 172, 173, 176, 226, 229, 473}, // Warrior
+	2:  {43, 44, 54, 55, 95, 160, 162, 172, 229},                                  // Paladin
+	3:  {43, 44, 45, 46, 55, 95, 136, 162, 172, 173, 226, 229, 473},               // Hunter
+	4:  {43, 45, 46, 54, 95, 162, 173, 176, 226, 473},                             // Rogue
+	5:  {54, 95, 136, 162, 173, 228},                                              // Priest
+	6:  {43, 44, 54, 55, 95, 160, 162, 172, 229},                                  // Death Knight
+	7:  {44, 54, 95, 136, 162, 173, 473},                                          // Shaman
+	8:  {43, 95, 136, 162, 173, 228},                                              // Mage
+	9:  {43, 95, 136, 162, 173, 228},                                              // Warlock
+	11: {54, 95, 136, 160, 162, 173, 229, 473},                                    // Druid
+}
+
+var weaponProficiencySpells = map[uint16]uint32{
+	43: 201, 44: 196, 45: 264, 46: 266, 54: 198, 55: 202, 136: 227,
+	160: 199, 172: 197, 173: 1180, 176: 2567, 226: 5011, 228: 5009,
+	229: 200, 473: 15590,
+}
+
+var level80RidingSpells = []uint32{33388, 33391, 34090, 34091, 54197}
+
 func (s *Server) deliveryLoop() {
 	_, _ = s.s.Auth.Exec("UPDATE portal_orders SET status='review',error_message='Delivery interrupted; verify before retrying' WHERE status='delivering' AND realm_key=?", s.c.RealmKey)
 	ticker := time.NewTicker(2 * time.Second)
@@ -55,8 +76,9 @@ func (s *Server) claimOrder(ctx context.Context) (queuedOrder, bool) {
 func (s *Server) fulfillOrder(ctx context.Context, o queuedOrder) {
 	var name string
 	var online bool
-	q := fmt.Sprintf("SELECT name,online FROM %s.characters WHERE guid=? AND account=? AND deleteDate IS NULL", s.c.CharactersDB)
-	if err := s.s.Characters.QueryRowContext(ctx, q, o.CharacterGUID, o.AccountID).Scan(&name, &online); err != nil {
+	var classID uint8
+	q := fmt.Sprintf("SELECT name,online,class FROM %s.characters WHERE guid=? AND account=? AND deleteDate IS NULL", s.c.CharactersDB)
+	if err := s.s.Characters.QueryRowContext(ctx, q, o.CharacterGUID, o.AccountID).Scan(&name, &online, &classID); err != nil {
 		s.reviewOrder(ctx, o.ID, "Character no longer exists")
 		return
 	}
@@ -124,8 +146,8 @@ func (s *Server) fulfillOrder(ctx context.Context, o queuedOrder) {
 		}
 	}
 	if o.ServiceLevel == 80 {
-		if err = s.maxLevel80CombatSkills(ctx, o.CharacterGUID); err != nil {
-			s.reviewOrder(ctx, o.ID, "Items delivered, but weapon training failed: "+err.Error())
+		if err = s.prepareLevel80Character(ctx, o.CharacterGUID, classID); err != nil {
+			s.reviewOrder(ctx, o.ID, "Items delivered, but level 80 training failed: "+err.Error())
 			return
 		}
 	}
@@ -134,13 +156,92 @@ func (s *Server) fulfillOrder(ctx context.Context, o queuedOrder) {
 	}
 }
 
-func (s *Server) maxLevel80CombatSkills(ctx context.Context, characterGUID uint32) error {
-	// AzerothCore's maxskill command cannot run from its console/SOAP interface.
-	// Updating existing skill rows while the character is offline preserves the
-	// class's learned weapon proficiencies without granting unsupported weapons.
-	const combatSkills = "43,44,45,46,54,55,95,136,160,162,172,173,176,226,228,229,473"
-	_, err := s.s.Characters.ExecContext(ctx, "UPDATE character_skills SET value=400,max=400 WHERE guid=? AND skill IN ("+combatSkills+")", characterGUID)
-	return err
+func (s *Server) prepareLevel80Character(ctx context.Context, characterGUID uint32, classID uint8) error {
+	skills, ok := level80WeaponSkills[classID]
+	if !ok {
+		return fmt.Errorf("unsupported class %d", classID)
+	}
+
+	// AzerothCore marks the convenient in-game class-learning and maxskill
+	// commands as Console::No, so SOAP cannot use them. Resolve the same class
+	// trainer spell list from the world DB and persist it while the character is
+	// offline. INSERT IGNORE makes retries safe and preserves existing spec masks.
+	rows, err := s.s.World.QueryContext(ctx, `SELECT DISTINCT ts.SpellId,
+		COALESCE(sd.Effect_1,0),COALESCE(sd.EffectTriggerSpell_1,0),
+		COALESCE(sd.Effect_2,0),COALESCE(sd.EffectTriggerSpell_2,0),
+		COALESCE(sd.Effect_3,0),COALESCE(sd.EffectTriggerSpell_3,0)
+		FROM trainer_spell ts JOIN trainer t ON t.Id=ts.TrainerId
+		LEFT JOIN spell_dbc sd ON sd.ID=ts.SpellId
+		WHERE t.Type=0 AND t.Requirement=? AND ts.ReqLevel<=80`, classID)
+	if err != nil {
+		return fmt.Errorf("load class trainer spells: %w", err)
+	}
+	spells := append([]uint32(nil), level80RidingSpells...)
+	classSpellCount := 0
+	for rows.Next() {
+		var spell uint32
+		var effects, triggers [3]uint32
+		if err = rows.Scan(&spell, &effects[0], &triggers[0], &effects[1], &triggers[1], &effects[2], &triggers[2]); err != nil {
+			rows.Close()
+			return fmt.Errorf("read class trainer spell: %w", err)
+		}
+		learned := learnedTrainerSpells(spell, effects, triggers)
+		classSpellCount += len(learned)
+		spells = append(spells, learned...)
+	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("read class trainer spells: %w", err)
+	}
+	rows.Close()
+	if classSpellCount == 0 {
+		return fmt.Errorf("no trainer spells found for class %d", classID)
+	}
+	for _, skill := range skills {
+		if spell := weaponProficiencySpells[skill]; spell != 0 {
+			spells = append(spells, spell)
+		}
+	}
+
+	tx, err := s.s.Characters.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, skill := range skills {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO character_skills(guid,skill,value,max) VALUES(?,?,400,400)
+			ON DUPLICATE KEY UPDATE value=GREATEST(value,400),max=GREATEST(max,400)`, characterGUID, skill); err != nil {
+			return fmt.Errorf("train weapon skill %d: %w", skill, err)
+		}
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO character_skills(guid,skill,value,max) VALUES(?,762,300,300)
+		ON DUPLICATE KEY UPDATE value=GREATEST(value,300),max=GREATEST(max,300)`, characterGUID); err != nil {
+		return fmt.Errorf("train riding: %w", err)
+	}
+	seen := make(map[uint32]bool, len(spells))
+	for _, spell := range spells {
+		if spell == 0 || seen[spell] {
+			continue
+		}
+		seen[spell] = true
+		if _, err = tx.ExecContext(ctx, "INSERT IGNORE INTO character_spell(guid,spell,specMask) VALUES(?,?,3)", characterGUID, spell); err != nil {
+			return fmt.Errorf("learn spell %d: %w", spell, err)
+		}
+	}
+	return tx.Commit()
+}
+
+func learnedTrainerSpells(spell uint32, effects, triggers [3]uint32) []uint32 {
+	learned := make([]uint32, 0, 3)
+	for i, effect := range effects {
+		if effect == 36 && triggers[i] != 0 { // SPELL_EFFECT_LEARN_SPELL in 3.3.5a.
+			learned = append(learned, triggers[i])
+		}
+	}
+	if len(learned) == 0 {
+		learned = append(learned, spell)
+	}
+	return learned
 }
 
 func splitItemStacks(itemID, quantity uint32, stackable int64) []string {

@@ -722,6 +722,111 @@ html[data-theme="light"] .home-hero :where(h1, .lede, .stats dt) { color: #f8faf
 html[data-theme="light"] :where(.insight-card,.achievement-browser,.admin-chart,.ranking-filterbar) { border-color:#d9e1ec; background:#fff; }
 html[data-theme="light"] .activity-list>div,html[data-theme="light"] .activity-list>a,html[data-theme="light"] .achievement-row { border-color:#d9e1ec; background:#f8fafc; }
 
+/* Obsidian realm theme: restrained warm-metal accents over true neutral blacks. */
+:root {
+  --ink: #eeeae2;
+  --muted: #9b9994;
+  --gold: #b99a62;
+  --gold2: #e0cda8;
+  --teal: #a98c59;
+  --bg: #050505;
+  --panel: #111111;
+  --line: #2e2d2a;
+  --class: #d2b77f;
+}
+html:not([data-theme="light"]) body { background: radial-gradient(circle at 50% -20%,rgba(185,154,98,.09),transparent 34rem),#050505; }
+html:not([data-theme="light"]) .app-header { border-bottom-color:#282724; background:rgba(5,5,5,.92); }
+html:not([data-theme="light"]) .brand-mark { background:linear-gradient(145deg,#28251f,#111); box-shadow:0 8px 24px rgba(0,0,0,.45); color:var(--gold2); }
+html:not([data-theme="light"]) body[data-page="home"] .nav nav a[href="/"],
+html:not([data-theme="light"]) body[data-page="armory"] .nav nav a[href="/armory"],
+html:not([data-theme="light"]) body[data-page="rankings"] .nav nav a[href="/rankings"],
+html:not([data-theme="light"]) body[data-page="guilds"] .nav nav a[href="/guilds"],
+html:not([data-theme="light"]) body[data-page="realm"] .nav nav a[href="/realm"],
+html:not([data-theme="light"]) body[data-page="shop"] .nav nav a[href="/shop"] { border-bottom-color:var(--gold); }
+html:not([data-theme="light"]) .theme-toggle,
+html:not([data-theme="light"]) .account-menu-trigger,
+html:not([data-theme="light"]) .ghost-button,
+html:not([data-theme="light"]) .filter { border-color:#343330; background:#121212; color:#c9c5bc; }
+html:not([data-theme="light"]) .theme-toggle:hover,
+html:not([data-theme="light"]) .account-menu-trigger:hover,
+html:not([data-theme="light"]) .ghost-button:hover { border-color:#625942; background:#1a1917; }
+html:not([data-theme="light"]) .account-dropdown { background:#111; }
+html:not([data-theme="light"]) .account-dropdown a:hover,
+html:not([data-theme="light"]) .account-dropdown button:hover { background:#211f1b; }
+html:not([data-theme="light"]) .header-signin { color:#c9c5bc!important; }
+html:not([data-theme="light"]) .header-action { border:1px solid #4b4435!important; background:#171612!important; color:var(--gold2)!important; box-shadow:none!important; }
+html:not([data-theme="light"]) .eyebrow,
+html:not([data-theme="light"]) .steps a,
+html:not([data-theme="light"]) .steps article > span:last-child,
+html:not([data-theme="light"]) .news-card a,
+html:not([data-theme="light"]) .form-card a,
+html:not([data-theme="light"]) .guild-name { color:var(--gold); }
+html:not([data-theme="light"]) .button,
+html:not([data-theme="light"]) .product-foot .buy,
+html:not([data-theme="light"]) .filter.active,
+html:not([data-theme="light"]) .bracket-picker button.active,
+html:not([data-theme="light"]) .admin-sidebar > a.active { border-color:#b99a62; background:linear-gradient(180deg,#b99a62,#8c713f); box-shadow:0 7px 20px rgba(0,0,0,.32); color:#090909; }
+html:not([data-theme="light"]) .button:hover,
+html:not([data-theme="light"]) .product-foot .buy:hover { background:linear-gradient(180deg,#c9aa70,#9b7d47); }
+html:not([data-theme="light"]) input,
+html:not([data-theme="light"]) select,
+html:not([data-theme="light"]) textarea,
+html:not([data-theme="light"]) .gm-panel select,
+html:not([data-theme="light"]) .gm-panel textarea { border-color:#343330; background:#0b0b0b; }
+html:not([data-theme="light"]) input:focus,
+html:not([data-theme="light"]) select:focus,
+html:not([data-theme="light"]) textarea:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(185,154,98,.14); }
+html:not([data-theme="light"]) .home-hero { border-bottom-color:rgba(185,154,98,.2); background-image:linear-gradient(180deg,rgba(0,0,0,.48),rgba(0,0,0,.9)),var(--hero-image); }
+html:not([data-theme="light"]) .expansion-pill { border-color:rgba(224,205,168,.28); background:rgba(5,5,5,.62); color:var(--gold2); }
+html:not([data-theme="light"]) .play b,
+html:not([data-theme="light"]) .step-icon { background:#181713; color:var(--gold); }
+html:not([data-theme="light"]) .stats div { border-color:rgba(224,205,168,.2)!important; background:rgba(5,5,5,.74); }
+html:not([data-theme="light"]) .panel-section { background:rgba(15,15,15,.72); }
+html:not([data-theme="light"]) .credit-packages button { border-color:#3a3730; background:#0b0b0b; color:var(--gold2); }
+html:not([data-theme="light"]) .credit-packages button:hover { border-color:var(--gold); }
+html:not([data-theme="light"]) :where(.steps article,.news-card,.home-realm-card,.character-card,.product-card,.account-panel,.realm-overview,.guild-profile,.profile-stat,.profile-overview section,.personal-team,.raid-card,.progress-summary,.status-card,.gm-panel,dialog,.ranking-table,.data-table-wrap,.form-card,.admin-sidebar,.admin-analytics>article,.credit-store,.insight-card,.achievement-browser,.admin-chart,.ranking-filterbar) { background:#111; }
+html:not([data-theme="light"]) :where(.home-realm-card dl div,.rank-head,.data-table th,.gear-slot,.realm-stats article,.catalog-slot,.catalog-bundle-row,.item-search-results) { background:#0b0b0b; }
+html:not([data-theme="light"]) .avatar,
+html:not([data-theme="light"]) .guild-crest { background:#24221e; color:var(--gold2); }
+html:not([data-theme="light"]) .product-art { background:linear-gradient(145deg,#1b1a17,#090909)!important; color:var(--gold2); }
+html:not([data-theme="light"]) .product-body .category,
+html:not([data-theme="light"]) .catalog-product-kind { color:var(--gold); }
+html:not([data-theme="light"]) .balance-card { border-color:#4d4535; background:linear-gradient(145deg,#211e18,#0e0e0d); }
+html:not([data-theme="light"]) .paperdoll { background:radial-gradient(circle at center,rgba(185,154,98,.1),transparent 48%),#0a0a0a; }
+html:not([data-theme="light"]) .character-model::before { border-color:rgba(185,154,98,.18); background:rgba(40,36,29,.25); }
+html:not([data-theme="light"]) .model-rune { color:rgba(224,205,168,.22); }
+html:not([data-theme="light"]) .gear-slot:hover { border-color:#625942; background:#171612; }
+html:not([data-theme="light"]) .site-footer { background:#080808; }
+
+html[data-theme="light"] {
+  --gold:#6f582f!important;
+  --gold2:#49391f!important;
+  --teal:#75603b!important;
+  --class:#6f582f;
+  --bg:#f4f2ed!important;
+  --panel:#fff;
+  --line:#d8d3c8;
+}
+html[data-theme="light"] body { background:radial-gradient(circle at 50% -20%,rgba(111,88,47,.08),transparent 34rem),#f4f2ed; }
+html[data-theme="light"] .brand-mark,
+html[data-theme="light"] .button,
+html[data-theme="light"] .product-foot .buy,
+html[data-theme="light"] .filter.active,
+html[data-theme="light"] .bracket-picker button.active,
+html[data-theme="light"] .admin-sidebar > a.active { border-color:#25231f; background:#25231f; color:#fff; box-shadow:none; }
+html[data-theme="light"] .step-icon { background:#eee9df; color:#6f582f; }
+html[data-theme="light"] .eyebrow,
+html[data-theme="light"] .steps a,
+html[data-theme="light"] .news-card a,
+html[data-theme="light"] .product-body .category,
+html[data-theme="light"] .catalog-product-kind { color:#6f582f; }
+html[data-theme="light"] body[data-page="home"] .nav nav a[href="/"],
+html[data-theme="light"] body[data-page="armory"] .nav nav a[href="/armory"],
+html[data-theme="light"] body[data-page="rankings"] .nav nav a[href="/rankings"],
+html[data-theme="light"] body[data-page="guilds"] .nav nav a[href="/guilds"],
+html[data-theme="light"] body[data-page="realm"] .nav nav a[href="/realm"],
+html[data-theme="light"] body[data-page="shop"] .nav nav a[href="/shop"] { border-bottom-color:#25231f; }
+
 @media (max-width: 560px) {
   .theme-toggle { flex: 0 0 36px; }
   .account-menu-trigger { padding-inline: 10px; }

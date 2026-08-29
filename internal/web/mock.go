@@ -53,6 +53,7 @@ var mockCharacters = []character{
 }
 
 func buildMockProducts() []product {
+	boostIncludes := []string{"Level 80 boost", "All class trainer spell ranks", "All class weapon proficiencies at 400", "Artisan Riding and Cold Weather Flying", "Four Frostweave Bags", "Faction-appropriate ground and flying mounts", "10,000 gold"}
 	products := []product{
 		{ID: 1, ItemID: 49284, Quantity: 1, Price: 120, Name: "Reins of the Swift Spectral Tiger", Description: "The WotLK mount item, delivered directly through in-game mail.", Category: "Mounts"},
 		{ID: 2, ItemID: 49623, Quantity: 1, Price: 85, Name: "Shadowmourne", Description: "A legendary two-handed axe for the realm's mightiest champions.", Category: "Weapons"},
@@ -60,7 +61,7 @@ func buildMockProducts() []product {
 		{ID: 4, ItemID: 23713, Quantity: 1, Price: 60, Name: "Hippogryph Hatchling", Description: "A loyal companion from the forests of Feralas.", Category: "Companions"},
 		{ID: 5, ItemID: 37719, Quantity: 5, Price: 15, Name: "Adventurer Supply Bundle", Description: "Useful supplies for your next adventure.", Category: "Utility"},
 		{ID: 6, ItemID: 50818, Quantity: 1, Price: 75, Name: "Invincible's Reins", Description: "The famed steed of the fallen prince awaits a new rider.", Category: "Mounts"},
-		{ID: 7, Price: 40, Name: "Instant Level 80", Description: "Raise one existing character to level 80 and receive a starter travel kit.", Category: "Services", Tier: "Level 80", ServiceLevel: 80, Includes: []string{"Level 80 boost", "Four 20-slot bags", "Cold Weather Flying starter gold"}},
+		{ID: 7, Price: 40, Name: "Complete Level 80 Boost", Description: "Raise one existing character to level 80 with training, travel essentials, bags, mounts, and spending gold.", Category: "Services", Tier: "Level 80", ServiceLevel: 80, Gold: 10000, Includes: append([]string(nil), boostIncludes...)},
 		{ID: 8, Price: 35, Name: "Race Change", Description: "Choose a new race from your current faction on your next login.", Category: "Services", Tier: "Character", ServiceAction: "race_change", Includes: []string{"AzerothCore race-change flag", "Same-faction races", "Applied to an offline character"}},
 		{ID: 9, Price: 50, Name: "Faction Change", Description: "Choose a compatible race from the opposite faction on your next login.", Category: "Services", Tier: "Character", ServiceAction: "faction_change", Includes: []string{"AzerothCore faction-change flag", "Alliance ↔ Horde", "Applied to an offline character"}},
 	}
@@ -90,14 +91,14 @@ func buildMockProducts() []product {
 			gladiator := map[string]string{"S6": "Furious", "S7": "Relentless"}[season.Name] + " Gladiator's " + set.PvPArmor
 			includes := []string{"Complete 5-piece " + gladiator + " set", "Matching neck, cloak, wrists, belt & boots", "2 rings and 2 PvP trinkets", "Alliance/Horde Medallion selected at checkout", "Spec weapon set + ranged weapon or relic"}
 			includes = append(includes, kits[set.Role]...)
-			includes = append(includes, "Level 80 service")
-			products = append(products, product{ID: id, Price: season.Price, Name: set.Class + " " + set.Spec + " " + season.Name + " Package", Description: "WotLK " + gladiator + " starter loadout for " + set.Spec + ".", Category: "PvP", ClassID: set.ID, ClassName: set.Class, Tier: season.Name, ServiceLevel: 80, Includes: includes})
+			includes = append(includes, boostIncludes...)
+			products = append(products, product{ID: id, Price: season.Price, Name: set.Class + " " + set.Spec + " " + season.Name + " Package", Description: "WotLK " + gladiator + " starter loadout for " + set.Spec + ".", Category: "PvP", ClassID: set.ID, ClassName: set.Class, Tier: season.Name, ServiceLevel: 80, Gold: 10000, Includes: includes})
 			id++
 		}
 		includes := []string{"Complete 5-piece Conqueror's " + set.T8Set + " set", "Ulduar neck, cloak, wrists, belt & boots", "2 Ulduar rings and 2 trinkets", "Spec weapon set + ranged weapon or relic"}
 		includes = append(includes, kits[set.Role]...)
-		includes = append(includes, "Level 80 service")
-		products = append(products, product{ID: id, Price: 135, Name: set.Class + " " + set.Spec + " T8 Package", Description: "Ulduar raid-ready WotLK tier 8 loadout for " + set.Spec + ".", Category: "PvE", ClassID: set.ID, ClassName: set.Class, Tier: "T8", ServiceLevel: 80, Includes: includes})
+		includes = append(includes, boostIncludes...)
+		products = append(products, product{ID: id, Price: 135, Name: set.Class + " " + set.Spec + " T8 Package", Description: "Ulduar raid-ready WotLK tier 8 loadout for " + set.Spec + ".", Category: "PvE", ClassID: set.ID, ClassName: set.Class, Tier: "T8", ServiceLevel: 80, Gold: 10000, Includes: includes})
 		id++
 	}
 	products = append(products,

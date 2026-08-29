@@ -17,7 +17,8 @@ Each resolved package is now a complete specialization loadout containing:
 - A ranged weapon, wand, thrown weapon, or class relic when the class has that slot.
 - Twenty role gems plus one appropriate meta gem. S6 and T8 receive Ulduar-era rare gems; S7 receives Trial of the Crusader-era epic gems.
 - A complete enchant kit covering head, shoulders, legs, chest, gloves, weapon, cloak, wrists, and boots.
-- A level-80 service.
+- A complete level-80 boost: all class-trainer spell ranks through level 80, every class-supported weapon proficiency trained to 400, defense and unarmed at 400, Artisan Riding, and Cold Weather Flying.
+- Four Frostweave Bags, a faction-appropriate epic ground mount and epic flying mount, plus 10,000 gold for consumables and other expenses.
 
 S6 and S7 use their matching Gladiator off-pieces, jewelry, and weapons. Every PvP package includes a crowd-control-removing Medallion; the order snapshot selects `Medallion of the Alliance` or `Medallion of the Horde` from the chosen character's race. The remaining S6/S7 gear is faction-neutral. T8 uses curated Ulduar items at item level 219–239, with armor type, role, dual-wield rules, shields, and relics selected per specialization. Death knight tanks correctly receive a two-handed weapon rather than a shield.
 
@@ -25,7 +26,7 @@ S6 and S7 use their matching Gladiator off-pieces, jewelry, and weapons. Every P
 
 Gems and enchantments are intentionally delivered as items. AzerothCore's standard `send items` command cannot safely create an already-enchanted, pre-socketed item instance. The player equips the armor and applies the supplied gems and scrolls in game. Physical dual-wield packages receive two weapon enchant scrolls.
 
-Level 80 packages also set every weapon and defense skill already learned by the character to 400. The character must remain offline during delivery. The portal does not grant weapon proficiencies that the class has not learned or cannot use.
+Level 80 packages teach the class's complete trainer spell list through level 80, add only weapon proficiencies supported by that class, set those skills plus defense and unarmed to 400, and set riding to 300. They also teach all four riding ranks and Cold Weather Flying. Alliance packages receive a Swift Brown Steed and Swift Green Gryphon; Horde packages receive a Swift Brown Wolf and Swift Purple Wind Rider. The selected character must remain offline during delivery so AzerothCore can safely reload the updated spell and skill records.
 
 Bundles larger than one mailbox message are split by the real `item_template.stackable` limits and sent in groups of at most twelve attachment stacks. The entire order remains in `review` after an ambiguous SOAP failure so staff can inspect already-sent mail before retrying.
 

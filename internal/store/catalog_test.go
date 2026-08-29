@@ -28,6 +28,22 @@ func TestDefaultCatalogCoversEveryWotLKClassAndTier(t *testing.T) {
 	}
 }
 
+func TestLevel80StarterKit(t *testing.T) {
+	want := map[uint32]uint32{41599: 4, 18777: 1, 25528: 1}
+	if level80StarterGold != 10000 {
+		t.Fatalf("starter gold = %d, want 10000", level80StarterGold)
+	}
+	for _, item := range level80StarterItems {
+		if want[item.id] != item.quantity {
+			t.Errorf("starter item %d quantity = %d, want %d", item.id, item.quantity, want[item.id])
+		}
+		delete(want, item.id)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing starter items: %v", want)
+	}
+}
+
 func TestEveryPackageHasCompleteUniqueEquipmentLoadout(t *testing.T) {
 	for _, d := range defaultCatalog() {
 		items, err := equipmentLoadout(d)

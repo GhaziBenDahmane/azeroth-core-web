@@ -213,7 +213,7 @@ curl -X POST http://localhost:8080/api/admin/products \
 
 Use item IDs approved for your exact AzerothCore world database. Gems and enchant scrolls are ordinary bundle items and arrive in the same mail; the portal deliberately does not write enchantment data directly into character inventory tables.
 
-The default specialization-aware S6, S7, and T8 catalog is populated automatically from the installed AzerothCore `item_template` table. It includes each five-piece armor set, all matching off-pieces, jewelry, trinkets, class-appropriate weapons and relics, a phase-appropriate gem kit, a full enchant kit, level 80, and maximum rank 400 for the character's learned weapon and defense skills. See [CATALOG.md](CATALOG.md) for the exact behavior and safety rationale.
+The default specialization-aware S6, S7, and T8 catalog is populated automatically from the installed AzerothCore `item_template` table. Every package includes its five-piece armor set, matching off-pieces, jewelry, trinkets, class-appropriate weapons and relics, gems, enchants, a complete level-80 boost, four Frostweave Bags, faction-appropriate ground and flying mounts, and 10,000 gold. The boost learns all class-trainer spell ranks through level 80, grants only the weapon proficiencies supported by that class, raises combat skills to 400, and teaches Artisan Riding plus Cold Weather Flying. See [CATALOG.md](CATALOG.md) for the exact behavior and safety rationale.
 
 Credits can be granted through the audited GM console. To sell fixed credit packs, configure the five `STRIPE_*` variables and point a Stripe webhook at `/api/billing/webhook` for `checkout.session.completed` events.
 
