@@ -23,6 +23,9 @@ func (c *Client) Enabled() bool { return c.URL != "" && c.User != "" && c.Passwo
 
 type responseEnvelope struct {
 	Body struct {
+		Response *struct {
+			Result string `xml:"result"`
+		} `xml:"executeCommandResponse"`
 		Fault *struct {
 			Code   string `xml:"faultcode"`
 			Reason string `xml:"faultstring"`
@@ -58,7 +61,16 @@ func (c *Client) Command(ctx context.Context, command string) (string, error) {
 		}
 		return "", fmt.Errorf("SOAP returned %s: %s", resp.Status, compact(string(b)))
 	}
-	return string(b), nil
+	var envelope responseEnvelope
+	if err := xml.Unmarshal(b, &envelope); err != nil {
+		return "", fmt.Errorf("decode SOAP response: %w", err)
+	}
+	if envelope.Body.Response == nil {
+		return "", fmt.Errorf("SOAP response did not contain executeCommandResponse")
+	}
+	result := strings.ReplaceAll(envelope.Body.Response.Result, "\r\n", "\n")
+	result = strings.ReplaceAll(result, "\r", "\n")
+	return strings.TrimSpace(result), nil
 }
 
 func soapFault(payload []byte) string {

@@ -23,6 +23,12 @@ type linkedGameAccount struct {
 }
 
 func (s *Server) ensureIdentity(ctx context.Context, accountID uint32, username, email string) (uint64, error) {
+	// Accounts may predate the portal or be created by bootstrap-account. Make
+	// their portal wallet available on first sign-in just as it is for accounts
+	// created through the registration endpoint.
+	if _, err := s.s.Auth.ExecContext(ctx, `INSERT IGNORE INTO portal_wallets(account_id,balance) VALUES(?,0)`, accountID); err != nil {
+		return 0, err
+	}
 	var identityID uint64
 	err := s.s.Auth.QueryRowContext(ctx, `SELECT identity_id FROM portal_identity_accounts WHERE account_id=?`, accountID).Scan(&identityID)
 	if err == nil {

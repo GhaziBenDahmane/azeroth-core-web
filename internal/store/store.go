@@ -58,27 +58,29 @@ func open(c config.Config, migrate, requireCurrent bool) (*Store, error) {
 		db.SetMaxOpenConns(10)
 		db.SetMaxIdleConns(3)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-	if err := a.PingContext(ctx); err != nil {
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer pingCancel()
+	if err := a.PingContext(pingCtx); err != nil {
 		s.Close()
 		return nil, fmt.Errorf("auth database: %w", err)
 	}
-	if err := ch.PingContext(ctx); err != nil {
+	if err := ch.PingContext(pingCtx); err != nil {
 		s.Close()
 		return nil, fmt.Errorf("characters database: %w", err)
 	}
-	if err := w.PingContext(ctx); err != nil {
+	if err := w.PingContext(pingCtx); err != nil {
 		s.Close()
 		return nil, fmt.Errorf("world database: %w", err)
 	}
 	if migrate {
-		if err := s.Migrate(ctx); err != nil {
+		migrationCtx, migrationCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer migrationCancel()
+		if err := s.Migrate(migrationCtx); err != nil {
 			s.Close()
 			return nil, err
 		}
 	} else if requireCurrent {
-		if err := s.RequireCurrentSchema(ctx); err != nil {
+		if err := s.RequireCurrentSchema(pingCtx); err != nil {
 			s.Close()
 			return nil, err
 		}

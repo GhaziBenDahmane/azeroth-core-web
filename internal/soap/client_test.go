@@ -36,3 +36,33 @@ func TestCommandReportsNonSOAPErrorBody(t *testing.T) {
 		t.Fatalf("expected response body, got %v", err)
 	}
 }
+
+func TestCommandReturnsDecodedResult(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/xml")
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="urn:AC"><SOAP-ENV:Body><ns1:executeCommandResponse><result>Connected players: 0.&#xD;
+Server uptime: 2 minutes</result></ns1:executeCommandResponse></SOAP-ENV:Body></SOAP-ENV:Envelope>`))
+	}))
+	defer server.Close()
+
+	client := New(server.URL, "soap-user", "secret")
+	got, err := client.Command(context.Background(), "server info")
+	if err != nil {
+		t.Fatalf("Command returned error: %v", err)
+	}
+	if got != "Connected players: 0.\nServer uptime: 2 minutes" {
+		t.Fatalf("decoded result = %q", got)
+	}
+}
+
+func TestCommandRejectsMalformedSuccessEnvelope(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`<html>not SOAP</html>`))
+	}))
+	defer server.Close()
+
+	client := New(server.URL, "soap-user", "secret")
+	if _, err := client.Command(context.Background(), "server info"); err == nil {
+		t.Fatal("expected malformed success response to fail")
+	}
+}
