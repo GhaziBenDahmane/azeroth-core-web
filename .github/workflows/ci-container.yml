@@ -76,7 +76,7 @@ jobs:
             docker stop portal-headless >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
-          for attempt in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:8787/readyz >/dev/null && curl --fail --silent http://127.0.0.1:9222/json/version >/dev/null; then
               break
             fi
@@ -94,7 +94,7 @@ jobs:
           if-no-files-found: ignore
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
       - name: Scan source, dependencies, licenses, and secrets
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scanners: vuln,secret,license
