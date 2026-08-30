@@ -24,6 +24,8 @@ type siteSettings struct {
 	HomeRules                 string     `json:"homeRules"`
 	DiscordStatus             string     `json:"discordStatus"`
 	HomeChangelog             string     `json:"homeChangelog"`
+	HomeFeatures              string     `json:"homeFeatures"`
+	HomeProgression           string     `json:"homeProgression"`
 	FeaturedNewsID            uint64     `json:"featuredNewsId"`
 	RealmAddress              string     `json:"realmAddress"`
 	ExperienceRate            string     `json:"experienceRate"`
@@ -31,6 +33,7 @@ type siteSettings struct {
 	RealmTimezone             string     `json:"realmTimezone"`
 	RealmDescription          string     `json:"realmDescription"`
 	SeasonName                string     `json:"seasonName"`
+	ArenaRewardPolicy         string     `json:"arenaRewardPolicy"`
 	QuestExperienceRate       string     `json:"questExperienceRate"`
 	KillExperienceRate        string     `json:"killExperienceRate"`
 	ExplorationExperienceRate string     `json:"explorationExperienceRate"`
@@ -42,6 +45,7 @@ type siteSettings struct {
 	StartLevel                uint8      `json:"startLevel"`
 	MaxLevel                  uint8      `json:"maxLevel"`
 	PopulationCap             uint32     `json:"populationCap"`
+	TransferSLAHours          uint32     `json:"transferSlaHours"`
 	CrossFaction              *bool      `json:"crossFaction"`
 	CrossFactionAccounts      *bool      `json:"crossFactionAccounts"`
 	CrossFactionCalendar      *bool      `json:"crossFactionCalendar"`
@@ -80,15 +84,40 @@ type siteSettings struct {
 }
 
 type newsEntry struct {
-	ID        uint64     `json:"id"`
-	Title     string     `json:"title"`
-	Summary   string     `json:"summary"`
-	URL       string     `json:"url"`
-	Kind      string     `json:"kind"`
-	PublishAt *time.Time `json:"publishAt,omitempty"`
-	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
-	Active    bool       `json:"active"`
-	Featured  bool       `json:"featured"`
+	ID         uint64     `json:"id"`
+	Title      string     `json:"title"`
+	Slug       string     `json:"slug"`
+	Summary    string     `json:"summary"`
+	Body       string     `json:"body"`
+	URL        string     `json:"url"`
+	CoverURL   string     `json:"coverUrl"`
+	Tags       string     `json:"tags"`
+	AuthorName string     `json:"authorName"`
+	Kind       string     `json:"kind"`
+	Status     string     `json:"status"`
+	PublishAt  *time.Time `json:"publishAt,omitempty"`
+	ExpiresAt  *time.Time `json:"expiresAt,omitempty"`
+	Active     bool       `json:"active"`
+	Featured   bool       `json:"featured"`
+	CreatedBy  uint32     `json:"createdBy,omitempty"`
+	CreatedAt  *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt  *time.Time `json:"updatedAt,omitempty"`
+}
+
+type newsRevision struct {
+	ID        uint64    `json:"id"`
+	NewsID    uint64    `json:"newsId"`
+	EditorID  uint32    `json:"editorId"`
+	Snapshot  newsEntry `json:"snapshot"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+const newsSelect = `id,title,COALESCE(slug,''),summary,body,url,cover_url,tags,author_name,kind,status,publish_at,expires_at,active,created_by,created_at,updated_at`
+
+type rowScanner interface{ Scan(...any) error }
+
+func scanNews(row rowScanner, n *newsEntry) error {
+	return row.Scan(&n.ID, &n.Title, &n.Slug, &n.Summary, &n.Body, &n.URL, &n.CoverURL, &n.Tags, &n.AuthorName, &n.Kind, &n.Status, &n.PublishAt, &n.ExpiresAt, &n.Active, &n.CreatedBy, &n.CreatedAt, &n.UpdatedAt)
 }
 
 type coupon struct {
@@ -101,6 +130,10 @@ type coupon struct {
 	StartsAt        *time.Time `json:"startsAt,omitempty"`
 	EndsAt          *time.Time `json:"endsAt,omitempty"`
 	Active          bool       `json:"active"`
+	AllowSale       bool       `json:"allowSale"`
+	MinSubtotal     uint32     `json:"minSubtotal"`
+	Category        string     `json:"category"`
+	Uses            uint32     `json:"uses,omitempty"`
 }
 
 var couponCodePattern = regexp.MustCompile(`^[A-Z0-9][A-Z0-9_-]{2,39}$`)
@@ -137,12 +170,24 @@ func (s *Server) defaultSiteSettings() siteSettings {
 	if maxLevel == 0 {
 		maxLevel = 80
 	}
+	transferSLAHours := s.c.TransferSLAHours
+	if transferSLAHours <= 0 {
+		transferSLAHours = 72
+	}
+	homeFeatures, homeProgression := s.c.HomeFeatures, s.c.HomeProgression
+	if s.c.MockMode && strings.TrimSpace(homeFeatures) == "" {
+		homeFeatures = "Faithful 3.3.5a|Wrath systems, items, talents, and progression use the level 80 expansion data.\nPlayer-first operations|Live status, transparent rankings, support, and audited delivery are built into the portal.\nCommunity progression|Guild recruitment, events, voting, and public feedback keep the realm active."
+	}
+	if s.c.MockMode && strings.TrimSpace(homeProgression) == "" {
+		homeProgression = "Naxxramas|Complete|The first Northrend raid tier has been conquered.\nUlduar|Live|Hard modes and raid-speed rankings are active now.\nTrial of the Crusader|Next|The next tier opens after the current progression window.\nIcecrown Citadel|Planned|The Lich King awaits at the end of the season."
+	}
 	return siteSettings{PortalName: s.c.PortalName, RealmName: s.c.RealmName, BrandMark: s.c.BrandMark, Tagline: s.c.PortalTagline,
 		HomeHeadline: s.c.HomeHeadline, HomeEyebrow: s.c.HomeEyebrow, HomePrimaryCTA: s.c.HomePrimaryCTA, HomeConnectTitle: s.c.HomeConnectTitle,
 		HomeGuideText: s.c.HomeGuideText, HomeRules: s.c.HomeRules, DiscordStatus: s.c.DiscordStatus, HomeChangelog: s.c.HomeChangelog,
-		RealmAddress: s.c.RealmAddress, ExperienceRate: overallRate, RealmType: realmType, RealmTimezone: timezone, RealmDescription: s.c.RealmDescription, SeasonName: s.c.SeasonName,
+		HomeFeatures: homeFeatures, HomeProgression: homeProgression,
+		RealmAddress: s.c.RealmAddress, ExperienceRate: overallRate, RealmType: realmType, RealmTimezone: timezone, RealmDescription: s.c.RealmDescription, SeasonName: s.c.SeasonName, ArenaRewardPolicy: s.c.ArenaRewardPolicy,
 		QuestExperienceRate: rate(s.c.QuestExperienceRate), KillExperienceRate: rate(s.c.KillExperienceRate), ExplorationExperienceRate: rate(s.c.ExplorationExperienceRate), DropRate: rate(s.c.DropRate), ReputationRate: rate(s.c.ReputationRate), HonorRate: rate(s.c.HonorRate), ProfessionRate: rate(s.c.ProfessionRate),
-		FactionPolicy: faction, StartLevel: uint8(startLevel), MaxLevel: uint8(maxLevel), PopulationCap: uint32(s.c.PopulationCap), CrossFaction: boolPtr(s.c.CrossFaction),
+		FactionPolicy: faction, StartLevel: uint8(startLevel), MaxLevel: uint8(maxLevel), PopulationCap: uint32(s.c.PopulationCap), TransferSLAHours: uint32(transferSLAHours), CrossFaction: boolPtr(s.c.CrossFaction),
 		CrossFactionAccounts: boolPtr(s.c.CrossFactionAccounts), CrossFactionCalendar: boolPtr(s.c.CrossFactionCalendar), CrossFactionChannels: boolPtr(s.c.CrossFactionChannels), CrossFactionGroups: boolPtr(s.c.CrossFactionGroups),
 		CrossFactionGuilds: boolPtr(s.c.CrossFactionGuilds), CrossFactionAuctions: boolPtr(s.c.CrossFactionAuctions), CrossFactionMail: boolPtr(s.c.CrossFactionMail), CrossFactionWho: boolPtr(s.c.CrossFactionWho), CrossFactionFriends: boolPtr(s.c.CrossFactionFriends), CrossFactionTrade: boolPtr(s.c.CrossFactionTrade),
 		DownloadURL: s.c.DownloadURL, CommunityURL: s.c.CommunityURL, TermsURL: s.c.TermsURL, PrivacyURL: s.c.PrivacyURL,
@@ -196,6 +241,9 @@ func (s *Server) runtimeSettings(ctx *http.Request) siteSettings {
 				stored.CrossFactionGuilds, stored.CrossFactionAuctions, stored.CrossFactionMail, stored.CrossFactionWho = boolPtr(legacy), boolPtr(legacy), boolPtr(legacy), boolPtr(legacy)
 				stored.CrossFactionFriends, stored.CrossFactionTrade = boolPtr(legacy), boolPtr(legacy)
 			}
+			if stored.TransferSLAHours == 0 {
+				stored.TransferSLAHours = base.TransferSLAHours
+			}
 			return stored
 		}
 	}
@@ -245,9 +293,17 @@ func (s *Server) publicNews(r *http.Request) []newsEntry {
 	if s.c.MockMode {
 		s.mock.mu.Lock()
 		defer s.mock.mu.Unlock()
-		return append([]newsEntry(nil), s.mock.news...)
+		now := time.Now()
+		out := []newsEntry{}
+		for _, item := range s.mock.news {
+			if item.Status == "published" && item.Active && (item.PublishAt == nil || !now.Before(*item.PublishAt)) && (item.ExpiresAt == nil || now.Before(*item.ExpiresAt)) {
+				item.CreatedBy = 0
+				out = append(out, item)
+			}
+		}
+		return out
 	}
-	rows, err := s.s.Auth.QueryContext(r.Context(), `SELECT id,title,summary,url,kind,publish_at,expires_at,active FROM portal_news WHERE realm_key=? AND active=1 AND (publish_at IS NULL OR publish_at<=NOW()) AND (expires_at IS NULL OR expires_at>NOW()) ORDER BY COALESCE(publish_at,created_at) DESC LIMIT 24`, s.c.RealmKey)
+	rows, err := s.s.Auth.QueryContext(r.Context(), `SELECT `+newsSelect+` FROM portal_news WHERE realm_key=? AND status='published' AND active=1 AND (publish_at IS NULL OR publish_at<=NOW()) AND (expires_at IS NULL OR expires_at>NOW()) ORDER BY COALESCE(publish_at,created_at) DESC LIMIT 24`, s.c.RealmKey)
 	if err != nil {
 		return []newsEntry{}
 	}
@@ -255,7 +311,8 @@ func (s *Server) publicNews(r *http.Request) []newsEntry {
 	out := []newsEntry{}
 	for rows.Next() {
 		var n newsEntry
-		if rows.Scan(&n.ID, &n.Title, &n.Summary, &n.URL, &n.Kind, &n.PublishAt, &n.ExpiresAt, &n.Active) == nil {
+		if scanNews(rows, &n) == nil {
+			n.CreatedBy = 0
 			out = append(out, n)
 		}
 	}
@@ -282,6 +339,7 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		in.QuestExperienceRate, in.KillExperienceRate, in.ExplorationExperienceRate = current.QuestExperienceRate, current.KillExperienceRate, current.ExplorationExperienceRate
 		in.DropRate, in.ReputationRate, in.HonorRate, in.ProfessionRate = current.DropRate, current.ReputationRate, current.HonorRate, current.ProfessionRate
 		in.FactionPolicy, in.StartLevel, in.MaxLevel, in.PopulationCap = current.FactionPolicy, current.StartLevel, current.MaxLevel, current.PopulationCap
+		in.TransferSLAHours = current.TransferSLAHours
 	}
 	if in.CrossFaction == nil {
 		in.CrossFaction = current.CrossFaction
@@ -307,7 +365,39 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		_, _ = s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_admin_audit(actor_account_id,action,target,details) VALUES(?,'settings.update',?,?)", a.ID, s.siteSettingsKey(), "Runtime portal configuration updated")
 	}
+	if maintenanceSettingsChanged(current, in) {
+		title, message := "Realm maintenance cancelled", "The previously announced maintenance window has been cancelled."
+		if in.MaintenanceEnabled {
+			title, message = "Realm maintenance scheduled", strings.TrimSpace(in.MaintenanceMessage)
+			if message == "" {
+				message = "Scheduled realm maintenance has been announced."
+			}
+			if in.MaintenanceStarts != nil {
+				message += " Starts " + in.MaintenanceStarts.UTC().Format("2 Jan 2006 15:04 UTC") + "."
+			}
+			if in.MaintenanceEnds != nil {
+				message += " Expected completion " + in.MaintenanceEnds.UTC().Format("2 Jan 2006 15:04 UTC") + "."
+			}
+		}
+		s.notifyAllAccounts(r.Context(), "maintenance", title, message, "/")
+	}
 	jsonOut(w, 200, map[string]bool{"ok": true})
+}
+
+func maintenanceSettingsChanged(before, after siteSettings) bool {
+	if before.MaintenanceEnabled != after.MaintenanceEnabled {
+		return true
+	}
+	if !after.MaintenanceEnabled {
+		return false
+	}
+	equalTime := func(left, right *time.Time) bool {
+		if left == nil || right == nil {
+			return left == nil && right == nil
+		}
+		return left.Equal(*right)
+	}
+	return before.MaintenanceMessage != after.MaintenanceMessage || !equalTime(before.MaintenanceStarts, after.MaintenanceStarts) || !equalTime(before.MaintenanceEnds, after.MaintenanceEnds)
 }
 
 func validateSiteSettings(in siteSettings) error {
@@ -315,6 +405,12 @@ func validateSiteSettings(in siteSettings) error {
 		if len(v) > 500 {
 			return fmt.Errorf("configuration text is too long")
 		}
+	}
+	if len(in.HomeFeatures) > 4000 || len(in.HomeProgression) > 4000 {
+		return fmt.Errorf("homepage feature and progression content must be at most 4000 characters")
+	}
+	if len(in.ArenaRewardPolicy) > 2000 {
+		return fmt.Errorf("arena reward policy must be at most 2000 characters")
 	}
 	if strings.TrimSpace(in.PortalName) == "" || strings.TrimSpace(in.RealmName) == "" || strings.TrimSpace(in.RealmAddress) == "" {
 		return fmt.Errorf("portal name, realm name, and realm address are required")
@@ -324,7 +420,7 @@ func validateSiteSettings(in siteSettings) error {
 	}
 	validRealmTypes := map[string]bool{"PvE": true, "PvP": true, "RP": true, "RP-PvP": true}
 	validFactionPolicies := map[string]bool{"both": true, "alliance": true, "horde": true}
-	if !validRealmTypes[in.RealmType] || !validFactionPolicies[in.FactionPolicy] || in.StartLevel < 1 || in.MaxLevel < in.StartLevel || in.MaxLevel > 80 || in.PopulationCap > 1_000_000 || len(in.RealmTimezone) > 80 {
+	if !validRealmTypes[in.RealmType] || !validFactionPolicies[in.FactionPolicy] || in.StartLevel < 1 || in.MaxLevel < in.StartLevel || in.MaxLevel > 80 || in.PopulationCap > 1_000_000 || in.TransferSLAHours < 1 || in.TransferSLAHours > 8760 || len(in.RealmTimezone) > 80 {
 		return fmt.Errorf("realm type, faction policy, level range, population cap, or timezone is invalid")
 	}
 	for _, rate := range []string{in.QuestExperienceRate, in.KillExperienceRate, in.ExplorationExperienceRate, in.DropRate, in.ReputationRate, in.HonorRate, in.ProfessionRate} {
@@ -368,7 +464,7 @@ func (s *Server) adminNews(w http.ResponseWriter, r *http.Request) {
 			jsonOut(w, 200, map[string]any{"news": out})
 			return
 		}
-		rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT id,title,summary,url,kind,publish_at,expires_at,active FROM portal_news WHERE realm_key=? ORDER BY id DESC LIMIT 100", s.c.RealmKey)
+		rows, e := s.s.Auth.QueryContext(r.Context(), "SELECT "+newsSelect+" FROM portal_news WHERE realm_key=? ORDER BY id DESC LIMIT 100", s.c.RealmKey)
 		if e != nil {
 			problem(w, 500, "Could not load news")
 			return
@@ -377,7 +473,7 @@ func (s *Server) adminNews(w http.ResponseWriter, r *http.Request) {
 		out := []newsEntry{}
 		for rows.Next() {
 			var n newsEntry
-			if rows.Scan(&n.ID, &n.Title, &n.Summary, &n.URL, &n.Kind, &n.PublishAt, &n.ExpiresAt, &n.Active) == nil {
+			if scanNews(rows, &n) == nil {
 				out = append(out, n)
 			}
 		}
@@ -388,7 +484,7 @@ func (s *Server) adminNews(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &n) {
 		return
 	}
-	if err := validateNews(n); err != nil {
+	if err := validateNews(&n); err != nil {
 		problem(w, 422, err.Error())
 		return
 	}
@@ -398,32 +494,55 @@ func (s *Server) adminNews(w http.ResponseWriter, r *http.Request) {
 		s.mock.news = append([]newsEntry{n}, s.mock.news...)
 		s.mock.mu.Unlock()
 	} else {
-		res, e := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_news(title,summary,url,kind,publish_at,expires_at,active,created_by,realm_key) VALUES(?,?,?,?,?,?,?,?,?)", n.Title, n.Summary, n.URL, n.Kind, n.PublishAt, n.ExpiresAt, n.Active, a.ID, s.c.RealmKey)
+		res, e := s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_news(title,slug,summary,body,url,cover_url,tags,author_name,kind,status,publish_at,expires_at,active,created_by,realm_key) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", n.Title, nullableSlug(n.Slug), n.Summary, n.Body, n.URL, n.CoverURL, n.Tags, n.AuthorName, n.Kind, n.Status, n.PublishAt, n.ExpiresAt, n.Active, a.ID, s.c.RealmKey)
 		if e != nil {
 			problem(w, 500, "Could not create news")
 			return
 		}
 		id, _ := res.LastInsertId()
 		n.ID = uint64(id)
+		_ = s.saveNewsRevision(r, n, a.ID)
 		_, _ = s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_admin_audit(actor_account_id,action,target,details) VALUES(?,'news.create',?,?)", a.ID, strconv.FormatUint(n.ID, 10), n.Title)
 	}
 	jsonOut(w, 201, n)
 }
 
-func validateNews(n newsEntry) error {
+func validateNews(n *newsEntry) error {
 	n.Title = strings.TrimSpace(n.Title)
-	if n.Title == "" || len(n.Title) > 120 || len(n.Summary) > 1000 || len(n.URL) > 500 {
+	n.Slug = strings.Trim(strings.ToLower(strings.TrimSpace(n.Slug)), "-")
+	if n.Slug == "" {
+		n.Slug = articleSlug(n.Title)
+	}
+	n.Status = strings.ToLower(strings.TrimSpace(n.Status))
+	if n.Status == "" {
+		if n.Active {
+			n.Status = "published"
+		} else {
+			n.Status = "draft"
+		}
+	}
+	n.Active = n.Status == "published"
+	if n.Title == "" || len(n.Title) > 120 || len(n.Slug) > 160 || len(n.Summary) > 1000 || len(n.Body) > 100000 || len(n.URL) > 500 || len(n.CoverURL) > 500 || len(n.Tags) > 500 || len(n.AuthorName) > 100 {
 		return fmt.Errorf("title is required and news fields must fit their limits")
 	}
-	if n.Kind != "news" && n.Kind != "announcement" && n.Kind != "maintenance" {
+	if n.Slug == "" || !regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`).MatchString(n.Slug) {
+		return fmt.Errorf("slug must contain lowercase letters, numbers, and hyphens")
+	}
+	if n.Status != "draft" && n.Status != "published" && n.Status != "archived" {
+		return fmt.Errorf("invalid article status")
+	}
+	if n.Kind != "news" && n.Kind != "announcement" && n.Kind != "maintenance" && n.Kind != "changelog" {
 		return fmt.Errorf("invalid news type")
 	}
 	if n.ExpiresAt != nil && n.PublishAt != nil && !n.ExpiresAt.After(*n.PublishAt) {
 		return fmt.Errorf("expiry must be after publication")
 	}
-	if n.URL != "" {
-		u, e := url.ParseRequestURI(n.URL)
-		if e != nil || strings.HasPrefix(n.URL, "//") || (!strings.HasPrefix(n.URL, "/") && (u.Host == "" || (u.Scheme != "http" && u.Scheme != "https"))) {
+	for _, link := range []string{n.URL, n.CoverURL} {
+		if link == "" {
+			continue
+		}
+		u, e := url.ParseRequestURI(link)
+		if e != nil || strings.HasPrefix(link, "//") || (!strings.HasPrefix(link, "/") && (u.Host == "" || (u.Scheme != "http" && u.Scheme != "https"))) {
 			return fmt.Errorf("invalid news URL")
 		}
 	}
@@ -447,11 +566,12 @@ func (s *Server) adminNewsItem(w http.ResponseWriter, r *http.Request) {
 			for i := range s.mock.news {
 				if s.mock.news[i].ID == id {
 					s.mock.news[i].Active = false
+					s.mock.news[i].Status = "archived"
 				}
 			}
 			s.mock.mu.Unlock()
 		} else {
-			res, e := s.s.Auth.ExecContext(r.Context(), "UPDATE portal_news SET active=0 WHERE id=? AND realm_key=?", id, s.c.RealmKey)
+			res, e := s.s.Auth.ExecContext(r.Context(), "UPDATE portal_news SET active=0,status='archived' WHERE id=? AND realm_key=?", id, s.c.RealmKey)
 			if e != nil {
 				problem(w, 500, "Could not archive news")
 				return
@@ -470,7 +590,7 @@ func (s *Server) adminNewsItem(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &n) {
 		return
 	}
-	if err := validateNews(n); err != nil {
+	if err := validateNews(&n); err != nil {
 		problem(w, 422, err.Error())
 		return
 	}
@@ -484,7 +604,7 @@ func (s *Server) adminNewsItem(w http.ResponseWriter, r *http.Request) {
 		}
 		s.mock.mu.Unlock()
 	} else {
-		res, e := s.s.Auth.ExecContext(r.Context(), "UPDATE portal_news SET title=?,summary=?,url=?,kind=?,publish_at=?,expires_at=?,active=? WHERE id=? AND realm_key=?", n.Title, n.Summary, n.URL, n.Kind, n.PublishAt, n.ExpiresAt, n.Active, id, s.c.RealmKey)
+		res, e := s.s.Auth.ExecContext(r.Context(), "UPDATE portal_news SET title=?,slug=?,summary=?,body=?,url=?,cover_url=?,tags=?,author_name=?,kind=?,status=?,publish_at=?,expires_at=?,active=? WHERE id=? AND realm_key=?", n.Title, nullableSlug(n.Slug), n.Summary, n.Body, n.URL, n.CoverURL, n.Tags, n.AuthorName, n.Kind, n.Status, n.PublishAt, n.ExpiresAt, n.Active, id, s.c.RealmKey)
 		if e != nil {
 			problem(w, 500, "Could not update news")
 			return
@@ -494,7 +614,31 @@ func (s *Server) adminNewsItem(w http.ResponseWriter, r *http.Request) {
 			problem(w, 404, "News item not found")
 			return
 		}
+		n.ID = id
+		_ = s.saveNewsRevision(r, n, a.ID)
 		_, _ = s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_admin_audit(actor_account_id,action,target,details) VALUES(?,'news.update',?,?)", a.ID, strconv.FormatUint(id, 10), n.Title)
 	}
 	jsonOut(w, 200, map[string]bool{"ok": true})
+}
+
+func articleSlug(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(value, "-")
+	value = strings.Trim(value, "-")
+	if len(value) > 150 {
+		value = strings.Trim(value[:150], "-")
+	}
+	return value
+}
+
+func nullableSlug(slug string) any {
+	if slug == "" {
+		return nil
+	}
+	return slug
+}
+
+func (s *Server) saveNewsRevision(r *http.Request, n newsEntry, editorID uint32) error {
+	_, err := s.s.Auth.ExecContext(r.Context(), `INSERT INTO portal_news_revisions(news_id,realm_key,editor_account_id,title,slug,summary,body,url,cover_url,tags,author_name,kind,status,publish_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, n.ID, s.c.RealmKey, editorID, n.Title, nullableSlug(n.Slug), n.Summary, n.Body, n.URL, n.CoverURL, n.Tags, n.AuthorName, n.Kind, n.Status, n.PublishAt, n.ExpiresAt)
+	return err
 }

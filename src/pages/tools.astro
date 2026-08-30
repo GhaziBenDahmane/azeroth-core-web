@@ -1,0 +1,16 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Tools — Azeroth" page="tools">
+  <section class="page-hero wrap"><p class="eyebrow">WOTLK TOOLBOX</p><h1>Prepare for the realm</h1><p>Search the 3.3.5a item database, plan a talent build, and browse community-maintained addons and WeakAuras.</p></section>
+  <section class="wrap content-section">
+    <nav class="profile-tabs" role="tablist" aria-label="Realm tools">
+      <button id="tools-tab-resources" role="tab" aria-controls="tools-resources" aria-selected="true" data-tools-tab="resources">Addons & WeakAuras</button>
+      <button id="tools-tab-items" role="tab" aria-controls="tools-items" aria-selected="false" tabindex="-1" data-tools-tab="items">Item database</button>
+      <button id="tools-tab-talents" role="tab" aria-controls="tools-talents" aria-selected="false" tabindex="-1" data-tools-tab="talents">Talent calculator</button>
+    </nav>
+    <section id="tools-resources" role="tabpanel" aria-labelledby="tools-tab-resources"><div class="ranking-filterbar"><label>Search<input id="resource-search" type="search" placeholder="Addon, raid, profession…"/></label><label>Type<select id="resource-kind"><option value="">All resources</option><option value="addon">Addons</option><option value="weakaura">WeakAuras</option></select></label></div><div id="resource-grid" class="news-grid"><div class="skeleton"></div></div></section>
+    <section id="tools-items" role="tabpanel" aria-labelledby="tools-tab-items" class="hidden"><form id="item-database-search" class="search"><input name="q" minlength="2" maxlength="100" placeholder="Search WotLK items…" aria-label="Item name" required/><button class="button">Search</button></form><div id="item-database-results" class="ranking-table"><p class="muted">Search by item name to begin.</p></div></section>
+    <section id="tools-talents" role="tabpanel" aria-labelledby="tools-tab-talents" class="hidden"><div class="ranking-filterbar"><label>Class<select id="talent-class"><option value="1">Warrior</option><option value="2" selected>Paladin</option><option value="3">Hunter</option><option value="4">Rogue</option><option value="5">Priest</option><option value="6">Death Knight</option><option value="7">Shaman</option><option value="8">Mage</option><option value="9">Warlock</option><option value="11">Druid</option></select></label><div><strong id="talent-points">0 / 71 points</strong><button id="talent-reset" class="ghost-button" type="button">Reset</button></div></div><div id="talent-trees" class="talent-calculator"><div class="skeleton"></div></div><p class="muted">The planner uses the realm's imported WotLK DBC data. Tier requirements are enforced; export the URL to share a build.</p></section>
+  </section>
+</Layout>

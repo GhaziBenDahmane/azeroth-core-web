@@ -60,15 +60,31 @@ func (s *Server) arenaRankings(w http.ResponseWriter, r *http.Request) {
 	if bracket != 2 && bracket != 3 && bracket != 5 {
 		bracket = 2
 	}
-	q := fmt.Sprintf(`SELECT arenaTeamId,name,type,rating,seasonGames,seasonWins FROM %s.arena_team WHERE type=? AND seasonGames>0 ORDER BY rating DESC,seasonWins DESC LIMIT 50`, s.c.CharactersDB)
-	rows, err := s.s.Characters.QueryContext(r.Context(), q, bracket)
+	page := rankingPage(r)
+	season := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("season")))
+	if season != "" && season != "current" {
+		s.archivedArenaRankings(w, r, season, bracket, page)
+		return
+	}
+	const pageSize = 25
+	offset := (page - 1) * pageSize
+	where, args := "type=? AND seasonGames>0", []any{bracket}
+	if excluded := s.activeRankingExclusions(r, "arena_team"); len(excluded) > 0 {
+		where += " AND LOWER(name) NOT IN (" + placeholders(len(excluded)) + ")"
+		for _, name := range excluded {
+			args = append(args, name)
+		}
+	}
+	args = append(args, pageSize+1, offset)
+	q := fmt.Sprintf(`SELECT arenaTeamId,name,type,rating,seasonGames,seasonWins FROM %s.arena_team WHERE %s ORDER BY rating DESC,seasonWins DESC LIMIT ? OFFSET ?`, s.c.CharactersDB, where)
+	rows, err := s.s.Characters.QueryContext(r.Context(), q, args...)
 	if err != nil {
 		problem(w, 500, "Could not load arena rankings")
 		return
 	}
 	defer rows.Close()
 	teams := []arenaTeam{}
-	rank := uint32(0)
+	rank := uint32(offset)
 	for rows.Next() {
 		var t arenaTeam
 		rank++
@@ -76,21 +92,54 @@ func (s *Server) arenaRankings(w http.ResponseWriter, r *http.Request) {
 		if rows.Scan(&t.ID, &t.Name, &t.Bracket, &t.Rating, &t.SeasonGames, &t.SeasonWins) != nil {
 			continue
 		}
-		mq := fmt.Sprintf(`SELECT c.name,c.class,m.personalRating,m.seasonGames,m.seasonWins FROM %s.arena_team_member m JOIN %s.characters c ON c.guid=m.guid WHERE m.arenaTeamId=? ORDER BY m.personalRating DESC`, s.c.CharactersDB, s.c.CharactersDB)
-		mr, e := s.s.Characters.QueryContext(r.Context(), mq, t.ID)
 		t.Members = []arenaMember{}
-		if e == nil {
-			for mr.Next() {
-				var member arenaMember
-				if mr.Scan(&member.Name, &member.Class, &member.PersonalRating, &member.SeasonGames, &member.SeasonWins) == nil {
-					t.Members = append(t.Members, member)
-				}
-			}
-			mr.Close()
-		}
 		teams = append(teams, t)
 	}
-	jsonOut(w, 200, map[string]any{"bracket": bracket, "teams": teams})
+	hasMore := len(teams) > pageSize
+	if hasMore {
+		teams = teams[:pageSize]
+	}
+	if len(teams) > 0 {
+		teamIndexes, args := map[uint32]int{}, make([]any, len(teams))
+		for index := range teams {
+			teamIndexes[teams[index].ID], args[index] = index, teams[index].ID
+		}
+		mq := fmt.Sprintf(`SELECT m.arenaTeamId,c.name,c.class,m.personalRating,m.seasonGames,m.seasonWins FROM %s.arena_team_member m JOIN %s.characters c ON c.guid=m.guid WHERE m.arenaTeamId IN (%s) ORDER BY m.arenaTeamId,m.personalRating DESC`, s.c.CharactersDB, s.c.CharactersDB, placeholders(len(teams)))
+		if members, queryErr := s.s.Characters.QueryContext(r.Context(), mq, args...); queryErr == nil {
+			for members.Next() {
+				var teamID uint32
+				var member arenaMember
+				if members.Scan(&teamID, &member.Name, &member.Class, &member.PersonalRating, &member.SeasonGames, &member.SeasonWins) == nil {
+					if index, found := teamIndexes[teamID]; found {
+						teams[index].Members = append(teams[index].Members, member)
+					}
+				}
+			}
+			members.Close()
+		}
+	}
+	jsonOut(w, 200, map[string]any{"bracket": bracket, "teams": teams, "page": page, "hasMore": hasMore, "season": "current", "seasonName": "Current season", "source": "Live AzerothCore arena tables", "seasons": s.arenaSeasons(r)})
+}
+
+func rankingPage(r *http.Request) int {
+	page, err := strconv.Atoi(r.URL.Query().Get("page"))
+	if err != nil || page < 1 {
+		return 1
+	}
+	if page > 1000 {
+		return 1000
+	}
+	return page
+}
+
+func (s *Server) rankingCapabilities(w http.ResponseWriter, r *http.Request) {
+	metrics := map[string]bool{"honorable-kills": true, "played-time": true, "level": true, "achievements": true, "exalted-reputations": true, "guild-members": true, "mounts": s.c.MockMode, "companions": s.c.MockMode}
+	if !s.c.MockMode {
+		var available bool
+		_ = s.s.World.QueryRowContext(r.Context(), `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema=? AND table_name='spell_dbc')`, s.c.WorldDB).Scan(&available)
+		metrics["mounts"], metrics["companions"] = available, available
+	}
+	jsonOut(w, http.StatusOK, map[string]any{"metrics": metrics, "battlegroundHistory": s.c.MockMode || s.c.CompetitiveIngestSecret != "", "arenaHistory": s.c.MockMode || s.c.CompetitiveIngestSecret != "", "raidSpeed": s.c.MockMode || s.c.CompetitiveIngestSecret != ""})
 }
 
 func (s *Server) expandedRankings(w http.ResponseWriter, r *http.Request) {
@@ -110,6 +159,9 @@ func (s *Server) expandedRankings(w http.ResponseWriter, r *http.Request) {
 		Online  bool   `json:"online,omitempty"`
 	}
 	out := []row{}
+	page := rankingPage(r)
+	const pageSize = 25
+	offset := (page - 1) * pageSize
 	var query string
 	classID, _ := strconv.Atoi(r.URL.Query().Get("class"))
 	if classID < 0 || classID > 11 || classID == 10 {
@@ -126,8 +178,18 @@ func (s *Server) expandedRankings(w http.ResponseWriter, r *http.Request) {
 		problem(w, 422, "Invalid specialization filter")
 		return
 	}
+	if spec != "" {
+		problem(w, 422, "Specialization rankings require a configured talent metadata provider")
+		return
+	}
 	where := "c.deleteDate IS NULL"
 	args := []any{}
+	if excluded := s.activeRankingExclusions(r, "character"); len(excluded) > 0 && metric != "guild-members" {
+		where += " AND LOWER(c.name) NOT IN (" + placeholders(len(excluded)) + ")"
+		for _, name := range excluded {
+			args = append(args, name)
+		}
+	}
 	if classID > 0 {
 		where += " AND c.class=?"
 		args = append(args, classID)
@@ -139,20 +201,36 @@ func (s *Server) expandedRankings(w http.ResponseWriter, r *http.Request) {
 	}
 	switch metric {
 	case "honorable-kills":
-		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,c.totalKills,c.online FROM `%s`.characters c WHERE %s ORDER BY c.totalKills DESC,c.guid LIMIT 100", s.c.CharactersDB, where)
+		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,c.totalKills,c.online FROM `%s`.characters c WHERE %s ORDER BY c.totalKills DESC,c.guid LIMIT ? OFFSET ?", s.c.CharactersDB, where)
 	case "played-time":
-		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,c.totaltime,c.online FROM `%s`.characters c WHERE %s ORDER BY c.totaltime DESC,c.guid LIMIT 100", s.c.CharactersDB, where)
+		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,c.totaltime,c.online FROM `%s`.characters c WHERE %s ORDER BY c.totaltime DESC,c.guid LIMIT ? OFFSET ?", s.c.CharactersDB, where)
 	case "level":
-		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,c.level,c.online FROM `%s`.characters c WHERE %s ORDER BY c.level DESC,c.totaltime DESC,c.guid LIMIT 100", s.c.CharactersDB, where)
+		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,c.level,c.online FROM `%s`.characters c WHERE %s ORDER BY c.level DESC,c.totaltime DESC,c.guid LIMIT ? OFFSET ?", s.c.CharactersDB, where)
 	case "achievements":
-		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,COALESCE(a.score,0),c.online FROM `%s`.characters c LEFT JOIN (SELECT guid,COUNT(*) score FROM `%s`.character_achievement GROUP BY guid) a ON a.guid=c.guid WHERE %s ORDER BY a.score DESC,c.guid LIMIT 100", s.c.CharactersDB, s.c.CharactersDB, where)
+		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,COALESCE(a.score,0),c.online FROM `%s`.characters c LEFT JOIN (SELECT guid,COUNT(*) score FROM `%s`.character_achievement GROUP BY guid) a ON a.guid=c.guid WHERE %s ORDER BY a.score DESC,c.guid LIMIT ? OFFSET ?", s.c.CharactersDB, s.c.CharactersDB, where)
+	case "exalted-reputations":
+		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,COALESCE(rep.score,0),c.online FROM `%s`.characters c LEFT JOIN (SELECT guid,COUNT(*) score FROM `%s`.character_reputation WHERE standing>=42000 GROUP BY guid) rep ON rep.guid=c.guid WHERE %s ORDER BY rep.score DESC,c.guid LIMIT ? OFFSET ?", s.c.CharactersDB, s.c.CharactersDB, where)
+	case "mounts", "companions":
+		condition := "(sp.Effect_1=6 AND sp.EffectApplyAuraName_1=78)"
+		if metric == "companions" {
+			condition = "sp.Effect_1=28"
+		}
+		query = fmt.Sprintf("SELECT c.name,c.class,c.race,c.level,COUNT(DISTINCT sp.ID),c.online FROM `%s`.characters c LEFT JOIN `%s`.character_spell cs ON cs.guid=c.guid AND cs.active=1 AND cs.disabled=0 LEFT JOIN `%s`.spell_dbc sp ON sp.ID=cs.spell AND %s WHERE %s GROUP BY c.guid,c.name,c.class,c.race,c.level,c.online ORDER BY COUNT(DISTINCT sp.ID) DESC,c.guid LIMIT ? OFFSET ?", s.c.CharactersDB, s.c.CharactersDB, s.c.WorldDB, condition, where)
 	case "guild-members":
-		query = fmt.Sprintf("SELECT g.name,0,0,0,COUNT(gm.guid),0 FROM `%s`.guild g LEFT JOIN `%s`.guild_member gm ON gm.guildid=g.guildid GROUP BY g.guildid,g.name ORDER BY COUNT(gm.guid) DESC,g.guildid LIMIT 100", s.c.CharactersDB, s.c.CharactersDB)
-		args = nil
+		guildWhere, guildArgs := "1=1", []any{}
+		if excluded := s.activeRankingExclusions(r, "guild"); len(excluded) > 0 {
+			guildWhere += " AND LOWER(g.name) NOT IN (" + placeholders(len(excluded)) + ")"
+			for _, name := range excluded {
+				guildArgs = append(guildArgs, name)
+			}
+		}
+		query = fmt.Sprintf("SELECT g.name,0,0,0,COUNT(gm.guid),0 FROM `%s`.guild g LEFT JOIN `%s`.guild_member gm ON gm.guildid=g.guildid WHERE %s GROUP BY g.guildid,g.name ORDER BY COUNT(gm.guid) DESC,g.guildid LIMIT ? OFFSET ?", s.c.CharactersDB, s.c.CharactersDB, guildWhere)
+		args = guildArgs
 	default:
 		problem(w, 422, "Unknown ranking metric")
 		return
 	}
+	args = append(args, pageSize+1, offset)
 	rows, e := s.s.Characters.QueryContext(r.Context(), query, args...)
 	if e != nil {
 		problem(w, 500, "Could not load rankings")
@@ -161,22 +239,21 @@ func (s *Server) expandedRankings(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	for rows.Next() {
 		var x row
-		x.Rank = uint32(len(out) + 1)
+		x.Rank = uint32(offset + len(out) + 1)
 		if rows.Scan(&x.Name, &x.Class, &x.Race, &x.Level, &x.Value, &x.Online) == nil {
 			if isAllianceRace(x.Race) {
 				x.Faction = "Alliance"
 			} else if isHordeRace(x.Race) {
 				x.Faction = "Horde"
 			}
-			if spec == "" || strings.EqualFold(spec, x.Spec) {
-				out = append(out, x)
-			}
+			out = append(out, x)
 		}
 	}
-	for i := range out {
-		out[i].Rank = uint32(i + 1)
+	hasMore := len(out) > pageSize
+	if hasMore {
+		out = out[:pageSize]
 	}
-	jsonOut(w, 200, map[string]any{"metric": metric, "rows": out, "filters": map[string]any{"class": classID, "faction": faction, "spec": spec}, "source": "AzerothCore character data; specialization requires a compatible talent metadata provider"})
+	jsonOut(w, 200, map[string]any{"metric": metric, "rows": out, "page": page, "hasMore": hasMore, "filters": map[string]any{"class": classID, "faction": faction, "spec": spec}, "source": "AzerothCore character data; specialization requires a compatible talent metadata provider"})
 }
 
 func (s *Server) mockExpandedRankings(w http.ResponseWriter, r *http.Request) {
@@ -184,7 +261,7 @@ func (s *Server) mockExpandedRankings(w http.ResponseWriter, r *http.Request) {
 	if metric == "" {
 		metric = "honorable-kills"
 	}
-	valid := map[string]bool{"honorable-kills": true, "played-time": true, "level": true, "achievements": true, "guild-members": true}
+	valid := map[string]bool{"honorable-kills": true, "played-time": true, "level": true, "achievements": true, "exalted-reputations": true, "mounts": true, "companions": true, "guild-members": true}
 	if !valid[metric] {
 		problem(w, 422, "Unknown ranking metric")
 		return
@@ -220,8 +297,12 @@ func (s *Server) mockExpandedRankings(w http.ResponseWriter, r *http.Request) {
 			value = uint64(c.Level)
 		} else if metric == "achievements" {
 			value = uint64(164 - i*9)
-		} else if metric == "guild-members" {
-			value = uint64(80 - i*5)
+		} else if metric == "exalted-reputations" {
+			value = uint64(18 - i)
+		} else if metric == "mounts" {
+			value = uint64(94 - i*4)
+		} else if metric == "companions" {
+			value = uint64(42 - i*2)
 		}
 		rows = append(rows, map[string]any{"rank": len(rows) + 1, "name": c.Name, "class": c.Class, "race": c.Race, "faction": characterFaction, "spec": spec, "level": c.Level, "value": value, "online": c.Online})
 	}

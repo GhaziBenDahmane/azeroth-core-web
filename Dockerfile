@@ -1,10 +1,13 @@
+# syntax=docker/dockerfile:1.7
+
 FROM --platform=$BUILDPLATFORM node:24-alpine AS ui
 WORKDIR /src
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
 ARG NPM_CONFIG_REPLACE_REGISTRY_HOST=never
 ARG NPM_CONFIG_STRICT_SSL=true
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN --mount=type=secret,id=build_ca,required=false \
+    if [ -f /run/secrets/build_ca ]; then NODE_EXTRA_CA_CERTS=/run/secrets/build_ca npm ci --no-audit --no-fund; else npm ci --no-audit --no-fund; fi
 COPY astro.config.mjs tsconfig.json webcore.config.scss ./
 COPY src ./src
 COPY public ./public
@@ -15,7 +18,8 @@ WORKDIR /src
 ARG TARGETOS
 ARG TARGETARCH
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=secret,id=build_ca,required=false \
+    if [ -f /run/secrets/build_ca ]; then SSL_CERT_FILE=/run/secrets/build_ca go mod download; else go mod download; fi
 COPY . .
 COPY --from=ui /src/dist ./dist
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /portal .

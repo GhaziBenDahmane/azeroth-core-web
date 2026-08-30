@@ -1,0 +1,12 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Vote — Azeroth" page="vote">
+  <section class="page-hero wrap"><p class="eyebrow">SUPPORT THE REALM</p><h1>Vote and earn rewards</h1><p>Help new players discover the realm. Verified votes award credits automatically.</p></section>
+  <section class="wrap content-section vote-layout">
+    <div><div class="section-head"><div><p class="eyebrow">VOTING SITES</p><h2>Your available votes</h2></div><p>Each provider has its own cooldown.</p></div><div id="vote-sites" class="vote-sites"><div class="skeleton"></div></div></div>
+    <aside class="account-panel"><p class="eyebrow">THIS MONTH</p><h2>Top supporters</h2><div id="vote-leaderboard" class="ranking-table"><div class="skeleton"></div></div></aside>
+  </section>
+  <section class="wrap content-section"><div class="section-head"><div><p class="eyebrow">TRANSPARENT DRAWS</p><h2>Seasonal voting campaigns</h2></div><p>Every verified vote is an entry. Draw commitments are published before winners are selected.</p></div><div id="vote-campaigns" class="campaign-grid"><div class="skeleton"></div></div></section>
+  <section class="wrap content-section"><div class="section-head"><div><p class="eyebrow">YOUR SUPPORT</p><h2>Verified vote history</h2></div><p>Rewards appear only after the voting provider confirms them.</p></div><div id="vote-history-summary" class="campaign-stats" aria-live="polite"></div><div id="vote-history" class="ranking-table"><div class="skeleton"></div></div></section>
+</Layout>

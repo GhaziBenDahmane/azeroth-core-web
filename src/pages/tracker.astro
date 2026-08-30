@@ -1,0 +1,32 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Community tracker — Azeroth" page="tracker">
+  <section class="page-hero wrap tracker-hero">
+    <div><p class="eyebrow">SHAPE THE REALM</p><h1>Suggestions and bug reports</h1><p>Follow staff decisions, vote on ideas, and help us reproduce problems.</p></div>
+    <button id="tracker-new-toggle" class="button" type="button">Submit feedback</button>
+  </section>
+  <main class="wrap tracker-layout">
+    <section id="tracker-index">
+      <form id="tracker-filters" class="tracker-filters">
+        <label>Search<input name="q" type="search" maxlength="100" placeholder="Search ideas, bugs, or labels"/></label>
+        <label>Type<select name="kind"><option value="">Suggestions and bugs</option><option value="suggestion">Suggestions</option><option value="bug">Bug reports</option></select></label>
+        <label>Status<select name="status"><option value="">Every status</option><option value="open">Open</option><option value="under_review">Under review</option><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option><option value="closed">Closed</option><option value="declined">Declined</option></select></label>
+        <label>Sort<select name="sort"><option value="recent">Recently updated</option><option value="votes">Most voted</option></select></label>
+        <button class="ghost-button" type="submit">Apply</button>
+      </form>
+      <div id="tracker-list" class="tracker-list" aria-live="polite"><div class="skeleton"></div></div>
+      <nav id="tracker-pagination" class="pager" aria-label="Tracker pages"></nav>
+    </section>
+    <section id="tracker-detail" class="hidden" aria-live="polite"></section>
+    <aside id="tracker-compose" class="account-panel hidden">
+      <div class="panel-title"><div><p class="eyebrow">NEW SUBMISSION</p><h2>Tell us what should change</h2></div><button id="tracker-compose-close" class="ghost-button" type="button">Close</button></div>
+      <form id="tracker-create-form">
+        <div class="gm-fields"><label>Type<select name="kind" required><option value="suggestion">Suggestion</option><option value="bug">Bug report</option></select></label><label>Category<select name="category" required><option value="gameplay">Gameplay</option><option value="website">Website</option><option value="events">Events</option><option value="battlegrounds">Battlegrounds</option><option value="shop">Shop</option><option value="community">Community</option><option value="other">Other</option></select></label></div>
+        <label>Title<input name="title" minlength="5" maxlength="160" required/></label>
+        <label>Details<textarea name="body" minlength="20" maxlength="10000" rows="8" placeholder="Explain the desired outcome or provide steps, expected behavior, and actual behavior." required></textarea></label>
+        <button class="button" type="submit">Submit for review</button><p class="form-message" role="status"></p>
+      </form>
+    </aside>
+  </main>
+</Layout>

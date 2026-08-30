@@ -1,6 +1,9 @@
 package web
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestLevel80WeaponSkillsCoverEveryClass(t *testing.T) {
 	for _, classID := range []uint8{1, 2, 3, 4, 5, 6, 7, 8, 9, 11} {
@@ -52,5 +55,18 @@ func TestLearnedTrainerSpellsUsesTriggeredSpell(t *testing.T) {
 	triggered := learnedTrainerSpells(456, [3]uint32{0, 36, 36}, [3]uint32{0, 789, 790})
 	if len(triggered) != 2 || triggered[0] != 789 || triggered[1] != 790 {
 		t.Fatalf("triggered trainer spells = %v", triggered)
+	}
+}
+
+func TestOrderStepKeysAreStrict(t *testing.T) {
+	for _, key := range []string{"items-01", "level", "money", "service", "training"} {
+		if !validOrderStepKey(key) {
+			t.Fatalf("expected generated step key %q to be valid", key)
+		}
+	}
+	for _, key := range []string{"", "../money", "items:01", "ITEMS-01", strings.Repeat("a", 65)} {
+		if validOrderStepKey(key) {
+			t.Fatalf("expected unsafe step key %q to be rejected", key)
+		}
 	}
 }

@@ -32,9 +32,12 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		claimed := s.mock.dailyClaim.Equal(time.Now().Local().Truncate(24 * time.Hour))
 		services := append([]dashboardService(nil), s.mock.services...)
 		s.mock.mu.Unlock()
+		missionData := s.loadPlayerMissions(r.Context(), 1)
 		jsonOut(w, http.StatusOK, map[string]any{
-			"dailyReward": map[string]any{"available": !claimed, "credits": 5, "streak": 4},
-			"referral":    map[string]any{"code": "DEMO-7A3F21", "uses": 3, "creditsEarned": 75},
+			"dailyReward": map[string]any{"available": !claimed, "credits": 8, "streak": 4, "cycleDay": 5, "cycle": dailyRewardCycle},
+			"loyalty":     s.loadLoyalty(r.Context(), 1),
+			"missions":    missionData,
+			"referral":    map[string]any{"code": "DEMO-7A3F21", "uses": 3, "creditsEarned": 75, "milestones": s.loadReferralMilestones(r, 1, 3), "activity": []map[string]any{{"username": "NORTHSTAR", "joinedAt": time.Now().Add(-48 * time.Hour)}, {"username": "FROSTBITE", "joinedAt": time.Now().Add(-9 * 24 * time.Hour)}}},
 			"vote":        map[string]any{"url": s.c.VoteURL, "credits": s.c.VoteRewardCredits},
 			"services":    services,
 			"activity":    []map[string]any{{"kind": "login", "ip": "127.0.0.1", "agent": "Demo browser", "at": time.Now().Add(-20 * time.Minute)}, {"kind": "password", "ip": "127.0.0.1", "agent": "Demo browser", "at": time.Now().Add(-5 * 24 * time.Hour)}},
@@ -50,9 +53,25 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 	_, _ = s.s.Auth.ExecContext(r.Context(), "INSERT IGNORE INTO portal_referrals(account_id,code) VALUES(?,?)", a.ID, code)
 	var uses, earned uint32
 	_ = s.s.Auth.QueryRowContext(r.Context(), "SELECT code,uses,credits_earned FROM portal_referrals WHERE account_id=?", a.ID).Scan(&code, &uses, &earned)
-	var claimedToday, streak uint32
-	_ = s.s.Auth.QueryRowContext(r.Context(), "SELECT COUNT(*),COUNT(DISTINCT claim_date) FROM portal_daily_rewards WHERE account_id=? AND realm_key=? AND claim_date>=CURRENT_DATE-INTERVAL 6 DAY", a.ID, s.c.RealmKey).Scan(&claimedToday, &streak)
-	_ = s.s.Auth.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM portal_daily_rewards WHERE account_id=? AND realm_key=? AND claim_date=CURRENT_DATE", a.ID, s.c.RealmKey).Scan(&claimedToday)
+	claimedToday, streak, todayCredits := scanDailyRewardState(r.Context(), s.s.Auth, a.ID, s.c.RealmKey)
+	rewardCredits := dailyRewardCycle[streak%uint32(len(dailyRewardCycle))]
+	cycleDay := streak%uint32(len(dailyRewardCycle)) + 1
+	if claimedToday {
+		rewardCredits = todayCredits
+		cycleDay = (streak-1)%uint32(len(dailyRewardCycle)) + 1
+	}
+	referralActivity := []map[string]any{}
+	referralRows, _ := s.s.Auth.QueryContext(r.Context(), fmt.Sprintf(`SELECT a.username,r.created_at FROM portal_referrals r JOIN %s.account a ON a.id=r.account_id WHERE r.referred_by=? ORDER BY r.created_at DESC LIMIT 20`, s.c.AuthDB), a.ID)
+	if referralRows != nil {
+		for referralRows.Next() {
+			var username string
+			var joined time.Time
+			if referralRows.Scan(&username, &joined) == nil {
+				referralActivity = append(referralActivity, map[string]any{"username": username, "joinedAt": joined})
+			}
+		}
+		referralRows.Close()
+	}
 	rows, _ := s.s.Auth.QueryContext(r.Context(), "SELECT action,character_name,success,response,created_at FROM portal_character_services WHERE account_id=? AND realm_key=? ORDER BY id DESC LIMIT 20", a.ID, s.c.RealmKey)
 	services := []dashboardService{}
 	if rows != nil {
@@ -77,8 +96,10 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	jsonOut(w, http.StatusOK, map[string]any{
-		"dailyReward": map[string]any{"available": claimedToday == 0, "credits": 5, "streak": streak},
-		"referral":    map[string]any{"code": code, "uses": uses, "creditsEarned": earned},
+		"dailyReward": map[string]any{"available": !claimedToday, "credits": rewardCredits, "streak": streak, "cycleDay": cycleDay, "cycle": dailyRewardCycle},
+		"loyalty":     s.loadLoyalty(r.Context(), a.ID),
+		"missions":    s.loadPlayerMissions(r.Context(), a.ID),
+		"referral":    map[string]any{"code": code, "uses": uses, "creditsEarned": earned, "milestones": s.loadReferralMilestones(r, a.ID, uses), "activity": referralActivity},
 		"vote":        map[string]any{"url": s.c.VoteURL, "credits": s.c.VoteRewardCredits},
 		"services":    services,
 		"activity":    activity,
@@ -99,8 +120,8 @@ func (s *Server) claimDailyReward(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.mock.dailyClaim = today
-		s.mock.balance += 5
-		jsonOut(w, http.StatusOK, map[string]any{"ok": true, "credits": 5, "balance": s.mock.balance})
+		s.mock.balance += 8
+		jsonOut(w, http.StatusOK, map[string]any{"ok": true, "credits": 8, "balance": s.mock.balance})
 		return
 	}
 	a, err := s.auth(r)
@@ -114,7 +135,13 @@ func (s *Server) claimDailyReward(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	result, err := tx.ExecContext(r.Context(), "INSERT IGNORE INTO portal_daily_rewards(account_id,realm_key,claim_date,credits) VALUES(?,?,CURRENT_DATE,5)", a.ID, s.c.RealmKey)
+	claimed, streak, _ := scanDailyRewardState(r.Context(), s.s.Auth, a.ID, s.c.RealmKey)
+	if claimed {
+		problem(w, http.StatusConflict, "Daily reward already claimed")
+		return
+	}
+	reward := dailyRewardCycle[streak%uint32(len(dailyRewardCycle))]
+	result, err := tx.ExecContext(r.Context(), "INSERT IGNORE INTO portal_daily_rewards(account_id,realm_key,claim_date,credits) VALUES(?,?,UTC_DATE(),?)", a.ID, s.c.RealmKey, reward)
 	if err != nil {
 		problem(w, http.StatusInternalServerError, "Could not claim daily reward")
 		return
@@ -123,11 +150,11 @@ func (s *Server) claimDailyReward(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusConflict, "Daily reward already claimed")
 		return
 	}
-	if _, err = tx.ExecContext(r.Context(), "UPDATE portal_wallets SET balance=balance+5 WHERE account_id=?", a.ID); err != nil {
+	if _, err = tx.ExecContext(r.Context(), "INSERT INTO portal_wallets(account_id,balance) VALUES(?,?) ON DUPLICATE KEY UPDATE balance=balance+VALUES(balance)", a.ID, reward); err != nil {
 		problem(w, http.StatusInternalServerError, "Could not credit daily reward")
 		return
 	}
-	if _, err = tx.ExecContext(r.Context(), "INSERT INTO portal_credit_ledger(actor_account_id,target_account_id,amount,reason) VALUES(0,?,5,'Daily login reward')", a.ID); err != nil {
+	if _, err = tx.ExecContext(r.Context(), "INSERT INTO portal_credit_ledger(actor_account_id,target_account_id,amount,reason) VALUES(0,?,?,?)", a.ID, reward, fmt.Sprintf("Daily reward cycle day %d", streak%uint32(len(dailyRewardCycle))+1)); err != nil {
 		problem(w, http.StatusInternalServerError, "Could not record daily reward")
 		return
 	}
@@ -135,9 +162,10 @@ func (s *Server) claimDailyReward(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusInternalServerError, "Could not commit daily reward")
 		return
 	}
+	s.notifyAccount(r.Context(), a.ID, "reward", "Daily reward claimed", fmt.Sprintf("%d credits were added to your wallet.", reward), "/account/rewards")
 	var balance uint32
 	_ = s.s.Auth.QueryRowContext(r.Context(), "SELECT balance FROM portal_wallets WHERE account_id=?", a.ID).Scan(&balance)
-	jsonOut(w, http.StatusOK, map[string]any{"ok": true, "credits": 5, "balance": balance})
+	jsonOut(w, http.StatusOK, map[string]any{"ok": true, "credits": reward, "balance": balance})
 }
 
 // voteRewardCallback is called by the configured voting provider after it has

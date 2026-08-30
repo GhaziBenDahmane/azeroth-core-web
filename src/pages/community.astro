@@ -1,0 +1,16 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Community — Azeroth" page="community">
+  <section class="page-hero wrap"><p class="eyebrow">THE COMMUNITY</p><h1>News, guilds and events</h1><p>Follow what is happening across the realm and find people to play with.</p><div class="hero-actions"><a class="button config-community hidden" rel="noreferrer">Join Discord →</a><a class="ghost-button" href="/guilds">Browse guilds</a></div></section>
+  <section id="news-section" class="wrap content-section"><div class="section-head"><div><p class="eyebrow">REALM NEWS</p><h2>Latest updates</h2></div><a href="/news">All news →</a></div><div id="news-grid" class="news-grid"><p class="muted">No announcements have been published yet.</p></div></section>
+  <section class="wrap content-section"><div class="section-head"><div><p class="eyebrow">CALENDAR</p><h2>Upcoming events</h2></div></div><div id="community-events" class="event-grid"><div class="skeleton"></div></div></section>
+  <section class="wrap community-sections content-section">
+    <article class="account-panel"><p class="eyebrow">DISCORD</p><h2>Stay connected</h2><div id="discord-widget"><p id="home-discord-status">Chat with players, organize groups, follow announcements, and contact the staff team.</p></div><a class="text-action config-community hidden" rel="noreferrer">Open Discord →</a></article>
+    <article class="account-panel"><p class="eyebrow">GUILDS</p><h2>Find your people</h2><p>Explore active guilds, inspect their rosters, and find a group that matches your goals.</p><a class="text-action" href="/guilds">Open guild directory →</a></article>
+    <article class="account-panel"><p class="eyebrow">CONTRIBUTE</p><h2>Support the realm</h2><p>Voting helps new players discover the server. Verified votes can also earn portal credits.</p><a class="text-action" href="/vote">View voting sites →</a></article>
+  </section>
+  <section class="wrap community-feedback"><div><p class="eyebrow">PUBLIC ROADMAP</p><h2>Suggest, report, and follow progress</h2><p>Browse community ideas and known issues, vote on priorities, and see staff decisions without losing discussions in Discord.</p></div><a class="button" href="/tracker">Open community tracker →</a></section>
+  <section id="community-changelog" class="wrap content-section"><div class="section-head"><div><p class="eyebrow">CHANGELOG</p><h2>Latest realm changes</h2></div></div><div id="community-changelog-list" class="news-grid"><p class="muted">No releases have been published yet.</p></div></section>
+  <dialog id="event-registration-dialog"><button class="dialog-close" type="button" aria-label="Close">×</button><p class="eyebrow">EVENT REGISTRATION</p><h2 id="event-registration-title">Reserve a place</h2><p>Choose the character you plan to bring. You can change it or cancel before registration closes.</p><form id="event-registration-form"><input name="eventId" type="hidden"/><label>Character<select name="characterGuid" required></select></label><button class="button full" type="submit">Reserve place</button><p class="form-message" role="status"></p></form></dialog>
+</Layout>

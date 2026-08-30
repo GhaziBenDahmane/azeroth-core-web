@@ -42,10 +42,6 @@ func (s *Server) sendVerificationEmail(email, username, token string) error {
 }
 
 func (s *Server) emailVerificationConfirm(w http.ResponseWriter, r *http.Request) {
-	if !s.c.RequireEmailVerification {
-		problem(w, http.StatusNotFound, "Email verification is disabled")
-		return
-	}
 	var in struct {
 		Token string `json:"token"`
 	}
@@ -65,19 +61,31 @@ func (s *Server) emailVerificationConfirm(w http.ResponseWriter, r *http.Request
 	}
 	defer tx.Rollback()
 	var accountID uint32
-	if err = tx.QueryRowContext(r.Context(), "SELECT account_id FROM portal_email_verifications WHERE token_hash=? AND expires_at>NOW() FOR UPDATE", hash[:]).Scan(&accountID); err != nil {
+	var pendingEmail string
+	if err = tx.QueryRowContext(r.Context(), "SELECT account_id,pending_email FROM portal_email_verifications WHERE token_hash=? AND expires_at>NOW() FOR UPDATE", hash[:]).Scan(&accountID, &pendingEmail); err != nil {
 		problem(w, 422, "Invalid or expired verification link")
 		return
 	}
-	q := fmt.Sprintf("UPDATE `%s`.account SET locked=0 WHERE id=?", s.c.AuthDB)
-	if _, err = tx.ExecContext(r.Context(), q, accountID); err == nil {
+	var q string
+	if pendingEmail != "" {
+		q = fmt.Sprintf("UPDATE `%s`.account SET email=?,reg_mail=? WHERE id=?", s.c.AuthDB)
+		_, err = tx.ExecContext(r.Context(), q, pendingEmail, pendingEmail, accountID)
+	} else {
+		q = fmt.Sprintf("UPDATE `%s`.account SET locked=0 WHERE id=?", s.c.AuthDB)
+		_, err = tx.ExecContext(r.Context(), q, accountID)
+	}
+	if err == nil {
 		_, err = tx.ExecContext(r.Context(), "DELETE FROM portal_email_verifications WHERE account_id=?", accountID)
 	}
 	if err != nil || tx.Commit() != nil {
 		problem(w, 500, "Could not verify account")
 		return
 	}
-	jsonOut(w, 200, map[string]any{"ok": true, "message": "Email verified. You can now sign in."})
+	message := "Email verified. You can now sign in."
+	if pendingEmail != "" {
+		message = "Your email address has been updated."
+	}
+	jsonOut(w, 200, map[string]any{"ok": true, "message": message})
 }
 
 func (s *Server) emailVerificationResend(w http.ResponseWriter, r *http.Request) {

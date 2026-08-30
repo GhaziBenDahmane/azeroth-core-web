@@ -1,6 +1,7 @@
 package web
 
 import (
+	"database/sql"
 	"fmt"
 	"net"
 	"net/http"
@@ -19,31 +20,44 @@ func (s *Server) adminOrders(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusForbidden, "GM access required")
 		return
 	}
-	rows, err := s.s.Auth.QueryContext(r.Context(), `SELECT o.id,a.username,o.character_guid,p.name,o.total,o.status,o.attempts,o.error_message,o.created_at FROM portal_orders o JOIN portal_products p ON p.id=o.product_id JOIN `+"`"+s.c.AuthDB+"`"+`.account a ON a.id=o.account_id WHERE o.realm_key=? ORDER BY o.id DESC LIMIT 100`, s.c.RealmKey)
+	page, perPage, offset := requestPage(r, 25, 100)
+	var total int
+	if err := s.s.Auth.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM portal_orders WHERE realm_key=?`, s.c.RealmKey).Scan(&total); err != nil {
+		problem(w, 500, "Could not count orders")
+		return
+	}
+	orderPagination := paginationMeta(page, perPage, total)
+	page, offset = orderPagination.Page, (orderPagination.Page-1)*perPage
+	rows, err := s.s.Auth.QueryContext(r.Context(), `SELECT o.id,a.username,o.character_guid,p.name,o.total,o.status,o.attempts,o.error_message,o.created_at,
+		(SELECT COUNT(*) FROM portal_order_steps os WHERE os.order_id=o.id),
+		(SELECT COUNT(*) FROM portal_order_steps os WHERE os.order_id=o.id AND os.status='completed')
+		FROM portal_orders o JOIN portal_products p ON p.id=o.product_id JOIN `+"`"+s.c.AuthDB+"`"+`.account a ON a.id=o.account_id WHERE o.realm_key=? ORDER BY o.id DESC LIMIT ? OFFSET ?`, s.c.RealmKey, perPage, offset)
 	if err != nil {
 		problem(w, 500, "Could not load orders")
 		return
 	}
 	defer rows.Close()
 	type row struct {
-		ID            uint64    `json:"id"`
-		Username      string    `json:"username"`
-		CharacterGUID uint32    `json:"characterGuid"`
-		Product       string    `json:"product"`
-		Total         uint32    `json:"total"`
-		Status        string    `json:"status"`
-		Attempts      uint32    `json:"attempts"`
-		Error         string    `json:"error"`
-		Created       time.Time `json:"created"`
+		ID             uint64    `json:"id"`
+		Username       string    `json:"username"`
+		CharacterGUID  uint32    `json:"characterGuid"`
+		Product        string    `json:"product"`
+		Total          uint32    `json:"total"`
+		Status         string    `json:"status"`
+		Attempts       uint32    `json:"attempts"`
+		Error          string    `json:"error"`
+		Created        time.Time `json:"created"`
+		Steps          uint32    `json:"steps"`
+		CompletedSteps uint32    `json:"completedSteps"`
 	}
 	out := []row{}
 	for rows.Next() {
 		var x row
-		if rows.Scan(&x.ID, &x.Username, &x.CharacterGUID, &x.Product, &x.Total, &x.Status, &x.Attempts, &x.Error, &x.Created) == nil {
+		if rows.Scan(&x.ID, &x.Username, &x.CharacterGUID, &x.Product, &x.Total, &x.Status, &x.Attempts, &x.Error, &x.Created, &x.Steps, &x.CompletedSteps) == nil {
 			out = append(out, x)
 		}
 	}
-	jsonOut(w, 200, map[string]any{"orders": out})
+	jsonOut(w, 200, map[string]any{"orders": out, "pagination": orderPagination})
 }
 
 func (s *Server) adminLedger(w http.ResponseWriter, r *http.Request) {
@@ -51,18 +65,27 @@ func (s *Server) adminLedger(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "GM access required")
 		return
 	}
-	rows, err := s.s.Auth.QueryContext(r.Context(), `SELECT l.id,COALESCE(actor.username,'SYSTEM'),target.username,l.amount,l.reason,l.created_at FROM portal_credit_ledger l LEFT JOIN `+"`"+s.c.AuthDB+"`"+`.account actor ON actor.id=l.actor_account_id JOIN `+"`"+s.c.AuthDB+"`"+`.account target ON target.id=l.target_account_id ORDER BY l.id DESC LIMIT 100`)
+	page, perPage, offset := requestPage(r, 25, 100)
+	var total int
+	if err := s.s.Auth.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM portal_credit_ledger`).Scan(&total); err != nil {
+		problem(w, 500, "Could not count credit ledger")
+		return
+	}
+	ledgerPagination := paginationMeta(page, perPage, total)
+	page, offset = ledgerPagination.Page, (ledgerPagination.Page-1)*perPage
+	rows, err := s.s.Auth.QueryContext(r.Context(), `SELECT l.id,COALESCE(actor.username,'SYSTEM'),target.username,l.amount,l.reason,l.created_at FROM portal_credit_ledger l LEFT JOIN `+"`"+s.c.AuthDB+"`"+`.account actor ON actor.id=l.actor_account_id JOIN `+"`"+s.c.AuthDB+"`"+`.account target ON target.id=l.target_account_id ORDER BY l.id DESC LIMIT ? OFFSET ?`, perPage, offset)
 	if err != nil {
 		problem(w, 500, "Could not load credit ledger")
 		return
 	}
 	defer rows.Close()
 	type row struct {
-		ID            uint64 `json:"id"`
-		Actor, Target string
-		Amount        int32
-		Reason        string
-		Created       time.Time
+		ID      uint64    `json:"id"`
+		Actor   string    `json:"actor"`
+		Target  string    `json:"target"`
+		Amount  int32     `json:"amount"`
+		Reason  string    `json:"reason"`
+		Created time.Time `json:"created"`
 	}
 	out := []row{}
 	for rows.Next() {
@@ -71,7 +94,7 @@ func (s *Server) adminLedger(w http.ResponseWriter, r *http.Request) {
 			out = append(out, x)
 		}
 	}
-	jsonOut(w, 200, map[string]any{"entries": out})
+	jsonOut(w, 200, map[string]any{"entries": out, "pagination": ledgerPagination})
 }
 
 func (s *Server) adminProducts(w http.ResponseWriter, r *http.Request) {
@@ -79,7 +102,40 @@ func (s *Server) adminProducts(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "GM access required")
 		return
 	}
-	rows, err := s.s.Auth.QueryContext(r.Context(), "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit,featured,sale_price,stock_limit,sold_count,category_order FROM portal_products WHERE realm_key=? ORDER BY category_order,category,id DESC LIMIT 200", s.c.RealmKey)
+	page, perPage, offset := requestPage(r, 50, 200)
+	where, args := " WHERE realm_key=?", []any{s.c.RealmKey}
+	search := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len(search) > 100 {
+		problem(w, http.StatusUnprocessableEntity, "Search is too long")
+		return
+	}
+	if search != "" {
+		where += " AND (name LIKE ? OR category LIKE ? OR tier_label LIKE ? OR tags LIKE ?)"
+		pattern := "%" + strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(search, "\\", "\\\\"), "%", "\\%"), "_", "\\_") + "%"
+		args = append(args, pattern, pattern, pattern, pattern)
+	}
+	if status := strings.TrimSpace(r.URL.Query().Get("status")); status == "active" || status == "archived" {
+		where += " AND active=?"
+		args = append(args, status == "active")
+	}
+	order := "category_order ASC,category ASC,id DESC"
+	if column, exists := map[string]string{"id": "id", "name": "name", "category": "category", "price": "price", "active": "active"}[r.URL.Query().Get("sort")]; exists {
+		direction := "ASC"
+		if strings.EqualFold(r.URL.Query().Get("direction"), "desc") {
+			direction = "DESC"
+		}
+		order = column + " " + direction + ",id DESC"
+	}
+	var total int
+	if err := s.s.Auth.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM portal_products"+where, args...).Scan(&total); err != nil {
+		problem(w, 500, "Could not count products")
+		return
+	}
+	productPagination := paginationMeta(page, perPage, total)
+	page, offset = productPagination.Page, (productPagination.Page-1)*perPage
+	query := "SELECT id,name,description,item_id,quantity,price,category,image_url,class_id,tier_label,service_level,gold_amount,service_action,active,starts_at,ends_at,per_account_limit,featured,sale_price,stock_limit,sold_count,category_order,tags,visibility_segment,variant_required,bundle_template_id FROM portal_products" + where + " ORDER BY " + order + " LIMIT ? OFFSET ?"
+	queryArgs := append(append([]any{}, args...), perPage, offset)
+	rows, err := s.s.Auth.QueryContext(r.Context(), query, queryArgs...)
 	if err != nil {
 		problem(w, 500, "Could not load products")
 		return
@@ -88,11 +144,15 @@ func (s *Server) adminProducts(w http.ResponseWriter, r *http.Request) {
 	out := []product{}
 	for rows.Next() {
 		var x product
-		if rows.Scan(&x.ID, &x.Name, &x.Description, &x.ItemID, &x.Quantity, &x.Price, &x.Category, &x.ImageURL, &x.ClassID, &x.Tier, &x.ServiceLevel, &x.Gold, &x.ServiceAction, &x.Active, &x.StartsAt, &x.EndsAt, &x.PerAccountLimit, &x.Featured, &x.SalePrice, &x.StockLimit, &x.SoldCount, &x.CategoryOrder) == nil {
+		if rows.Scan(&x.ID, &x.Name, &x.Description, &x.ItemID, &x.Quantity, &x.Price, &x.Category, &x.ImageURL, &x.ClassID, &x.Tier, &x.ServiceLevel, &x.Gold, &x.ServiceAction, &x.Active, &x.StartsAt, &x.EndsAt, &x.PerAccountLimit, &x.Featured, &x.SalePrice, &x.StockLimit, &x.SoldCount, &x.CategoryOrder, &x.Tags, &x.Visibility, &x.VariantRequired, &x.BundleID) == nil {
 			out = append(out, x)
 		}
 	}
-	jsonOut(w, 200, map[string]any{"products": out, "schema": fmt.Sprintf("%s.portal_products", s.c.AuthDB)})
+	if err = s.loadProductMerchandising(r.Context(), out); err != nil {
+		problem(w, http.StatusInternalServerError, "Could not load product variants")
+		return
+	}
+	jsonOut(w, 200, map[string]any{"products": out, "schema": fmt.Sprintf("%s.portal_products", s.c.AuthDB), "pagination": productPagination})
 }
 
 func (s *Server) adminAccounts(w http.ResponseWriter, r *http.Request) {
@@ -107,11 +167,19 @@ func (s *Server) adminAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 	escaped := strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(query, "\\", "\\\\"), "%", "\\%"), "_", "\\_")
 	pattern := "%" + escaped + "%"
+	page, perPage, offset := requestPage(r, 25, 100)
+	var total int
+	if err := s.s.Auth.QueryRowContext(r.Context(), fmt.Sprintf(`SELECT COUNT(*) FROM %s.account a WHERE a.username LIKE ? OR a.email LIKE ?`, s.c.AuthDB), pattern, pattern).Scan(&total); err != nil {
+		problem(w, 500, "Could not count accounts")
+		return
+	}
+	accountPagination := paginationMeta(page, perPage, total)
+	page, offset = accountPagination.Page, (accountPagination.Page-1)*perPage
 	rows, err := s.s.Auth.QueryContext(r.Context(), fmt.Sprintf(`SELECT a.id,a.username,a.email,a.locked,
 		EXISTS(SELECT 1 FROM %s.account_banned b WHERE b.id=a.id AND b.active=1),
 		COALESCE((SELECT b.unbandate FROM %s.account_banned b WHERE b.id=a.id AND b.active=1 ORDER BY b.bandate DESC LIMIT 1),0),
 		COALESCE((SELECT b.banreason FROM %s.account_banned b WHERE b.id=a.id AND b.active=1 ORDER BY b.bandate DESC LIMIT 1),'')
-		FROM %s.account a WHERE a.username LIKE ? OR a.email LIKE ? ORDER BY a.id DESC LIMIT 25`, s.c.AuthDB, s.c.AuthDB, s.c.AuthDB, s.c.AuthDB), pattern, pattern)
+		FROM %s.account a WHERE a.username LIKE ? OR a.email LIKE ? ORDER BY a.id DESC LIMIT ? OFFSET ?`, s.c.AuthDB, s.c.AuthDB, s.c.AuthDB, s.c.AuthDB), pattern, pattern, perPage, offset)
 	if err != nil {
 		problem(w, 500, "Could not search accounts")
 		return
@@ -138,20 +206,63 @@ func (s *Server) adminAccounts(w http.ResponseWriter, r *http.Request) {
 		var a adminAccount
 		if rows.Scan(&a.ID, &a.Username, &a.Email, &a.Locked, &a.Banned, &a.BanUntil, &a.BanReason) == nil {
 			a.Characters = []adminCharacter{}
-			charQuery := fmt.Sprintf("SELECT name,level,class,online FROM %s.characters WHERE account=? AND deleteDate IS NULL ORDER BY level DESC,name LIMIT 20", s.c.CharactersDB)
-			if chars, charErr := s.s.Characters.QueryContext(r.Context(), charQuery, a.ID); charErr == nil {
-				for chars.Next() {
-					var c adminCharacter
-					if chars.Scan(&c.Name, &c.Level, &c.Class, &c.Online) == nil {
-						a.Characters = append(a.Characters, c)
-					}
-				}
-				chars.Close()
-			}
 			accounts = append(accounts, a)
 		}
 	}
-	jsonOut(w, 200, map[string]any{"accounts": accounts})
+	if len(accounts) > 0 {
+		ids, args, indexes := make([]uint32, 0, len(accounts)), make([]any, 0, len(accounts)), map[uint32]int{}
+		for index := range accounts {
+			ids = append(ids, accounts[index].ID)
+			args = append(args, accounts[index].ID)
+			indexes[accounts[index].ID] = index
+		}
+		charQuery := fmt.Sprintf("SELECT account,name,level,class,online FROM %s.characters WHERE account IN (%s) AND deleteDate IS NULL ORDER BY account,level DESC,name", s.c.CharactersDB, placeholders(len(ids)))
+		if chars, charErr := s.s.Characters.QueryContext(r.Context(), charQuery, args...); charErr == nil {
+			perAccount := map[uint32]int{}
+			for chars.Next() {
+				var accountID uint32
+				var c adminCharacter
+				if chars.Scan(&accountID, &c.Name, &c.Level, &c.Class, &c.Online) == nil && perAccount[accountID] < 20 {
+					if index, exists := indexes[accountID]; exists {
+						accounts[index].Characters = append(accounts[index].Characters, c)
+						perAccount[accountID]++
+					}
+				}
+			}
+			chars.Close()
+		}
+	}
+	jsonOut(w, 200, map[string]any{"accounts": accounts, "pagination": accountPagination})
+}
+
+func (s *Server) adminRevokeAccountSessions(w http.ResponseWriter, r *http.Request) {
+	actor, ok := s.requireStaffPermission(r, "moderation")
+	if !ok {
+		problem(w, http.StatusForbidden, "Moderation access required")
+		return
+	}
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 32)
+	if err != nil || id == 0 {
+		problem(w, http.StatusBadRequest, "Invalid account")
+		return
+	}
+	var username string
+	if err = s.s.Auth.QueryRowContext(r.Context(), fmt.Sprintf("SELECT username FROM %s.account WHERE id=?", s.c.AuthDB), id).Scan(&username); err != nil {
+		if err == sql.ErrNoRows {
+			problem(w, http.StatusNotFound, "Account not found")
+		} else {
+			problem(w, http.StatusInternalServerError, "Could not load account")
+		}
+		return
+	}
+	result, err := s.s.Auth.ExecContext(r.Context(), "DELETE FROM portal_sessions WHERE account_id=?", id)
+	if err != nil {
+		problem(w, http.StatusInternalServerError, "Could not revoke account sessions")
+		return
+	}
+	revoked, _ := result.RowsAffected()
+	_, _ = s.s.Auth.ExecContext(r.Context(), "INSERT INTO portal_admin_audit(actor_account_id,action,target,details) VALUES(?,'account.sessions.revoke',?,?)", actor.ID, username, fmt.Sprintf("Revoked %d portal sessions", revoked))
+	jsonOut(w, http.StatusOK, map[string]any{"ok": true, "accountId": id, "username": username, "revoked": revoked, "requestId": RequestID(r.Context())})
 }
 
 func (s *Server) adminModeration(w http.ResponseWriter, r *http.Request) {
@@ -304,6 +415,7 @@ func (s *Server) adminModeration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, _ = s.s.Auth.ExecContext(r.Context(), "UPDATE portal_moderation_log SET status='executed' WHERE id=?", logID)
+	s.recordSanction(r, logID, actor.ID, targetAccountID, in.Target, in.Action, in.Duration, in.Reason)
 	s.notifyDiscordAsync("Moderation action", "**%s** applied `%s` to **%s** on **%s**. Reason: %s", actor.Username, in.Action, in.Target, s.c.RealmName, in.Reason)
 	jsonOut(w, 200, map[string]any{"ok": true, "action": in.Action, "target": in.Target})
 }

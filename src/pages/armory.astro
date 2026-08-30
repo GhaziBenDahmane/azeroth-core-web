@@ -3,12 +3,12 @@ import Layout from '../layouts/Layout.astro';
 ---
 <Layout title="Armory — Azeroth" page="armory">
   <section class="page-hero armory-hero wrap">
-    <p class="eyebrow">Character database</p>
-    <h1>Realm armory</h1>
-    <p>Find a character and inspect their equipment, achievements, raid progression, and arena record.</p>
+    <p class="eyebrow" data-i18n="armory.eyebrow">Character database</p>
+    <h1 data-i18n="armory.title">Realm armory</h1>
+    <p data-i18n="armory.intro">Find a character and inspect their equipment, achievements, raid progression, and arena record.</p>
   </section>
   <section class="wrap armory-shell">
-    <form id="armory-search" class="search"><input name="q" maxlength="12" placeholder="Search character name…" aria-label="Character name"/><button class="button" type="submit">Search</button></form>
+    <form id="armory-search" class="search"><input name="q" maxlength="12" placeholder="Search character name…" aria-label="Character name" data-i18n-placeholder="armory.searchPlaceholder" data-i18n-aria-label="armory.searchLabel"/><button class="button" type="submit" data-i18n="action.search">Search</button></form>
     <div id="armory-results" class="character-grid loading-grid"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
     <div id="character-detail"></div>
   </section>

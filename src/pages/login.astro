@@ -3,13 +3,15 @@ import Layout from '../layouts/Layout.astro';
 ---
 <Layout title="Sign in — Azeroth" page="login">
   <section class="auth-shell wrap compact">
-    <div class="auth-aside"><p class="eyebrow">Account portal</p><h1>Welcome back</h1><p>Manage your characters, credits, orders, and account security.</p></div>
+    <div class="auth-aside"><p class="eyebrow" data-i18n="login.eyebrow">Account portal</p><h1 data-i18n="login.title">Welcome back</h1><p data-i18n="login.intro">Manage your characters, credits, orders, and account security.</p></div>
     <form id="login-form" class="form-card">
       <p class="eyebrow">Account access</p><h2>Sign in</h2><p class="muted">New to the realm? <a href="/register">Create an account</a></p>
-      <label>Username<input name="username" maxlength="32" autocomplete="username" required/></label>
-      <label>Password<input name="password" type="password" maxlength="32" autocomplete="current-password" required/></label>
-      <label>Authenticator code <small>Only required when two-factor authentication is enabled.</small><input name="OTP" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code"/></label>
-      <button class="button full" type="submit">Sign in</button><p class="muted"><a href="/forgot-password">Forgot password?</a></p><p class="form-message" aria-live="polite"></p>
+      <label><span data-i18n="field.username">Username</span><input name="username" maxlength="32" autocomplete="username" required/></label>
+      <label><span data-i18n="field.password">Password</span><input name="password" type="password" maxlength="32" autocomplete="current-password" required/></label>
+      <label>Authenticator or recovery code <small>Only required when two-factor authentication is enabled.</small><input name="OTP" inputmode="text" autocomplete="one-time-code"/></label>
+      <button class="button full" type="submit" data-i18n="action.signIn">Sign in</button><p class="muted"><a href="/forgot-password" data-i18n="login.forgotPassword">Forgot password?</a></p><p class="form-message" aria-live="polite"></p>
+      <div class="auth-divider hidden" data-social-oauth><span>or</span></div><a class="ghost-button full hidden" data-discord-oauth href="/api/auth/discord/start">Continue with Discord</a><a class="ghost-button full hidden" data-google-oauth href="/api/auth/google/start">Continue with Google</a>
+      <button id="passkey-login" class="ghost-button full hidden" data-passkeys type="button">Sign in with a passkey</button>
     </form>
   </section>
 </Layout>

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/mail"
@@ -22,15 +23,18 @@ type Config struct {
 	HomePrimaryCTA, HomeConnectTitle           string
 	HomeGuideText, HomeRules                   string
 	DiscordStatus, HomeChangelog               string
+	HomeFeatures, HomeProgression              string
 	ExpansionName, ClientVersion               string
 	ClientBuild, ExperienceRate                string
 	RealmType, RealmTimezone                   string
 	RealmDescription, SeasonName               string
+	ArenaRewardPolicy                          string
 	QuestExperienceRate, KillExperienceRate    string
 	ExplorationExperienceRate, DropRate        string
 	ReputationRate, HonorRate, ProfessionRate  string
 	FactionPolicy                              string
 	StartLevel, MaxLevel, PopulationCap        int
+	TransferSLAHours                           int
 	CrossFaction                               bool
 	CrossFactionAccounts, CrossFactionCalendar bool
 	CrossFactionChannels, CrossFactionGroups   bool
@@ -43,10 +47,13 @@ type Config struct {
 	ThemePrimary, ThemeSecondary               string
 	ThemeAccent, ThemeBackground               string
 	Locale, TermsURL, PrivacyURL               string
+	SecurityContactURL                         string
+	AnalyticsScriptURL, AnalyticsDomain        string
 	UIText                                     map[string]string
 	News                                       []NewsItem
 	Realms                                     []RealmConfig
 	SOAPURL, SOAPUser, SOAPPassword            string
+	DeliveryDiagnosticCharacter                string
 	CookieSecure                               bool
 	TrustProxy                                 bool
 	Expansion                                  int
@@ -65,12 +72,21 @@ type Config struct {
 	TurnstileSiteKey, TurnstileSecret          string
 	SMTPAddr, SMTPUser, SMTPPassword           string
 	SMTPFrom                                   string
+	TOTPEncryptionKey                          []byte
 	DiscordWebhookURL                          string
+	DiscordClientID, DiscordClientSecret       string
+	DiscordGuildID                             string
+	DiscordRedirectURL                         string
+	DiscordBotRewardSecret                     string
+	GoogleClientID, GoogleClientSecret         string
+	GoogleRedirectURL                          string
 	VoteURL                                    string
 	VoteRewardCredits                          int
 	VoteCallbackSecret                         string
+	CompetitiveIngestSecret                    string
 	RequireEmailVerification                   bool
 	RealmStartWebhook, RealmControlToken       string
+	RealmAgentURL, RealmAgentToken             string
 	EnableRegistration, EnableArmory           bool
 	EnableRankings, EnableGuilds               bool
 	EnableRealmStatus, EnableShop              bool
@@ -79,8 +95,10 @@ type Config struct {
 	GMConsoleLevel                             int
 	GMConsoleAllowed                           []string
 	EnableSetup                                bool
+	AutoMigrate                                bool
 	SetupToken                                 string
 	SetupGMLevel, SetupGMRealmID               int
+	AuditRetentionDays, AuditIPRetentionDays   int
 }
 
 type NewsItem struct {
@@ -93,46 +111,50 @@ type NewsItem struct {
 // RealmConfig describes one AzerothCore realm served by this portal process.
 // Connection fields are never included in the public configuration response.
 type RealmConfig struct {
-	Key                  string `json:"key"`
-	Name                 string `json:"name"`
-	Address              string `json:"address"`
-	ExperienceRate       string `json:"experienceRate"`
-	RealmType            string `json:"type"`
-	Timezone             string `json:"timezone"`
-	Description          string `json:"description"`
-	SeasonName           string `json:"seasonName"`
-	QuestXPRate          string `json:"questXpRate"`
-	KillXPRate           string `json:"killXpRate"`
-	ExplorationXPRate    string `json:"explorationXpRate"`
-	DropRate             string `json:"dropRate"`
-	ReputationRate       string `json:"reputationRate"`
-	HonorRate            string `json:"honorRate"`
-	ProfessionRate       string `json:"professionRate"`
-	FactionPolicy        string `json:"factionPolicy"`
-	StartLevel           int    `json:"startLevel"`
-	MaxLevel             int    `json:"maxLevel"`
-	PopulationCap        int    `json:"populationCap"`
-	CrossFaction         *bool  `json:"crossFaction"`
-	CrossFactionAccounts *bool  `json:"crossFactionAccounts"`
-	CrossFactionCalendar *bool  `json:"crossFactionCalendar"`
-	CrossFactionChannels *bool  `json:"crossFactionChannels"`
-	CrossFactionGroups   *bool  `json:"crossFactionGroups"`
-	CrossFactionGuilds   *bool  `json:"crossFactionGuilds"`
-	CrossFactionAuctions *bool  `json:"crossFactionAuctions"`
-	CrossFactionMail     *bool  `json:"crossFactionMail"`
-	CrossFactionWho      *bool  `json:"crossFactionWho"`
-	CrossFactionFriends  *bool  `json:"crossFactionFriends"`
-	CrossFactionTrade    *bool  `json:"crossFactionTrade"`
-	CharactersDSN        string `json:"charactersDsn"`
-	WorldDSN             string `json:"worldDsn"`
-	CharactersDB         string `json:"charactersDb"`
-	WorldDB              string `json:"worldDb"`
-	SOAPURL              string `json:"soapUrl"`
-	SOAPUser             string `json:"soapUser"`
-	SOAPPassword         string `json:"soapPassword"`
-	StartWebhook         string `json:"startWebhook"`
-	ControlToken         string `json:"controlToken"`
-	ID                   int    `json:"id"`
+	Key                         string `json:"key"`
+	Name                        string `json:"name"`
+	Address                     string `json:"address"`
+	ExperienceRate              string `json:"experienceRate"`
+	RealmType                   string `json:"type"`
+	Timezone                    string `json:"timezone"`
+	Description                 string `json:"description"`
+	SeasonName                  string `json:"seasonName"`
+	QuestXPRate                 string `json:"questXpRate"`
+	KillXPRate                  string `json:"killXpRate"`
+	ExplorationXPRate           string `json:"explorationXpRate"`
+	DropRate                    string `json:"dropRate"`
+	ReputationRate              string `json:"reputationRate"`
+	HonorRate                   string `json:"honorRate"`
+	ProfessionRate              string `json:"professionRate"`
+	FactionPolicy               string `json:"factionPolicy"`
+	StartLevel                  int    `json:"startLevel"`
+	MaxLevel                    int    `json:"maxLevel"`
+	PopulationCap               int    `json:"populationCap"`
+	TransferSLAHours            int    `json:"transferSlaHours"`
+	CrossFaction                *bool  `json:"crossFaction"`
+	CrossFactionAccounts        *bool  `json:"crossFactionAccounts"`
+	CrossFactionCalendar        *bool  `json:"crossFactionCalendar"`
+	CrossFactionChannels        *bool  `json:"crossFactionChannels"`
+	CrossFactionGroups          *bool  `json:"crossFactionGroups"`
+	CrossFactionGuilds          *bool  `json:"crossFactionGuilds"`
+	CrossFactionAuctions        *bool  `json:"crossFactionAuctions"`
+	CrossFactionMail            *bool  `json:"crossFactionMail"`
+	CrossFactionWho             *bool  `json:"crossFactionWho"`
+	CrossFactionFriends         *bool  `json:"crossFactionFriends"`
+	CrossFactionTrade           *bool  `json:"crossFactionTrade"`
+	CharactersDSN               string `json:"charactersDsn"`
+	WorldDSN                    string `json:"worldDsn"`
+	CharactersDB                string `json:"charactersDb"`
+	WorldDB                     string `json:"worldDb"`
+	SOAPURL                     string `json:"soapUrl"`
+	SOAPUser                    string `json:"soapUser"`
+	SOAPPassword                string `json:"soapPassword"`
+	DeliveryDiagnosticCharacter string `json:"deliveryDiagnosticCharacter"`
+	StartWebhook                string `json:"startWebhook"`
+	ControlToken                string `json:"controlToken"`
+	AgentURL                    string `json:"agentUrl"`
+	AgentToken                  string `json:"agentToken"`
+	ID                          int    `json:"id"`
 }
 
 func (c Config) ForRealm(realm RealmConfig) Config {
@@ -183,6 +205,9 @@ func (c Config) ForRealm(realm RealmConfig) Config {
 	if realm.PopulationCap > 0 {
 		c.PopulationCap = realm.PopulationCap
 	}
+	if realm.TransferSLAHours > 0 {
+		c.TransferSLAHours = realm.TransferSLAHours
+	}
 	if realm.CrossFaction != nil {
 		c.CrossFaction = *realm.CrossFaction
 	}
@@ -200,7 +225,11 @@ func (c Config) ForRealm(realm RealmConfig) Config {
 	c.CharactersDSN, c.WorldDSN = realm.CharactersDSN, realm.WorldDSN
 	c.CharactersDB, c.WorldDB = realm.CharactersDB, realm.WorldDB
 	c.SOAPURL, c.SOAPUser, c.SOAPPassword = realm.SOAPURL, realm.SOAPUser, realm.SOAPPassword
+	if strings.TrimSpace(realm.DeliveryDiagnosticCharacter) != "" {
+		c.DeliveryDiagnosticCharacter = strings.TrimSpace(realm.DeliveryDiagnosticCharacter)
+	}
 	c.RealmStartWebhook, c.RealmControlToken = realm.StartWebhook, realm.ControlToken
+	c.RealmAgentURL, c.RealmAgentToken = realm.AgentURL, realm.AgentToken
 	return c
 }
 
@@ -213,17 +242,18 @@ func Load() (Config, error) {
 		AuthDB: env("AUTH_DB", "acore_auth"), CharactersDB: env("CHARACTERS_DB", "acore_characters"), WorldDB: env("WORLD_DB", "acore_world"),
 		PublicURL: env("PUBLIC_URL", "http://localhost:8080"), RealmName: env("REALM_NAME", "Azeroth"), RealmAddress: env("REALM_ADDRESS", "logon.example.com"), RealmKey: env("REALM_KEY", "default"),
 		PortalName: env("PORTAL_NAME", env("REALM_NAME", "Azeroth")), BrandMark: env("BRAND_MARK", "A"),
-		PortalTagline: env("PORTAL_TAGLINE", "A timeless realm, shaped by its community. Forge alliances, conquer raids, and write your story."),
+		PortalTagline: env("PORTAL_TAGLINE", "Wrath of the Lich King 3.3.5a with 2× leveling, live realm status, armory, rankings, and community events."),
 		HomeHeadline:  strings.TrimSpace(os.Getenv("HOME_HEADLINE")), HomeEyebrow: env("HOME_EYEBROW", "Realm status"),
 		HomePrimaryCTA: env("HOME_PRIMARY_CTA", "Create account"), HomeConnectTitle: env("HOME_CONNECT_TITLE", "Connect in three steps"),
 		HomeGuideText: env("HOME_GUIDE_TEXT", "Everything you need to join the server."), HomeRules: strings.TrimSpace(os.Getenv("HOME_RULES")),
 		DiscordStatus: strings.TrimSpace(os.Getenv("DISCORD_STATUS")), HomeChangelog: strings.TrimSpace(os.Getenv("HOME_CHANGELOG")),
+		HomeFeatures: strings.TrimSpace(os.Getenv("HOME_FEATURES")), HomeProgression: strings.TrimSpace(os.Getenv("HOME_PROGRESSION")),
 		ExpansionName: env("EXPANSION_NAME", "Wrath of the Lich King"), ClientVersion: env("CLIENT_VERSION", "3.3.5a"), ClientBuild: env("CLIENT_BUILD", "12340"),
 		ExperienceRate: env("EXPERIENCE_RATE", "2×"), UptimeLabel: env("UPTIME_LABEL", "24/7"),
-		RealmType: env("REALM_TYPE", "PvE"), RealmTimezone: env("REALM_TIMEZONE", "UTC"), RealmDescription: strings.TrimSpace(os.Getenv("REALM_DESCRIPTION")), SeasonName: strings.TrimSpace(os.Getenv("SEASON_NAME")),
+		RealmType: env("REALM_TYPE", "PvE"), RealmTimezone: env("REALM_TIMEZONE", "UTC"), RealmDescription: strings.TrimSpace(os.Getenv("REALM_DESCRIPTION")), SeasonName: strings.TrimSpace(os.Getenv("SEASON_NAME")), ArenaRewardPolicy: strings.TrimSpace(os.Getenv("ARENA_REWARD_POLICY")),
 		QuestExperienceRate: env("XP_QUEST_RATE", env("EXPERIENCE_RATE", "2×")), KillExperienceRate: env("XP_KILL_RATE", env("EXPERIENCE_RATE", "2×")), ExplorationExperienceRate: env("XP_EXPLORATION_RATE", env("EXPERIENCE_RATE", "2×")),
 		DropRate: env("DROP_RATE", "1×"), ReputationRate: env("REPUTATION_RATE", "1×"), HonorRate: env("HONOR_RATE", "1×"), ProfessionRate: env("PROFESSION_RATE", "1×"),
-		FactionPolicy: env("FACTION_POLICY", "both"), StartLevel: envInt("START_LEVEL", 1), MaxLevel: envInt("MAX_LEVEL", 80), PopulationCap: envInt("POPULATION_CAP", 0), CrossFaction: envBool("CROSS_FACTION", false),
+		FactionPolicy: env("FACTION_POLICY", "both"), StartLevel: envInt("START_LEVEL", 1), MaxLevel: envInt("MAX_LEVEL", 80), PopulationCap: envInt("POPULATION_CAP", 0), TransferSLAHours: envInt("TRANSFER_SLA_HOURS", 72), CrossFaction: envBool("CROSS_FACTION", false),
 		CrossFactionAccounts: envBool("CROSS_FACTION_ACCOUNTS", envBool("CROSS_FACTION", false)), CrossFactionCalendar: envBool("CROSS_FACTION_CALENDAR", envBool("CROSS_FACTION", false)),
 		CrossFactionChannels: envBool("CROSS_FACTION_CHANNELS", envBool("CROSS_FACTION", false)), CrossFactionGroups: envBool("CROSS_FACTION_GROUPS", envBool("CROSS_FACTION", false)),
 		CrossFactionGuilds: envBool("CROSS_FACTION_GUILDS", envBool("CROSS_FACTION", false)), CrossFactionAuctions: envBool("CROSS_FACTION_AUCTIONS", envBool("CROSS_FACTION", false)),
@@ -233,8 +263,9 @@ func Load() (Config, error) {
 		DownloadURL: strings.TrimSpace(os.Getenv("DOWNLOAD_URL")), CommunityURL: strings.TrimSpace(os.Getenv("COMMUNITY_URL")),
 		LogoURL: strings.TrimSpace(os.Getenv("LOGO_URL")), HeroImageURL: strings.TrimSpace(os.Getenv("HERO_IMAGE_URL")), FaviconURL: strings.TrimSpace(os.Getenv("FAVICON_URL")),
 		ThemePrimary: env("THEME_PRIMARY", "#d3ae68"), ThemeSecondary: env("THEME_SECONDARY", "#f3d89c"), ThemeAccent: env("THEME_ACCENT", "#3fd0be"), ThemeBackground: env("THEME_BACKGROUND", "#07110f"),
-		Locale: env("PORTAL_LOCALE", "en"), TermsURL: strings.TrimSpace(os.Getenv("TERMS_URL")), PrivacyURL: strings.TrimSpace(os.Getenv("PRIVACY_URL")),
-		SOAPURL: os.Getenv("SOAP_URL"), SOAPUser: os.Getenv("SOAP_USER"), SOAPPassword: os.Getenv("SOAP_PASSWORD"),
+		Locale: env("PORTAL_LOCALE", "en"), TermsURL: strings.TrimSpace(os.Getenv("TERMS_URL")), PrivacyURL: strings.TrimSpace(os.Getenv("PRIVACY_URL")), SecurityContactURL: strings.TrimSpace(os.Getenv("SECURITY_CONTACT_URL")),
+		AnalyticsScriptURL: strings.TrimSpace(os.Getenv("ANALYTICS_SCRIPT_URL")), AnalyticsDomain: strings.TrimSpace(os.Getenv("ANALYTICS_DOMAIN")),
+		SOAPURL: os.Getenv("SOAP_URL"), SOAPUser: os.Getenv("SOAP_USER"), SOAPPassword: os.Getenv("SOAP_PASSWORD"), DeliveryDiagnosticCharacter: strings.TrimSpace(os.Getenv("DELIVERY_DIAGNOSTIC_CHARACTER")),
 		CookieSecure: envBool("COOKIE_SECURE", false), TrustProxy: envBool("TRUST_PROXY", false), Expansion: envInt("ACCOUNT_EXPANSION", 2),
 		StartingCredits: envInt("STARTING_CREDITS", 0), AdminToken: os.Getenv("ADMIN_TOKEN"),
 		MockMode: envBool("MOCK_MODE", false),
@@ -244,11 +275,21 @@ func Load() (Config, error) {
 		TurnstileSiteKey: os.Getenv("TURNSTILE_SITE_KEY"), TurnstileSecret: os.Getenv("TURNSTILE_SECRET"),
 		SMTPAddr: os.Getenv("SMTP_ADDR"), SMTPUser: os.Getenv("SMTP_USER"), SMTPPassword: os.Getenv("SMTP_PASSWORD"), SMTPFrom: os.Getenv("SMTP_FROM"),
 		DiscordWebhookURL:        strings.TrimSpace(os.Getenv("DISCORD_WEBHOOK_URL")),
+		DiscordClientID:          strings.TrimSpace(os.Getenv("DISCORD_CLIENT_ID")),
+		DiscordClientSecret:      os.Getenv("DISCORD_CLIENT_SECRET"),
+		DiscordGuildID:           strings.TrimSpace(os.Getenv("DISCORD_GUILD_ID")),
+		DiscordRedirectURL:       strings.TrimSpace(os.Getenv("DISCORD_REDIRECT_URL")),
+		DiscordBotRewardSecret:   os.Getenv("DISCORD_BOT_REWARD_SECRET"),
+		GoogleClientID:           strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID")),
+		GoogleClientSecret:       os.Getenv("GOOGLE_CLIENT_SECRET"),
+		GoogleRedirectURL:        strings.TrimSpace(os.Getenv("GOOGLE_REDIRECT_URL")),
 		VoteURL:                  strings.TrimSpace(os.Getenv("VOTE_URL")),
 		VoteRewardCredits:        envInt("VOTE_REWARD_CREDITS", 0),
 		VoteCallbackSecret:       os.Getenv("VOTE_CALLBACK_SECRET"),
+		CompetitiveIngestSecret:  os.Getenv("COMPETITIVE_INGEST_SECRET"),
 		RequireEmailVerification: envBool("REQUIRE_EMAIL_VERIFICATION", false),
 		RealmStartWebhook:        os.Getenv("REALM_START_WEBHOOK"), RealmControlToken: os.Getenv("REALM_CONTROL_TOKEN"),
+		RealmAgentURL: strings.TrimRight(strings.TrimSpace(os.Getenv("REALM_AGENT_URL")), "/"), RealmAgentToken: os.Getenv("REALM_AGENT_TOKEN"),
 		EnableRegistration: envBool("ENABLE_REGISTRATION", true), EnableArmory: envBool("ENABLE_ARMORY", true),
 		EnableRankings: envBool("ENABLE_RANKINGS", true), EnableGuilds: envBool("ENABLE_GUILDS", true),
 		EnableRealmStatus: envBool("ENABLE_REALM_STATUS", true), EnableShop: envBool("ENABLE_SHOP", true),
@@ -256,7 +297,16 @@ func Load() (Config, error) {
 		EnableGMConsole: envBool("ENABLE_GM_CONSOLE", false), GMConsoleAllowAll: envBool("GM_CONSOLE_ALLOW_ALL", false),
 		GMConsoleLevel: envInt("GM_CONSOLE_LEVEL", 3),
 		EnableSetup:    envBool("ENABLE_SETUP", false), SetupToken: os.Getenv("SETUP_TOKEN"),
+		AutoMigrate:  envBool("AUTO_MIGRATE", true),
 		SetupGMLevel: envInt("SETUP_GM_LEVEL", 3), SetupGMRealmID: envInt("SETUP_GM_REALM_ID", -1),
+		AuditRetentionDays: envInt("AUDIT_RETENTION_DAYS", 365), AuditIPRetentionDays: envInt("AUDIT_IP_RETENTION_DAYS", 30),
+	}
+	if encoded := strings.TrimSpace(os.Getenv("TOTP_ENCRYPTION_KEY")); encoded != "" {
+		key, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(encoded, "="))
+		if err != nil || len(key) != 32 {
+			return c, fmt.Errorf("TOTP_ENCRYPTION_KEY must be a base64url-encoded 32-byte key")
+		}
+		c.TOTPEncryptionKey = key
 	}
 	c.SupportGMLevel = envInt("STAFF_SUPPORT_GM_LEVEL", c.GMLevel)
 	c.ModeratorGMLevel = envInt("STAFF_MODERATOR_GM_LEVEL", c.GMLevel)
@@ -302,14 +352,17 @@ func Load() (Config, error) {
 	if c.SetupGMLevel < 1 || c.SetupGMLevel > 3 || c.SetupGMRealmID < -1 {
 		return c, fmt.Errorf("invalid setup GM level or realm ID")
 	}
+	if c.AuditRetentionDays < 30 || c.AuditIPRetentionDays < 1 || c.AuditIPRetentionDays > c.AuditRetentionDays {
+		return c, fmt.Errorf("AUDIT_RETENTION_DAYS must be at least 30 and AUDIT_IP_RETENTION_DAYS must be within that retention period")
+	}
 	if c.GMConsoleLevel < 1 || c.GMConsoleLevel > 3 {
 		return c, fmt.Errorf("GM_CONSOLE_LEVEL must be between 1 and 3")
 	}
 	if c.SupportGMLevel < 1 || c.ModeratorGMLevel < c.SupportGMLevel || c.GMLevel < c.ModeratorGMLevel || c.GMLevel > 3 {
 		return c, fmt.Errorf("staff GM levels must satisfy support <= moderator <= administrator <= 3")
 	}
-	if c.StartLevel < 1 || c.StartLevel > 80 || c.MaxLevel < c.StartLevel || c.MaxLevel > 80 || c.PopulationCap < 0 {
-		return c, fmt.Errorf("START_LEVEL, MAX_LEVEL, or POPULATION_CAP is invalid")
+	if c.StartLevel < 1 || c.StartLevel > 80 || c.MaxLevel < c.StartLevel || c.MaxLevel > 80 || c.PopulationCap < 0 || c.TransferSLAHours < 1 || c.TransferSLAHours > 8760 {
+		return c, fmt.Errorf("START_LEVEL, MAX_LEVEL, POPULATION_CAP, or TRANSFER_SLA_HOURS is invalid")
 	}
 	if c.EnableRegistration && c.RequireEmailVerification && !c.MockMode {
 		if _, _, err := net.SplitHostPort(c.SMTPAddr); err != nil {
@@ -326,8 +379,56 @@ func Load() (Config, error) {
 			return c, fmt.Errorf("DISCORD_WEBHOOK_URL must be an HTTPS Discord webhook URL")
 		}
 	}
+	if (c.AnalyticsScriptURL == "") != (c.AnalyticsDomain == "") {
+		return c, fmt.Errorf("ANALYTICS_SCRIPT_URL and ANALYTICS_DOMAIN must be configured together")
+	}
+	if c.AnalyticsScriptURL != "" {
+		analyticsURL, analyticsErr := url.ParseRequestURI(c.AnalyticsScriptURL)
+		if analyticsErr != nil || analyticsURL.Scheme != "https" || analyticsURL.Host == "" || analyticsURL.User != nil || analyticsURL.Fragment != "" || len(c.AnalyticsDomain) > 255 || strings.ContainsAny(c.AnalyticsDomain, "\r\n\t ") {
+			return c, fmt.Errorf("analytics configuration must use an HTTPS script URL and a valid site domain")
+		}
+	}
+	if (c.DiscordClientID == "") != (c.DiscordClientSecret == "") {
+		return c, fmt.Errorf("DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET must be configured together")
+	}
+	if c.DiscordClientID != "" {
+		if c.DiscordRedirectURL == "" {
+			c.DiscordRedirectURL = strings.TrimRight(c.PublicURL, "/") + "/api/auth/discord/callback"
+		}
+		redirect, redirectErr := url.ParseRequestURI(c.DiscordRedirectURL)
+		public, _ := url.Parse(c.PublicURL)
+		if redirectErr != nil || redirect.Scheme != public.Scheme || redirect.Host != public.Host || redirect.Path != "/api/auth/discord/callback" || redirect.RawQuery != "" || redirect.Fragment != "" {
+			return c, fmt.Errorf("DISCORD_REDIRECT_URL must exactly target /api/auth/discord/callback on PUBLIC_URL")
+		}
+	}
+	if (c.GoogleClientID == "") != (c.GoogleClientSecret == "") {
+		return c, fmt.Errorf("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured together")
+	}
+	if c.GoogleClientID != "" {
+		if c.GoogleRedirectURL == "" {
+			c.GoogleRedirectURL = strings.TrimRight(c.PublicURL, "/") + "/api/auth/google/callback"
+		}
+		redirect, redirectErr := url.ParseRequestURI(c.GoogleRedirectURL)
+		public, _ := url.Parse(c.PublicURL)
+		if redirectErr != nil || redirect.Scheme != public.Scheme || redirect.Host != public.Host || redirect.Path != "/api/auth/google/callback" || redirect.RawQuery != "" || redirect.Fragment != "" {
+			return c, fmt.Errorf("GOOGLE_REDIRECT_URL must exactly target /api/auth/google/callback on PUBLIC_URL")
+		}
+	}
 	if !validPublicURL(c.VoteURL, true) || c.VoteRewardCredits < 0 || c.VoteRewardCredits > 100000 {
 		return c, fmt.Errorf("VOTE_URL or VOTE_REWARD_CREDITS is invalid")
+	}
+	if c.CompetitiveIngestSecret != "" && (len(c.CompetitiveIngestSecret) < 16 || len(c.CompetitiveIngestSecret) > 256) {
+		return c, fmt.Errorf("COMPETITIVE_INGEST_SECRET must contain 16–256 characters when configured")
+	}
+	if c.RealmAgentURL != "" {
+		agentURL, err := url.ParseRequestURI(c.RealmAgentURL)
+		localhost := err == nil && (agentURL.Hostname() == "localhost" || agentURL.Hostname() == "127.0.0.1" || agentURL.Hostname() == "::1")
+		if err != nil || agentURL.Host == "" || (agentURL.Scheme != "https" && !(agentURL.Scheme == "http" && localhost)) {
+			return c, fmt.Errorf("REALM_AGENT_URL must use HTTPS, except for a loopback development agent")
+		}
+		if len(c.RealmAgentToken) < 32 || len(c.RealmAgentToken) > 512 {
+			return c, fmt.Errorf("REALM_AGENT_TOKEN must contain 32–512 characters when REALM_AGENT_URL is configured")
+		}
 	}
 	for _, prefix := range strings.Split(env("GM_CONSOLE_ALLOWED_PREFIXES", "help,server info,server motd,account online list,lookup,player info"), ",") {
 		prefix = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(prefix, ".")))

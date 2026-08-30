@@ -29,7 +29,7 @@ func loadCustomization(c *Config) error {
 	}
 	for name, value := range map[string]string{
 		"DOWNLOAD_URL": c.DownloadURL, "COMMUNITY_URL": c.CommunityURL,
-		"TERMS_URL": c.TermsURL, "PRIVACY_URL": c.PrivacyURL,
+		"TERMS_URL": c.TermsURL, "PRIVACY_URL": c.PrivacyURL, "SECURITY_CONTACT_URL": c.SecurityContactURL,
 	} {
 		if !validPublicURL(value, true) {
 			return fmt.Errorf("%s must be empty, root-relative, or an absolute HTTP(S) URL", name)
@@ -68,7 +68,7 @@ func loadCustomization(c *Config) error {
 	if !textKey.MatchString(c.RealmKey) {
 		return fmt.Errorf("REALM_KEY must contain lowercase letters, numbers, dots, underscores, or hyphens")
 	}
-	c.Realms = []RealmConfig{{Key: c.RealmKey, Name: c.RealmName, Address: c.RealmAddress, ExperienceRate: c.ExperienceRate, ID: c.RealmID, CharactersDSN: c.CharactersDSN, WorldDSN: c.WorldDSN, CharactersDB: c.CharactersDB, WorldDB: c.WorldDB, SOAPURL: c.SOAPURL, SOAPUser: c.SOAPUser, SOAPPassword: c.SOAPPassword, StartWebhook: c.RealmStartWebhook, ControlToken: c.RealmControlToken}}
+	c.Realms = []RealmConfig{{Key: c.RealmKey, Name: c.RealmName, Address: c.RealmAddress, ExperienceRate: c.ExperienceRate, ID: c.RealmID, CharactersDSN: c.CharactersDSN, WorldDSN: c.WorldDSN, CharactersDB: c.CharactersDB, WorldDB: c.WorldDB, SOAPURL: c.SOAPURL, SOAPUser: c.SOAPUser, SOAPPassword: c.SOAPPassword, StartWebhook: c.RealmStartWebhook, ControlToken: c.RealmControlToken, AgentURL: c.RealmAgentURL, AgentToken: c.RealmAgentToken}}
 	if raw := strings.TrimSpace(os.Getenv("REALMS_JSON")); raw != "" {
 		if len(raw) > 32*1024 || json.Unmarshal([]byte(raw), &c.Realms) != nil || len(c.Realms) == 0 || len(c.Realms) > 20 {
 			return fmt.Errorf("REALMS_JSON must be an array of 1–20 realms smaller than 32 KiB")
@@ -102,6 +102,17 @@ func loadCustomization(c *Config) error {
 			}
 			if realm.StartWebhook == "" {
 				realm.StartWebhook, realm.ControlToken = c.RealmStartWebhook, c.RealmControlToken
+			}
+			if realm.AgentURL == "" {
+				realm.AgentURL, realm.AgentToken = c.RealmAgentURL, c.RealmAgentToken
+			}
+			realm.AgentURL = strings.TrimRight(strings.TrimSpace(realm.AgentURL), "/")
+			if realm.AgentURL != "" {
+				agentURL, err := url.ParseRequestURI(realm.AgentURL)
+				localhost := err == nil && (agentURL.Hostname() == "localhost" || agentURL.Hostname() == "127.0.0.1" || agentURL.Hostname() == "::1")
+				if err != nil || agentURL.Host == "" || (agentURL.Scheme != "https" && !(agentURL.Scheme == "http" && localhost)) || len(realm.AgentToken) < 32 || len(realm.AgentToken) > 512 {
+					return fmt.Errorf("REALMS_JSON contains an invalid realm configuration agent")
+				}
 			}
 			if !identifier.MatchString(realm.CharactersDB) || !identifier.MatchString(realm.WorldDB) || !textKey.MatchString(realm.Key) || strings.TrimSpace(realm.Name) == "" || len(realm.Name) > 80 || realm.ID < 1 || seen[realm.Key] || seenIDs[realm.ID] {
 				return fmt.Errorf("REALMS_JSON contains an invalid or duplicate realm")

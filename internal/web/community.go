@@ -19,8 +19,11 @@ func (s *Server) realmOverview(w http.ResponseWriter, r *http.Request) {
 	cq := fmt.Sprintf(`SELECT COUNT(*),COALESCE(SUM(online),0),COALESCE(SUM(CASE WHEN race IN (1,3,4,7,11) THEN online ELSE 0 END),0),COALESCE(SUM(CASE WHEN race IN (2,5,6,8,10) THEN online ELSE 0 END),0) FROM %s.characters WHERE deleteDate IS NULL`, s.c.CharactersDB)
 	_ = s.s.Characters.QueryRowContext(r.Context(), cq).Scan(&total, &online, &alliance, &horde)
 	var uptime, maxPlayers uint64
-	uq := fmt.Sprintf("SELECT uptime,maxplayers FROM `%s`.uptime WHERE realmid=? ORDER BY starttime DESC LIMIT 1", s.c.AuthDB)
+	uq := fmt.Sprintf("SELECT GREATEST(uptime,IF(starttime+uptime>=UNIX_TIMESTAMP()-900,UNIX_TIMESTAMP()-starttime,uptime)),maxplayers FROM `%s`.uptime WHERE realmid=? ORDER BY starttime DESC LIMIT 1", s.c.AuthDB)
 	_ = s.s.Auth.QueryRowContext(r.Context(), uq, s.c.RealmID).Scan(&uptime, &maxPlayers)
+	if maxPlayers < uint64(online) {
+		maxPlayers = uint64(online)
+	}
 	jsonOut(w, 200, map[string]any{"name": info.Name, "address": info.Address, "port": info.Port, "population": info.Population, "characters": total, "online": online, "allianceOnline": alliance, "hordeOnline": horde, "uptime": uptime, "recordOnline": maxPlayers})
 }
 
@@ -33,11 +36,12 @@ func (s *Server) guildList(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 	type guild struct {
-		ID           uint32 `json:"id"`
-		Name, Leader string
-		Members      uint32
-		AverageLevel float64
-		Online       uint32
+		ID           uint32  `json:"id"`
+		Name         string  `json:"name"`
+		Leader       string  `json:"leader"`
+		Members      uint32  `json:"members"`
+		AverageLevel float64 `json:"averageLevel"`
+		Online       uint32  `json:"online"`
 	}
 	out := []guild{}
 	for rows.Next() {

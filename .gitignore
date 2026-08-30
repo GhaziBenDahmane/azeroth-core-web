@@ -3,3 +3,4 @@ dist/
 .astro/
 portal
 .env
+test-results/

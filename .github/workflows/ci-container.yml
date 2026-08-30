@@ -12,6 +12,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  database-matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [mysql:8.0, mariadb:10.11]
+    runs-on: ubuntu-latest
+    services:
+      database:
+        image: ${{ matrix.database }}
+        env:
+          MYSQL_ROOT_PASSWORD: portal-test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pportal-test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test numbered migrations on ${{ matrix.database }}
+        env:
+          PORTAL_TEST_MYSQL_DSN: root:portal-test@tcp(127.0.0.1:3306)/
+        # Both packages exercise the same database service with destructive,
+        # clean-schema fixtures. Keep package execution serial so migrations do
+        # not contend for DDL locks and produce false timeout failures.
+        run: go test -p 1 -run 'Test(MigrationMatrix|ArmoryMetadataMatrix|StripeWebhookLedgerMatrix|ForcedPasswordResetMatrix|EventRewardMatrix|VoteCallbackMatrix)' -v ./internal/store ./internal/web
+
   test:
     runs-on: ubuntu-latest
     permissions:
@@ -28,14 +60,51 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run build
+      - run: npm run test:api-contract
+      - run: npm run test:db-grants
+      - run: npm run test:frontend-security
       - run: npm audit --omit=dev --audit-level=high
       - run: go test -race ./...
       - run: go vet ./...
+      - name: Browser journeys and accessibility audit
+        run: |
+          docker run --detach --rm --name portal-headless --add-host=host.docker.internal:host-gateway -p 9222:9222 chromedp/headless-shell:stable
+          PORTAL_ADDR=:8787 MOCK_MODE=true PUBLIC_URL=http://host.docker.internal:8787 ENABLE_GM_CONSOLE=true go run . > /tmp/portal-browser.log 2>&1 &
+          portal_pid=$!
+          cleanup() {
+            kill "$portal_pid" 2>/dev/null || true
+            docker stop portal-headless >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8787/readyz >/dev/null && curl --fail --silent http://127.0.0.1:9222/json/version >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          STRICT_CONTRAST=1 npm run test:browser
+      - name: Compare approved visual baselines
+        run: npm run test:visual
+      - name: Upload browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-audit-screenshots
+          path: test-results/browser
+          if-no-files-found: ignore
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+      - name: Scan source, dependencies, licenses, and secrets
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln,secret,license
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
 
   publish:
     if: github.event_name != 'pull_request'
-    needs: test
+    needs: [test, database-matrix]
     runs-on: ubuntu-latest
     permissions:
       contents: read
