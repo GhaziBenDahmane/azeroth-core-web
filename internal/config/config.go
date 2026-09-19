@@ -24,6 +24,7 @@ type Config struct {
 	HomeGuideText, HomeRules                   string
 	DiscordStatus, HomeChangelog               string
 	HomeFeatures, HomeProgression              string
+	HomeEvents, HomeStats                      string
 	ExpansionName, ClientVersion               string
 	ClientBuild, ExperienceRate                string
 	RealmType, RealmTimezone                   string
@@ -240,14 +241,15 @@ func Load() (Config, error) {
 		Addr:    env("PORTAL_ADDR", ":8080"),
 		AuthDSN: os.Getenv("AUTH_DSN"), CharactersDSN: os.Getenv("CHARACTERS_DSN"), WorldDSN: os.Getenv("WORLD_DSN"),
 		AuthDB: env("AUTH_DB", "acore_auth"), CharactersDB: env("CHARACTERS_DB", "acore_characters"), WorldDB: env("WORLD_DB", "acore_world"),
-		PublicURL: env("PUBLIC_URL", "http://localhost:8080"), RealmName: env("REALM_NAME", "Azeroth"), RealmAddress: env("REALM_ADDRESS", "logon.example.com"), RealmKey: env("REALM_KEY", "default"),
-		PortalName: env("PORTAL_NAME", env("REALM_NAME", "Azeroth")), BrandMark: env("BRAND_MARK", "A"),
-		PortalTagline: env("PORTAL_TAGLINE", "Wrath of the Lich King 3.3.5a with 2× leveling, live realm status, armory, rankings, and community events."),
+		PublicURL: env("PUBLIC_URL", "http://localhost:8080"), RealmName: env("REALM_NAME", "Valenoza"), RealmAddress: env("REALM_ADDRESS", "logon.valenoza.com"), RealmKey: env("REALM_KEY", "default"),
+		PortalName: env("PORTAL_NAME", env("REALM_NAME", "Valenoza")), BrandMark: env("BRAND_MARK", "V"),
+		PortalTagline: env("PORTAL_TAGLINE", "A Wrath of the Lich King realm built with the community, for the community. Forge your legend across Northrend."),
 		HomeHeadline:  strings.TrimSpace(os.Getenv("HOME_HEADLINE")), HomeEyebrow: env("HOME_EYEBROW", "Realm status"),
 		HomePrimaryCTA: env("HOME_PRIMARY_CTA", "Create account"), HomeConnectTitle: env("HOME_CONNECT_TITLE", "Connect in three steps"),
 		HomeGuideText: env("HOME_GUIDE_TEXT", "Everything you need to join the server."), HomeRules: strings.TrimSpace(os.Getenv("HOME_RULES")),
 		DiscordStatus: strings.TrimSpace(os.Getenv("DISCORD_STATUS")), HomeChangelog: strings.TrimSpace(os.Getenv("HOME_CHANGELOG")),
 		HomeFeatures: strings.TrimSpace(os.Getenv("HOME_FEATURES")), HomeProgression: strings.TrimSpace(os.Getenv("HOME_PROGRESSION")),
+		HomeEvents: strings.TrimSpace(os.Getenv("HOME_EVENTS")), HomeStats: strings.TrimSpace(os.Getenv("HOME_STATS")),
 		ExpansionName: env("EXPANSION_NAME", "Wrath of the Lich King"), ClientVersion: env("CLIENT_VERSION", "3.3.5a"), ClientBuild: env("CLIENT_BUILD", "12340"),
 		ExperienceRate: env("EXPERIENCE_RATE", "2×"), UptimeLabel: env("UPTIME_LABEL", "24/7"),
 		RealmType: env("REALM_TYPE", "PvE"), RealmTimezone: env("REALM_TIMEZONE", "UTC"), RealmDescription: strings.TrimSpace(os.Getenv("REALM_DESCRIPTION")), SeasonName: strings.TrimSpace(os.Getenv("SEASON_NAME")), ArenaRewardPolicy: strings.TrimSpace(os.Getenv("ARENA_REWARD_POLICY")),
@@ -259,10 +261,10 @@ func Load() (Config, error) {
 		CrossFactionGuilds: envBool("CROSS_FACTION_GUILDS", envBool("CROSS_FACTION", false)), CrossFactionAuctions: envBool("CROSS_FACTION_AUCTIONS", envBool("CROSS_FACTION", false)),
 		CrossFactionMail: envBool("CROSS_FACTION_MAIL", envBool("CROSS_FACTION", false)), CrossFactionWho: envBool("CROSS_FACTION_WHO", envBool("CROSS_FACTION", false)),
 		CrossFactionFriends: envBool("CROSS_FACTION_FRIENDS", envBool("CROSS_FACTION", false)), CrossFactionTrade: envBool("CROSS_FACTION_TRADE", envBool("CROSS_FACTION", false)),
-		FooterText:  env("FOOTER_TEXT", "Independent community realm portal. Not affiliated with Blizzard Entertainment."),
+		FooterText:  env("FOOTER_TEXT", "Valenoza is an independent community realm. Not affiliated with or endorsed by Blizzard Entertainment."),
 		DownloadURL: strings.TrimSpace(os.Getenv("DOWNLOAD_URL")), CommunityURL: strings.TrimSpace(os.Getenv("COMMUNITY_URL")),
 		LogoURL: strings.TrimSpace(os.Getenv("LOGO_URL")), HeroImageURL: strings.TrimSpace(os.Getenv("HERO_IMAGE_URL")), FaviconURL: strings.TrimSpace(os.Getenv("FAVICON_URL")),
-		ThemePrimary: env("THEME_PRIMARY", "#d3ae68"), ThemeSecondary: env("THEME_SECONDARY", "#f3d89c"), ThemeAccent: env("THEME_ACCENT", "#3fd0be"), ThemeBackground: env("THEME_BACKGROUND", "#07110f"),
+		ThemePrimary: env("THEME_PRIMARY", "#22d3ee"), ThemeSecondary: env("THEME_SECONDARY", "#67e8f9"), ThemeAccent: env("THEME_ACCENT", "#a855f7"), ThemeBackground: env("THEME_BACKGROUND", "#07080d"),
 		Locale: env("PORTAL_LOCALE", "en"), TermsURL: strings.TrimSpace(os.Getenv("TERMS_URL")), PrivacyURL: strings.TrimSpace(os.Getenv("PRIVACY_URL")), SecurityContactURL: strings.TrimSpace(os.Getenv("SECURITY_CONTACT_URL")),
 		AnalyticsScriptURL: strings.TrimSpace(os.Getenv("ANALYTICS_SCRIPT_URL")), AnalyticsDomain: strings.TrimSpace(os.Getenv("ANALYTICS_DOMAIN")),
 		SOAPURL: os.Getenv("SOAP_URL"), SOAPUser: os.Getenv("SOAP_USER"), SOAPPassword: os.Getenv("SOAP_PASSWORD"), DeliveryDiagnosticCharacter: strings.TrimSpace(os.Getenv("DELIVERY_DIAGNOSTIC_CHARACTER")),

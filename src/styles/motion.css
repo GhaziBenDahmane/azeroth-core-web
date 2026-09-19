@@ -1,0 +1,304 @@
+/* ==========================================================================
+   Motion layer
+   Scroll-triggered reveals, counters, marquee, parallax.
+   Everything inside `.js` gates so the page is fully readable without JS,
+   and every effect is disabled under prefers-reduced-motion.
+   ========================================================================== */
+
+.js [data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0);
+  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+.js [data-reveal="left"] {
+  transform: translate3d(-28px, 0, 0);
+}
+.js [data-reveal="right"] {
+  transform: translate3d(28px, 0, 0);
+}
+.js [data-reveal="scale"] {
+  transform: scale(0.96);
+}
+.js [data-reveal].is-revealed {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+/* Hero entrance: children rise in sequence once the page is ready. */
+.js [data-hero-item] {
+  opacity: 0;
+  transform: translate3d(0, 26px, 0);
+  transition: opacity 0.9s var(--ease), transform 0.9s var(--ease);
+  transition-delay: var(--hero-delay, 0ms);
+}
+.js.hero-ready [data-hero-item] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Slow drift on the hero plate so a still image feels alive. */
+@keyframes hero-drift {
+  from {
+    transform: scale(1.06) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.14) translate3d(-1.5%, -2%, 0);
+  }
+}
+.js .hero-art.is-animated {
+  animation: hero-drift 34s var(--ease) infinite alternate;
+}
+
+/* Pointer parallax: JS writes --px / --py in the range -1..1. */
+.js [data-parallax] {
+  transform: translate3d(calc(var(--px, 0) * var(--parallax-x, 14px)), calc(var(--py, 0) * var(--parallax-y, 10px)), 0);
+  transition: transform 0.5s var(--ease);
+}
+
+/* Marquee: duplicated track, seam-free, pauses on hover. */
+.marquee {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  border-block: var(--bw) solid var(--line);
+  background: var(--surface-1);
+  mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+}
+.marquee-track {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--s-8);
+  padding-block: var(--s-5);
+  padding-right: var(--s-8);
+  white-space: nowrap;
+}
+.js .marquee-track {
+  animation: marquee-scroll var(--marquee-duration, 46s) linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@keyframes marquee-scroll {
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+.marquee-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 1.6vw, 1.3rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.marquee-item::after {
+  content: "◆";
+  color: var(--accent-line);
+  font-size: 0.6em;
+}
+
+/* Timeline (progression roadmap): a single rail with state dots. */
+.timeline {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(200px, 1fr);
+  gap: 0;
+  overflow-x: auto;
+  padding-bottom: var(--s-3);
+  scrollbar-width: thin;
+}
+.timeline-step {
+  position: relative;
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-6) var(--s-5) 0 0;
+  border-top: 2px solid var(--line);
+}
+.timeline-step::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--bg);
+}
+.timeline-step.is-complete {
+  border-top-color: color-mix(in srgb, var(--success) 55%, transparent);
+}
+.timeline-step.is-complete::before {
+  border-color: var(--success);
+  background: var(--success);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--success) 60%, transparent);
+}
+.timeline-step.is-live {
+  border-top-color: var(--accent);
+}
+.timeline-step.is-live::before {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 16px var(--accent);
+  animation: pulse-dot 2.4s var(--ease) infinite;
+}
+.timeline-step.is-next::before {
+  border-color: var(--warn);
+}
+@keyframes pulse-dot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+.timeline-step h3 {
+  font-size: var(--t-h4);
+}
+.timeline-step p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+.timeline-step .timeline-state {
+  color: var(--faint);
+  font-size: var(--t-nano);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.timeline-step.is-complete .timeline-state {
+  color: var(--success);
+}
+.timeline-step.is-live .timeline-state {
+  color: var(--accent);
+}
+.timeline-step.is-next .timeline-state {
+  color: var(--warn);
+}
+
+/* Editorial list: hairline-separated rows, not cards. */
+.editorial-list {
+  display: grid;
+  border-top: var(--bw) solid var(--line);
+}
+.editorial-item {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr) auto;
+  gap: var(--s-5);
+  align-items: baseline;
+  padding-block: var(--s-5);
+  border-bottom: var(--bw) solid var(--line);
+  transition: background var(--dur-2) var(--ease), padding var(--dur-2) var(--ease);
+}
+.editorial-item:hover {
+  background: linear-gradient(90deg, var(--accent-soft), transparent 60%);
+}
+.editorial-item h3 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--t-h3);
+}
+.editorial-item p {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+.editorial-item time,
+.editorial-item .editorial-meta {
+  color: var(--accent);
+  font-size: var(--t-nano);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.editorial-item .editorial-end {
+  text-align: right;
+}
+@media (max-width: 860px) {
+  .editorial-item {
+    grid-template-columns: 1fr;
+    gap: var(--s-2);
+  }
+  .editorial-item .editorial-end {
+    text-align: left;
+  }
+}
+
+/* Feature storytelling: numbered rows with a rule, no boxes. */
+.feature-rows {
+  display: grid;
+  border-top: var(--bw) solid var(--line);
+}
+.feature-row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1.05fr) minmax(0, 1.4fr);
+  gap: var(--s-5);
+  align-items: start;
+  padding-block: var(--s-6);
+  border-bottom: var(--bw) solid var(--line);
+}
+.feature-row .feature-index {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 2.4vw, 2.2rem);
+  color: var(--accent-line);
+  line-height: 1;
+}
+.feature-row h3 {
+  margin: 0;
+  font-size: var(--t-h2);
+  letter-spacing: var(--tracking-display);
+}
+.feature-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--t-body);
+}
+@media (max-width: 860px) {
+  .feature-row {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+  .feature-row p {
+    grid-column: 2;
+  }
+}
+
+/* Step rail for "how to connect". */
+.step-rail {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-6);
+  counter-reset: step;
+}
+.step-rail > article {
+  display: grid;
+  gap: var(--s-3);
+  align-content: start;
+  padding-top: var(--s-5);
+  border-top: 2px solid var(--line);
+}
+.step-rail > article:hover {
+  border-top-color: var(--accent-line);
+}
+.step-rail h3 {
+  margin: 0;
+  font-size: var(--t-h3);
+}
+.step-rail p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+@media (max-width: 860px) {
+  .step-rail {
+    grid-template-columns: 1fr;
+    gap: var(--s-5);
+  }
+}

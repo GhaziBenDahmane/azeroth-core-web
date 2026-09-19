@@ -12,11 +12,15 @@
     "test:frontend-security": "node scripts/frontend-security.mjs",
     "test:browser": "node scripts/browser-audit.mjs",
     "test:visual": "node scripts/visual-diff.mjs",
-    "test:visual:approve": "node scripts/visual-diff.mjs --approve"
+    "test:visual:approve": "node scripts/visual-diff.mjs --approve",
+    "test:integration": "node tools/integration-check.mjs"
   },
   "dependencies": {
     "astro": "7.2.9",
     "sass": "^1.103.1",
     "webcoreui": "^1.5.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.56.0"
   }
 }

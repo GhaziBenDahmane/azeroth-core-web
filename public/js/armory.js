@@ -1,4 +1,5 @@
 import {esc, qs, qsa} from "/js/ui.js";
+import {mountCharacterModel} from "/js/model-viewer.js";
 
 export function mountArmory(context) {
 	const { api, toast, classes, races, slots, qualityNames, statNames, iconBase, localItemIcon, useLocalItemFallback, initial } = context;
@@ -18,82 +19,22 @@ export function mountArmory(context) {
 	function itemIcon(item) {
 		return item.icon ? iconBase + item.icon + ".jpg" : fallbackIcon;
 	}
-	let jqueryLoader, wowheadLoader;
-	function loadJQuery() {
-		if (window.jQuery) return Promise.resolve(window.jQuery);
-		if (jqueryLoader) return jqueryLoader;
-		jqueryLoader = new Promise((resolve, reject) => {
-			const script = document.createElement("script");
-			script.src = "https://code.jquery.com/jquery-3.7.1.min.js";
-			script.integrity = "sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=";
-			script.crossOrigin = "anonymous";
-			script.async = true;
-			script.onload = () =>
-				window.jQuery
-					? resolve(window.jQuery)
-					: reject(new Error("jQuery API unavailable"));
-			script.onerror = () => reject(new Error("jQuery CDN unavailable"));
-			document.head.append(script);
-		});
-		return jqueryLoader;
-	}
-	function loadWowhead() {
-		if (window.ZamModelViewer) return Promise.resolve(window.ZamModelViewer);
-		if (wowheadLoader) return wowheadLoader;
-		wowheadLoader = loadJQuery().then(
-			() =>
-				new Promise((resolve, reject) => {
-					const script = document.createElement("script");
-					script.src =
-						"https://wow.zamimg.com/modelviewer/live/viewer/viewer.min.js";
-					script.async = true;
-					script.onload = () =>
-						window.ZamModelViewer
-							? resolve(window.ZamModelViewer)
-							: reject(new Error("Viewer API unavailable"));
-					script.onerror = () => reject(new Error("Wowhead CDN unavailable"));
-					document.head.append(script);
-				}),
-		);
-		return wowheadLoader;
-	}
 	async function mountWowheadModel(container, c, equipment) {
 		const stage = qs(".wowhead-model", container),
 			status = qs(".model-provider", container);
-		try {
-			const Viewer = await loadWowhead();
-			const display = (characterDisplays[c.race] || characterDisplays[1])[
-				c.gender === 1 ? 1 : 0
-			];
-			const model = {
-				id: display,
-				type: 8,
-				items: equipment
-					.filter((i) => i.displayId)
-					.map((i) => [Number(i.slot) + 1, Number(i.displayId)]),
-			};
-			const options = {
-				type: 1,
-				contentPath: "https://wow.zamimg.com/modelviewer/live/",
-				container: stage,
-				aspect: 0.72,
-				hd: true,
-				models: [model],
-			};
-			let viewer;
-			try {
-				viewer = new Viewer(options);
-			} catch {
-				viewer = new Viewer({ ...options, models: model });
-			}
-			await Promise.resolve(viewer);
+		const mounted = await mountCharacterModel(stage, c, equipment);
+		if (mounted) {
 			stage.classList.add("ready");
-			status.textContent = "Interactive 3D · Wowhead model viewer";
-		} catch (error) {
-			status.textContent = "Wowhead model viewer failed to initialize";
-			stage.innerHTML =
-				'<p class="model-error">Unable to load the 3D model.</p>';
+			status.textContent = "Interactive 3D";
+			return;
 		}
+		// Honest failure: label the fallback instead of leaving a spinner up.
+		stage.classList.add("ready");
+		status.textContent = "2D paper-doll";
+		const note = document.createElement("p");
+		note.className = "model-error";
+		note.textContent = "3D preview unavailable — showing the full equipment paper-doll.";
+		stage.replaceChildren(note);
 	}
 	async function resolveIcon(img, item) {
 		if (item.icon) return;

@@ -511,6 +511,8 @@ func (s *Server) mockHandler() http.Handler {
 	m.HandleFunc("GET /healthz", s.health)
 	m.HandleFunc("GET /readyz", s.ready)
 	m.HandleFunc("GET /metrics", s.prometheusMetrics)
+	// Self-hosted model viewer: the CDN rejects cross-origin requests.
+	m.Handle("/modelviewer/", modelViewerProxy())
 	m.Handle("/", spaHandler(s.static))
 	return m
 }

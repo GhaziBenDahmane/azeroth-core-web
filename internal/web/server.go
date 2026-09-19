@@ -338,6 +338,8 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("DELETE /api/privacy/requests/{id}", s.privacyRequestCancel)
 	m.HandleFunc("GET /api/admin/privacy-requests", s.feature(s.c.EnableAdminPanel, "Administration", s.adminPrivacyRequests))
 	m.HandleFunc("POST /api/admin/privacy-requests/{id}", s.feature(s.c.EnableAdminPanel, "Administration", s.adminPrivacyRequestUpdate))
+	// Self-hosted model viewer: the CDN rejects cross-origin requests.
+	m.Handle("/modelviewer/", modelViewerProxy())
 	m.Handle("/", spaHandler(s.static))
 	return s.middleware(m)
 }

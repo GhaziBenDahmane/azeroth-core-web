@@ -1,0 +1,662 @@
+/* ==========================================================================
+   Bridge layer
+
+   This portal's page components (`public/js/*`) still render their own markup,
+   so this file maps that component vocabulary onto the new design tokens:
+   it aliases the legacy variable names, replaces the hard-coded blue palette
+   with the token palette, and restyles the shared primitives (buttons, fields,
+   surfaces, tables, tabs) to match `components.css`.
+
+   Load order is: modern.css + enhancements.css (structure) → tokens.css →
+   components.css → shell.css → motion.css → this file. Nothing here invents
+   new colours; every value comes from tokens.css.
+   ========================================================================== */
+
+/* ---- 1. legacy token aliases --------------------------------------------- */
+:root,
+[data-theme="dark"],
+[data-theme="light"] {
+  --panel: var(--surface-1);
+  --text: var(--ink);
+  --gold: var(--accent);
+  --gold2: var(--accent-strong);
+  --teal: var(--info);
+  --class: var(--accent);
+}
+
+/* ---- 2. canvas + type ---------------------------------------------------- */
+html {
+  background: var(--bg);
+}
+body {
+  background-color: var(--bg);
+  background-image: var(--glow), linear-gradient(180deg, var(--bg), var(--bg-deep));
+  background-attachment: fixed;
+  background-size: cover;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tracking-heading);
+}
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono);
+}
+main {
+  min-height: calc(100vh - var(--header-h));
+}
+.wrap {
+  width: min(var(--container), calc(100% - (var(--gutter) * 2)));
+}
+
+/* ---- 3. eyebrows, section heads, page heroes ----------------------------- */
+.eyebrow {
+  margin: 0 0 var(--s-3);
+  color: var(--accent);
+  font-size: var(--t-nano);
+  font-weight: 700;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.section-head {
+  gap: var(--s-5);
+  margin-bottom: var(--s-6);
+}
+.section-head h2 {
+  margin: var(--s-2) 0 0;
+  font-size: var(--t-h2);
+}
+.section-head > p {
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+.page-hero {
+  padding: var(--s-8) 0 var(--s-6);
+  border-bottom: var(--bw) solid var(--line);
+}
+.page-hero h1 {
+  margin: var(--s-3) 0;
+  font-size: var(--t-h1);
+}
+.page-hero > p:not(.eyebrow) {
+  max-width: 62ch;
+  color: var(--muted);
+}
+h3 {
+  font-size: var(--t-h3);
+}
+h4 {
+  font-size: var(--t-h4);
+}
+
+/* ---- 4. buttons ---------------------------------------------------------- */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 42px;
+  padding: 0 var(--s-5);
+  border: var(--bw) solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  box-shadow: var(--shadow-sm);
+  color: var(--accent-ink);
+  font-size: var(--t-micro);
+  font-weight: 650;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease),
+    transform var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.button:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  transform: translateY(-1px);
+}
+.button:disabled,
+.button[aria-disabled="true"] {
+  opacity: 0.5;
+  transform: none;
+  cursor: not-allowed;
+}
+.button.small {
+  min-height: 34px;
+  padding: 0 var(--s-4);
+  font-size: var(--t-nano);
+}
+.button.full {
+  width: 100%;
+}
+
+.ghost-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 38px;
+  padding: 0 var(--s-4);
+  border: var(--bw) solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+    background var(--dur-1) var(--ease);
+}
+.ghost-button:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.ghost-button.small {
+  min-height: 32px;
+  padding: 0 var(--s-3);
+  font-size: var(--t-nano);
+}
+
+.text-link,
+.text-action {
+  color: var(--accent);
+  border-bottom: var(--bw) solid transparent;
+}
+.text-link:hover,
+.text-action:hover {
+  border-bottom-color: currentColor;
+}
+
+/* The chip in the top bar is theirs (`.account-menu-trigger`). */
+.account-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 38px;
+  padding: 0 var(--s-4);
+  border: var(--bw) solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.account-menu-trigger:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.account-dropdown {
+  border: var(--bw) solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-lg);
+}
+.account-dropdown a,
+.account-dropdown button {
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+.account-dropdown a:hover,
+.account-dropdown button:hover {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.notification-badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: var(--t-nano);
+  font-weight: 700;
+  text-align: center;
+}
+
+/* ---- 5. fields ----------------------------------------------------------- */
+label {
+  color: var(--muted);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+}
+input,
+select,
+textarea {
+  min-height: 42px;
+  margin-top: var(--s-2);
+  padding: var(--s-3);
+  border: var(--bw) solid var(--field-border);
+  border-radius: var(--r-sm);
+  background: var(--field-bg);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--t-body);
+  transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--field-placeholder);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+select {
+  appearance: none;
+  padding-right: var(--s-7);
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+input[type="checkbox"],
+input[type="radio"] {
+  width: 16px;
+  min-height: 0;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.form-message {
+  color: var(--danger);
+  font-size: var(--t-small);
+}
+.form-message.success {
+  color: var(--success);
+}
+
+/* ---- 6. surfaces -------------------------------------------------------- */
+/* One surface recipe replaces the per-component blue-tinted panels. Cards keep
+   a single hairline and a soft fill instead of a border-plus-shadow stack. */
+.account-panel,
+.form-card,
+.gm-panel,
+.product-card,
+.news-card,
+.character-card,
+.guild-card,
+.status-card,
+.realm-overview,
+.guild-profile,
+.raid-card,
+.progress-summary,
+.profile-stat,
+.personal-team,
+.catalog-slot,
+.catalog-bundle-row,
+.admin-row,
+.ticket-row,
+.session-row,
+.balance-card,
+.auth-aside,
+.vote-site,
+.tracker-card,
+.tracker-issue,
+.play-sidebar,
+.community-goal {
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  box-shadow: none;
+}
+.account-panel,
+.form-card,
+.gm-panel,
+.realm-overview,
+.guild-profile,
+.raid-card {
+  padding: var(--s-5);
+}
+.news-card,
+.product-card,
+.character-card,
+.guild-card,
+.status-card,
+.tracker-card,
+.tracker-issue,
+.vote-site {
+  transition: border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
+}
+.news-card:hover,
+.character-card:hover,
+.guild-card:hover,
+.tracker-card:hover,
+.vote-site:hover {
+  border-color: var(--accent-line);
+  transform: translateY(-2px);
+}
+.product-card:hover {
+  border-color: var(--accent-line);
+}
+.panel-title h2,
+.panel-title h3,
+.account-panel h2,
+.account-panel h3 {
+  font-size: var(--t-h3);
+}
+
+/* ---- 7. tables ----------------------------------------------------------- */
+.data-table,
+.admin-table table,
+table.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.data-table th,
+.admin-table th {
+  padding: var(--s-3) var(--s-4);
+  border-bottom: var(--bw) solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--t-nano);
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+.data-table td,
+.admin-table td {
+  padding: var(--s-4);
+  border-bottom: var(--bw) solid var(--line);
+  color: var(--ink);
+  font-size: var(--t-small);
+}
+.data-table tbody tr:hover td {
+  background: var(--surface-2);
+}
+.table-status,
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 3px var(--s-3);
+  border: var(--bw) solid var(--line-strong);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: var(--t-nano);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.table-status.is-active,
+.status-delivered,
+.status-executed,
+.status-answered,
+.status-open.is-positive {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+}
+.status-failed,
+.status-review {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+/* ---- 8. tabs ------------------------------------------------------------- */
+.armory-tabs,
+.profile-tabs,
+.admin-subnav,
+.tabs {
+  display: flex;
+  gap: var(--s-1);
+  border-bottom: var(--bw) solid var(--line);
+  margin-bottom: var(--s-5);
+  overflow-x: auto;
+}
+.armory-tabs button,
+.profile-tabs button,
+.admin-subnav a,
+.tabs button {
+  padding: var(--s-4);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font-size: var(--t-nano);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.armory-tabs button.active,
+.profile-tabs button.active,
+.admin-subnav a.active,
+.tabs button.active {
+  border-bottom-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+/* Segmented controls and filter chips. */
+.bracket-picker,
+.bracket-picker button,
+.filter,
+.filter-chip {
+  border-radius: var(--r-sm);
+}
+.bracket-picker button,
+.filter {
+  border: var(--bw) solid var(--line);
+  background: var(--surface-1);
+  color: var(--muted);
+  font-size: var(--t-nano);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.bracket-picker button.active,
+.filter.active {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+/* ---- 9. status dots and meters ------------------------------------------ */
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--online);
+  box-shadow: 0 0 10px var(--online);
+}
+.realm-live-dot {
+  background: var(--online);
+}
+.progress,
+.raid-progress,
+.meter {
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.raid-progress i,
+.meter i {
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+}
+
+/* ---- 10. home hero (still this line's markup until it is replaced) ------- */
+.hero {
+  min-height: min(78svh, 720px);
+  padding: var(--s-9) 0;
+}
+.hero h1,
+.home-hero h1 {
+  font-size: var(--t-display);
+  letter-spacing: var(--tracking-display);
+}
+.hero .lede {
+  color: var(--ink);
+  opacity: 0.86;
+}
+.home-hero {
+  border-bottom: var(--bw) solid var(--line);
+}
+.stats dt,
+.hero-stats dt {
+  font-family: var(--font-display);
+  color: var(--accent-strong);
+}
+.expansion-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 3px var(--s-3);
+  border: var(--bw) solid var(--accent-line);
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: var(--t-nano);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---- 11. empty, skeleton, toast, dialogs --------------------------------- */
+.empty {
+  border: var(--bw) dashed var(--line-strong);
+  border-radius: var(--r-md);
+  color: var(--muted);
+}
+.skeleton {
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-md);
+  background: linear-gradient(100deg, var(--skeleton-a) 22%, var(--skeleton-b) 46%, var(--skeleton-a) 70%);
+  background-size: 220% 100%;
+}
+#toast,
+.toast {
+  position: fixed;
+  z-index: 120;
+  bottom: var(--s-5);
+  left: 50%;
+  right: auto;
+  max-width: min(420px, calc(100vw - var(--s-6)));
+  padding: var(--s-4) var(--s-5);
+  border: var(--bw) solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-lg);
+  color: var(--ink);
+  font-size: var(--t-small);
+  opacity: 0;
+  transform: translate(-50%, 140%);
+  pointer-events: none;
+  transition: transform var(--dur-2) var(--ease-out), opacity var(--dur-2) var(--ease);
+}
+#toast.show,
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+dialog,
+.admin-dialog {
+  border: var(--bw) solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: var(--shadow-lg);
+}
+dialog::backdrop {
+  background: var(--overlay);
+  backdrop-filter: blur(3px);
+}
+.admin-dialog h2 {
+  font-size: var(--t-h3);
+}
+
+/* ---- 12. admin shell ----------------------------------------------------- */
+/* The primary rail already owns the left edge, so the admin's own section list
+   becomes a horizontal tab strip: two stacked vertical navs read as dated. */
+.admin-shell {
+  display: block;
+  padding-block: var(--s-6) var(--s-9);
+}
+.admin-sidebar,
+.admin-nav {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 30;
+  display: flex;
+  gap: var(--s-1);
+  align-items: center;
+  margin-bottom: var(--s-6);
+  padding: var(--s-2) 0;
+  overflow-x: auto;
+  border: 0;
+  border-bottom: var(--bw) solid var(--line);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(12px);
+  scrollbar-width: none;
+}
+.admin-sidebar::-webkit-scrollbar,
+.admin-nav::-webkit-scrollbar {
+  display: none;
+}
+.admin-sidebar .eyebrow {
+  display: none;
+}
+.admin-sidebar button,
+.admin-sidebar a,
+.admin-nav button,
+.admin-nav a {
+  padding: var(--s-2) var(--s-4);
+  border: 0;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: var(--t-small);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.admin-sidebar button:hover,
+.admin-sidebar a:hover,
+.admin-nav button:hover,
+.admin-nav a:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.admin-sidebar button.active,
+.admin-sidebar a.active,
+.admin-nav button.active,
+.admin-nav a.active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+.admin-workspace {
+  min-width: 0;
+}
+.admin-section-title {
+  font-size: var(--t-h3);
+}
+
+/* ---- 13. misc shell leftovers ------------------------------------------- */
+.maintenance-banner {
+  background: var(--warn-soft);
+  border-bottom: var(--bw) solid color-mix(in srgb, var(--warn) 45%, transparent);
+  color: var(--warn);
+}
+.photo-credit {
+  color: var(--faint);
+  font-size: var(--t-nano);
+}
